@@ -7,6 +7,8 @@ RUN npm ci
 
 COPY . .
 
+RUN npm run build
+
 ENV PORT=3201
 EXPOSE 3201
 
