@@ -1,52 +1,40 @@
+try {
+  require('dotenv').config();
+} catch (error) {
+  // En Docker las variables de entorno se inyectan desde docker-compose.yml
+}
+const cors = require('cors');
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+const { closeDatabase, initializeDatabase, query } = require('./db');
+const healthRoutes = require('./routes/healthRoutes');
 
 const app = express();
-const PORT = process.env.BACKEND_INTERNAL_PORT || 3505;
-const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/mearn_db';
-
-app.use(cors());const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-
-const app = express();
-const PORT = process.env.BACKEND_INTERNAL_PORT || 3505;
-const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017/mearn_db';
+const port = Number(process.env.BACKEND_INTERNAL_PORT || 3505);
 
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend funcionando' });
-});
+app.use('/api', healthRoutes(query));
 
-mongoose.connect(MONGO_URL)
-  .then(() => {
-    console.log('Conectado a MongoDB');
-    app.listen(PORT, () => {
-      console.log(`Servidor backend escuchando en puerto ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Error conectando a MongoDB:', err);
-    process.exit(1);
+async function start() {
+  await initializeDatabase();
+
+  const server = app.listen(port, () => {
+    console.log(`Servidor backend escuchando en puerto ${port}`);
   });
 
-app.use(express.json());
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend funcionando' });
-});
-
-mongoose.connect(MONGO_URL)
-  .then(() => {
-    console.log('Conectado a MongoDB');
-    app.listen(PORT, () => {
-      console.log(`Servidor backend escuchando en puerto ${PORT}`);
+  const shutdown = async () => {
+    server.close(async () => {
+      await closeDatabase();
+      process.exit(0);
     });
-  })
-  .catch((err) => {
-    console.error('Error conectando a MongoDB:', err);
-    process.exit(1);
-  });
+  };
+
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+}
+
+start().catch((error) => {
+  console.error('Error iniciando el backend:', error.message);
+  process.exit(1);
+});
