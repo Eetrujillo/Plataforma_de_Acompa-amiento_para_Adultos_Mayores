@@ -9,14 +9,35 @@ const { closeDatabase, initializeDatabase, query } = require('./db');
 const healthRoutes = require('./routes/healthRoutes');
 
 const app = express();
-const port = Number(process.env.BACKEND_INTERNAL_PORT || 3505);
+const port = Number(process.env.BACKEND_INTERNAL_PORT || 3506);
 
 app.use(cors());
 app.use(express.json());
 
 app.use('/api', healthRoutes(query));
 
+async function testDatabase() {
+  return await query('SELECT * FROM application_metadata WHERE id = 1');
+}
+
+app.get('/test', async (req, res) => {
+  try {
+    const result = await testDatabase();
+    res.json({
+      mensaje: '¡El servidor Express funciona correctamente!',
+      test: result.rows
+    });
+  } catch (err) {
+    console.error('Error al probar la base de datos:', err);
+    res.status(500).json({
+      mensaje: 'Error al conectar con la base de datos',
+      error: err.message
+    });
+  }
+});
+
 async function start() {
+  console.log(port)
   await initializeDatabase();
 
   const server = app.listen(port, () => {
