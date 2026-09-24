@@ -1,53 +1,41 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: mearn-mongo
+  postgres:
+    image: postgres:16
+    container_name: mearn-postgres
     restart: unless-stopped
     environment:
-      MONGO_INITDB_DATABASE: mearn_db
+      POSTGRES_DB: mearn_db
+      POSTGRES_USER: mearn_user
+      POSTGRES_PASSWORD: mearn_password
     ports:
-      - "4301:27017"
+      - "4301:5432"
     volumes:
-      - mongo_data:/data/db
-      - ./mongo-init:/docker-entrypoint-initdb.d:ro
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     networks:
       - mearn-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mearn_user -d mearn_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      network: host
     container_name: mearn-backend
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - MONGO_URL=${MONGO_URL}
+      - DATABASE_URL=${DATABASE_URL}
     depends_on:
-      - mongo
+      postgres:
+        condition: service_healthy
     ports:
       - "${BACKEND_PORT}:${BACKEND_INTERNAL_PORT}"
-    volumes:
-      - ./backend:/usr/src/app
-      - /usr/src/app/node_modules
-    networks:
-      - mearn-net
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: mearn-frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      - VITE_API_BASE=/api
-    ports:
-      - "3201:3201"
-    volumes:
-      - ./frontend:/usr/src/app
-      - /usr/src/app/node_modules
     networks:
       - mearn-net
 
@@ -56,4 +44,4 @@ networks:
     driver: bridge
 
 volumes:
-  mongo_data:
+  postgres_data:

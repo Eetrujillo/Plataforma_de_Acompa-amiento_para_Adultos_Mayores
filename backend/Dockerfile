@@ -1,9 +1,10 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm install --omit=dev --no-audit --no-fund --fetch-retries=5 \
+	&& node -e "require('cors'); require('dotenv'); require('express'); require('pg')"
 
 COPY . .
 
