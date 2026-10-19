@@ -8,14 +8,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "4301:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     networks:
       - older-adult-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U older_adult_user -d older_adult_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,13 +24,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      network: host
     container_name: older-adult-backend
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,9 +36,22 @@ services:
     networks:
       - older-adult-net
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: older-adult-frontend
+    restart: unless-stopped
+    ports:
+      - "3201:80"
+    depends_on:
+      - backend
+    networks:
+      - older-adult-net
+
 networks:
   older-adult-net:
     driver: bridge
 
 volumes:
-  postgres_data:
+  postgres_data:  
