@@ -1,22 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from './context/AuthProvider';
+import { SessionExpiredModal } from './components/auth/SessionExpiredModal';
+import { AppRoutes } from './routes/AppRoutes';
+import './styles/globals.css';
 
-function App() {
-  const [status, setStatus] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/health')
-      .then(res => res.json())
-      .then(data => setStatus(data))
-      .catch(err => setStatus({ error: err.message }));
-  }, []);
-
-  return (
-    <div style={{ fontFamily: 'sans-serif' }}>
-      <h1>MEARN Frontend</h1>
-      <pre>{JSON.stringify(status, null, 2)}</pre>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+        <SessionExpiredModal />
+      </AuthProvider>
+    </BrowserRouter>
+  </React.StrictMode>
+);
