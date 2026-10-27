@@ -1,15 +1,22 @@
-FROM node:20-alpine
+FROM node:20-alpine AS build
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
 COPY package*.json ./
 RUN npm ci
 
 COPY . .
 
-RUN npm run build
+ARG VITE_API_BASE=/api
+ENV VITE_API_BASE=$VITE_API_BASE
 
-ENV PORT=3201
-EXPOSE 3201
+RUN npm run typecheck && npm run build
 
-CMD ["node", "dist/main.js"]
+FROM nginx:1.27-alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
