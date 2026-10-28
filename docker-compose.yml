@@ -1,41 +1,71 @@
 services:
-  postgres:
-    image: postgres:18.6-trixie
-    container_name: mearn-postgres
+  mongo:
+    image: mongo:7
+    container_name: mearn-mongo
     restart: unless-stopped
     environment:
-      POSTGRES_DB: mearn_db
-      POSTGRES_USER: mearn_user
-      POSTGRES_PASSWORD: mearn_password
+      MONGO_INITDB_DATABASE: mearn_db
     ports:
-      - "4301:5432"
+      - "4301:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - mearn-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mearn_user -d mearn_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      network: host
     container_name: mearn-backend
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - NODE_ENV=production
+      - MONGO_URL=${MONGO_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - APP_URL=${APP_URL:-http://localhost:3201}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - LINK_QR_BASE_URL=${LINK_QR_BASE_URL:-acompanamiento://vincular}
     depends_on:
-      postgres:
+      mongo:
         condition: service_healthy
     ports:
-      - "${BACKEND_PORT}:${BACKEND_INTERNAL_PORT}"
+      - "${BACKEND_PORT:-3505}:3701"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3701/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - mearn-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: /api
+    container_name: mearn-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3201:80"
     networks:
       - mearn-net
 
@@ -44,4 +74,4 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
+  mongo_data:

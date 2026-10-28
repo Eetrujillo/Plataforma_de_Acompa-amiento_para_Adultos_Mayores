@@ -9,7 +9,7 @@ export default defineConfig({
     allowedHosts: ['gestion-academica.apolobyte.top', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
-        target: 'http://backend:3505',
+        target: 'http://backend:3701',
         changeOrigin: true
       }
     }
