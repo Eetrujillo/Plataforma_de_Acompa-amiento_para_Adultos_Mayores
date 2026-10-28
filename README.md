@@ -37,10 +37,15 @@ docker-compose.yml
 ## Puesta en marcha
 
 ```bash
-cp .env.example .env          # ajustar valores
+cp .env.example .env          # recomendado: ajustar JWT_SECRET antes de usar
 docker compose up -d --build
 docker compose logs -f backend
 ```
+
+Docker Compose incluye valores locales por defecto para `MONGO_URL` y `JWT_SECRET`,
+por lo que también puede arrancarse sin `.env`. El secreto por defecto es solo para
+desarrollo local: configura un `JWT_SECRET` largo y aleatorio en `.env` antes de
+desplegar o exponer la aplicación.
 
 | Servicio | Puerto host | Puerto interno |
 |---|---|---|
