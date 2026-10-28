@@ -10,6 +10,12 @@ services:
     volumes:
       - mongo_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - mearn-net
 
@@ -19,17 +25,31 @@ services:
       dockerfile: Dockerfile
     container_name: mearn-backend
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
+      - NODE_ENV=production
       - MONGO_URL=${MONGO_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - APP_URL=${APP_URL:-http://localhost:3201}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - LINK_QR_BASE_URL=${LINK_QR_BASE_URL:-acompanamiento://vincular}
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     ports:
-      - "${BACKEND_PORT}:${BACKEND_INTERNAL_PORT}"
-    volumes:
-      - ./backend:/usr/src/app
-      - /usr/src/app/node_modules
+      - "${BACKEND_PORT:-3505}:3701"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3701/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - mearn-net
 
@@ -37,17 +57,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: /api
     container_name: mearn-frontend
     restart: unless-stopped
     depends_on:
-      - backend
-    environment:
-      - VITE_API_BASE=/api
+      backend:
+        condition: service_healthy
     ports:
-      - "3201:3201"
-    volumes:
-      - ./frontend:/usr/src/app
-      - /usr/src/app/node_modules
+      - "3201:80"
     networks:
       - mearn-net
 
