@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConsentContent } from '../../components/app/ConsentContent';
+import { ActivityReminderSettings } from '../../components/app/ActivityReminderSettings';
 import { AppApiError, olderAdultAppService } from '../../services/olderAdultAppService';
 import type { ConsentState, ConsentText, OlderAdultAppProfile } from '../../types';
 
@@ -295,6 +296,8 @@ export function OlderAdultSettingsPage() {
             <p>No pudimos cargar el texto del consentimiento. Revisa tu conexión.</p>
           )}
         </section>
+
+        <ActivityReminderSettings />
 
         <section className="senior-card">
           <h2>Cerrar mi sesión</h2>

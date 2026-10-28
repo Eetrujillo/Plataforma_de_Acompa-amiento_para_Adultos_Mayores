@@ -126,6 +126,18 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 - No introducir texto pequeño ni depender del color como único indicador.
 - El QR es opcional: el campo de texto para el código siempre debe estar disponible.
 
+### Avisos de actividades (HU-016)
+
+- El aviso se calcula desde `scheduledAt`, que ya es un instante absoluto: no se hacen cuentas
+  de zona horaria en el cliente.
+- El segundo aviso depende del estado real de la actividad. Si se marca como hecha antes, no se
+  envía.
+- El aviso en pantalla (`ActivityReminderHost`) funciona aunque las notificaciones del sistema
+  estén bloqueadas. Es el canal de respaldo, no un extra.
+- **Límite de la plataforma web:** los avisos se disparan con la app abierta. Con la pestaña
+  cerrada el navegador no ejecuta temporizadores, y sin internet no hay Web Push. Cubrir ese caso
+  requiere Web Push con servidor o una app nativa.
+
 ### Validación antes de commitear
 
 ```bash
@@ -162,6 +174,7 @@ npm run build
 | HU-013 | Repetición diaria y semanal |
 | HU-014 | Edición de actividades con conservación del historial |
 | HU-015 | Eliminación lógica de actividades |
+| HU-016 | Recordatorio de actividades a su hora, con segundo aviso si sigue sin marcar |
 
 ## Endpoints
 
@@ -211,5 +224,6 @@ OpenCode descubre estas skills locales en `.opencode/skills/`:
 - El texto menciona alertas de ayuda y ubicación al pedir ayuda; esas funciones no están
   implementadas. Decidir si se retiran del texto o se implementan en una HU posterior.
 - Confirmar el uso del PIN para cerrar sesión (HU-011).
+- Confirmar el segundo aviso a los 10 minutos y si ese plazo es el definitivo (HU-016).
 - Definir si el historial se muestra tras una nueva vinculación.
 - Añadir suite de pruebas automatizadas al repositorio.

@@ -1483,3 +1483,93 @@ a:hover {
     justify-self: stretch;
   }
 }
+
+/* --- HU-016: aviso de actividad en pantalla --- */
+
+.senior-reminder-host {
+  /* El aviso vive fuera de .senior-app, asi que repite los tokens del tema
+     para que los botones hereden el mismo contraste. */
+  --senior-bg: #f4f8ff;
+  --senior-surface: #ffffff;
+  --senior-text: #101820;
+  --senior-muted: #33414f;
+  --senior-primary: #0d3f7a;
+  --senior-primary-hover: #082b55;
+  --senior-border: #5b6b7d;
+  --senior-focus: #b45309;
+  --senior-error-bg: #fde8e8;
+  --senior-error-text: #7f1414;
+  --senior-success-bg: #e3f6e9;
+  --senior-success-text: #135c2c;
+  --reminder-accent: #b45309;
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+.senior-reminder {
+  pointer-events: auto;
+  display: grid;
+  gap: 1rem;
+  width: min(680px, 100%);
+  padding: 1.25rem;
+  border: 3px solid var(--reminder-accent);
+  border-radius: 18px;
+  background: var(--senior-surface);
+  color: var(--senior-text);
+  box-shadow: 0 18px 40px rgba(16, 24, 32, 0.28);
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.senior-reminder-icon {
+  font-size: 2.4em;
+  line-height: 1;
+}
+
+.senior-reminder-eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.95em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--reminder-accent);
+}
+
+.senior-reminder-body h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.5em;
+  line-height: 1.2;
+  color: var(--senior-primary);
+}
+
+.senior-reminder-body p {
+  margin: 0;
+  font-size: 1em;
+}
+
+.senior-reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.senior-reminder-actions .senior-btn {
+  flex: 1 1 220px;
+}
+
+@media (max-width: 640px) {
+  .senior-reminder-actions {
+    flex-direction: column;
+  }
+
+  .senior-reminder-actions .senior-btn {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}

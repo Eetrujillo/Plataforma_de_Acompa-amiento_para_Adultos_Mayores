@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConsentContent } from '../../components/app/ConsentContent';
 import { AppApiError, olderAdultAppService } from '../../services/olderAdultAppService';
+import { getPermission, isSupported } from '../../services/reminderService';
 import type {
   AppActivitiesResponse,
   AppActivity,
@@ -28,6 +29,7 @@ export function OlderAdultHomePage() {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentSubmitting, setConsentSubmitting] = useState(false);
   const [consentError, setConsentError] = useState('');
+  const [reminderPermission, setReminderPermission] = useState(() => getPermission());
 
   const needsConsent = consentState?.required === true;
 
@@ -72,6 +74,16 @@ export function OlderAdultHomePage() {
       window.removeEventListener('offline', handleOffline);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // HU-016: el permiso puede cambiar fuera de la app (ajustes del telefono).
+  useEffect(() => {
+    function syncReminderPermission() {
+      setReminderPermission(getPermission());
+    }
+
+    document.addEventListener('visibilitychange', syncReminderPermission);
+    return () => document.removeEventListener('visibilitychange', syncReminderPermission);
   }, []);
 
   useEffect(() => {
@@ -372,6 +384,19 @@ export function OlderAdultHomePage() {
             {activities
               ? 'Sin internet. Estás viendo tu última rutina guardada.'
               : 'Sin internet. Necesitas conexión para ver tus actividades.'}
+          </div>
+        ) : null}
+
+        {isSupported() && reminderPermission !== 'granted' ? (
+          <div className="senior-notice" role="status">
+            <p>
+              {reminderPermission === 'denied'
+                ? 'Los avisos están bloqueados en tu celular, así que no sonarán.'
+                : 'Activa los avisos para no olvidar tus actividades.'}
+            </p>
+            <Link className="senior-link" to="/app/ajustes">
+              Cómo activar los avisos
+            </Link>
           </div>
         ) : null}
 
