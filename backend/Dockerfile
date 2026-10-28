@@ -1,14 +1,14 @@
-FROM node:22.23.3-trixie-slim
+FROM node:20-alpine
 
 WORKDIR /usr/src/app
 
-COPY package*.json ./
+ENV NODE_ENV=production
 
-RUN npm install --omit=dev --no-audit --no-fund --fetch-retries=5 \
-	&& node -e "require('cors'); require('dotenv'); require('express'); require('pg')"
+COPY package*.json ./
+RUN npm ci --omit=dev
 
 COPY . .
 
-EXPOSE 3505
+EXPOSE 3701
 
 CMD ["npm", "start"]
