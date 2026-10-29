@@ -180,26 +180,12 @@ npm run build
 
 ## Historias de usuario
 
-| HU | Alcance |
-|---|---|
-| HU-001 | Registro de familiar con aceptación de política de privacidad |
-| HU-002 | Confirmación de correo y acceso restringido sin verificar |
-| HU-003 | Inicio de sesión, bloqueo por intentos fallidos y vencimiento de sesión |
-| HU-004 | Recuperación de contraseña con token de un solo uso |
-| HU-005 | Perfiles de adultos mayores por cuenta familiar |
-| HU-006 | Generación de código y QR de vinculación |
-| HU-007 | Vinculación de la app del adulto mayor con el código |
-| HU-008 | Consentimiento informado antes de compartir datos |
-| HU-009 | Sesión persistente de la app del adulto mayor |
-| HU-010 | Desvinculación del perfil |
-| HU-011 | Cierre de sesión de la app con PIN |
-| HU-012 | Creación de actividades |
-| HU-013 | Repetición diaria y semanal |
-| HU-014 | Edición de actividades con conservación del historial |
-| HU-015 | Eliminación lógica de actividades |
-| HU-016 | Recordatorio de actividades a su hora, con segundo aviso si sigue sin marcar |
-| HU-017 | Lista de actividades del día con su estado, calculada en la zona horaria del celular |
-| HU-018 | Marcar una actividad como hecha con deshacer durante 10 segundos |
+El alcance y el estado de cada historia viven en el tablero de Jira del proyecto:
+
+<https://unimayor-team-qv3i018t.atlassian.net/jira/software/projects/SCRUM/boards/1/backlog?selectedIssue=SCRUM-30>
+
+Este README documenta cómo está construida la plataforma y qué se puede verificar en el
+código; Jira es la fuente única para el seguimiento de las HU.
 
 ## Endpoints
 
