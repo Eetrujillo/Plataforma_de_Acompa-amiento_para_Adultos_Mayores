@@ -84,7 +84,7 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 
 ### Alcance y compatibilidad
 
-- Mantener el comportamiento de **HU-001 a HU-019**. Un cambio no puede romper una HU anterior.
+- Mantener el comportamiento de **HU-001 a HU-020**. Un cambio no puede romper una HU anterior.
 - Trabajar por módulo y por HU, de forma incremental.
 - El stack es MongoDB + Express + React. No introducir otra base de datos ni otro framework sin decisión de equipo.
 - Todo cambio debe funcionar con Docker Compose; es el entorno de despliegue.
@@ -176,6 +176,21 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 - HU-028 (avisos de incumplimiento) todavía no existe. Lo que sí queda resuelto es el dato que
   necesita: la marca conserva la hora real del toque aunque llegue tarde.
 
+### Estado de las actividades del día (HU-020)
+
+- El familiar ve cada actividad de hoy como **Pendiente**, **Completada** o **Vencida**, siempre
+  con el texto visible y no solo con color.
+- El estado lo calcula el backend en `GET /api/activities/today`. El umbral de 30 minutos vive
+  solo en `activity.service.js` (`EXPIRATION_GRACE_MINUTES`); el cliente recibe `expiresAt` y
+  únicamente adelanta el paso a "Vencida" cuando ese instante ya pasó.
+- La pantalla `/hoy` se refresca sola cada **8 segundos**, y también al volver a la pestaña o al
+  recuperar el foco. Así una marca del adulto mayor se ve en menos de 10 segundos sin recargar.
+- En las completadas se muestra la hora real de la marca (`completedAt`) en la zona del celular
+  del familiar.
+- Solo se consultan los perfiles del familiar autenticado: un perfil de otra cuenta responde
+  `404`. Sin actividades hoy se muestra un acceso directo para crear una en ese perfil.
+- El día por defecto es el "hoy" del adulto mayor, calculado con su zona horaria.
+
 ### Validación antes de commitear
 
 ```bash
@@ -210,7 +225,7 @@ código; Jira es la fuente única para el seguimiento de las HU.
 | Cuenta | `GET /api/auth/me` | JWT |
 | Perfiles | `GET/POST /api/older-adults`, `GET/PUT /api/older-adults/:id`, `POST /:id/unlink` | JWT + correo verificado |
 | Vinculación | `POST /api/older-adults/:id/linking-code`, `POST /api/linking/redeem` | JWT / público |
-| Actividades | `GET/POST /api/activities`, `GET/PUT/DELETE /api/activities/:id` | JWT + correo verificado |
+| Actividades | `GET/POST /api/activities`, `GET /api/activities/today`, `GET/PUT/DELETE /api/activities/:id` | JWT + correo verificado |
 | App del adulto mayor | `GET /api/app/session`, `POST /api/app/consent`, `POST /api/app/logout`, `GET /api/app/activities`, `POST/DELETE /api/app/activities/:id/complete` | `X-Older-Adult-Token` |
 | Estado | `GET /api/health` | No |
 

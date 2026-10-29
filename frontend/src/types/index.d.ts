@@ -208,6 +208,37 @@ export interface ActivityResponse {
   message?: string;
 }
 
+/** HU-020: estado de una actividad del dia para el familiar. */
+export type ActivityDayStatus = 'pending' | 'completed' | 'expired';
+
+export interface ActivityDayItem {
+  _id: string;
+  title: string;
+  icon: string;
+  iconLabel: string;
+  iconEmoji: string;
+  scheduledAt: string;
+  time: string;
+  repeatType: OlderAdultRepeatType;
+  repeatSummary: string;
+  completed: boolean;
+  completedAt: string | null;
+  status: ActivityDayStatus;
+  /** Instante en que la actividad pasa a "Vencida" si sigue sin marcar. */
+  expiresAt: string;
+}
+
+export interface ActivityDayResponse {
+  date: string;
+  timeZone: string;
+  olderAdult: {
+    _id: string;
+    name: string;
+    timeZone: string;
+  };
+  activities: ActivityDayItem[];
+}
+
 export interface ConsentResponse {
   consent: ConsentText;
 }

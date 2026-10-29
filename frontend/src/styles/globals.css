@@ -992,6 +992,57 @@ a:hover {
   font-size: 0.95rem;
 }
 
+/* --- HU-020: estado del dia para el familiar --- */
+
+.today-card {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.today-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.activity-body .today-status {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.15rem 0.75rem;
+  border: 2px solid;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.today-status-pending {
+  border-color: #8a6d1f;
+  background: #fff6dc;
+  color: #4a3600;
+}
+
+.today-status-completed {
+  border-color: #1f6f43;
+  background: #e6f6ec;
+  color: #14532d;
+}
+
+.today-status-expired {
+  border-color: #9b2c2c;
+  background: #fdeaea;
+  color: #7f1d1d;
+}
+
+.today-updated {
+  margin-top: 0.9rem;
+  font-size: 0.9rem;
+}
+
 /* --- App del adulto mayor: letra grande y alto contraste --- */
 
 .senior-app {

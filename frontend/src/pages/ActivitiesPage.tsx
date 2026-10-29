@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { FormField } from '../components/ui/FormField';
 import { Notification } from '../components/ui/Notification';
@@ -62,6 +62,7 @@ function emptyForm(olderAdult?: OlderAdult): FormState {
 }
 
 export function ActivitiesPage() {
+  const [searchParams] = useSearchParams();
   const [adults, setAdults] = useState<OlderAdult[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -103,7 +104,10 @@ export function ActivitiesPage() {
         setAdults(adultsResponse.olderAdults);
         setActivities(activitiesResponse.activities);
 
+        // HU-020: al llegar desde el estado del dia, se abre el perfil pedido.
+        const fromQuery = searchParams.get('olderAdultId');
         const preferred =
+          adultsResponse.olderAdults.find((adult) => adult._id === fromQuery) ??
           adultsResponse.olderAdults.find((adult) => adult.linkStatus === 'linked') ??
           adultsResponse.olderAdults[0];
 
@@ -362,6 +366,12 @@ export function ActivitiesPage() {
           </Link>
           <Link className="btn-secondary" to="/adultos-mayores">
             Perfiles
+          </Link>
+          <Link
+            className="btn-secondary"
+            to={selectedId ? `/hoy?olderAdultId=${encodeURIComponent(selectedId)}` : '/hoy'}
+          >
+            Ver el día de hoy
           </Link>
           {mode === null && selectedAdult ? (
             <button className="btn-primary" type="button" onClick={startCreate}>

@@ -101,6 +101,18 @@ export function Dashboard() {
       </section>
 
       <section className="card dashboard-section">
+        <h2>Estado de hoy</h2>
+        <p className="muted">
+          Revisa si las actividades de hoy están pendientes, completadas o vencidas.
+        </p>
+        <p className="dashboard-section-action">
+          <Link className="btn-primary" to="/hoy">
+            Ver el día de hoy
+          </Link>
+        </p>
+      </section>
+
+      <section className="card dashboard-section">
         <h2>Actividades y rutina</h2>
         <p className="muted">
           Crea actividades una sola vez, todos los días o en los días que elijas. Tu
