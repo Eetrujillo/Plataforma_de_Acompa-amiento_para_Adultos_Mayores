@@ -84,7 +84,7 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 
 ### Alcance y compatibilidad
 
-- Mantener el comportamiento de **HU-001 a HU-018**. Un cambio no puede romper una HU anterior.
+- Mantener el comportamiento de **HU-001 a HU-019**. Un cambio no puede romper una HU anterior.
 - Trabajar por módulo y por HU, de forma incremental.
 - El stack es MongoDB + Express + React. No introducir otra base de datos ni otro framework sin decisión de equipo.
 - Todo cambio debe funcionar con Docker Compose; es el entorno de despliegue.
@@ -150,8 +150,9 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 
 ### Marcar una actividad como hecha (HU-018)
 
-- El cambio se ve **antes** de que responda el servidor. Si la llamada falla, la actividad vuelve
-  a "Pendiente" y se avisa del error.
+- El cambio se ve **antes** de que responda el servidor.
+- Si el servidor rechaza la marca (la actividad ya no existe o no corresponde al día), vuelve a
+  "Pendiente" y se avisa del error. Si el fallo es de conexión, la marca queda en cola (HU-019).
 - Después de marcar aparece **"Deshacer" durante 10 segundos**, con la cuenta atrás en el propio
   botón. Al vencer, la acción desaparece.
 - Dos toques seguidos cuentan como una sola confirmación: el segundo toque se ignora mientras la
@@ -160,6 +161,20 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
   celular. Un segundo toque no mueve esa hora.
 - El botón de marcar ocupa todo el ancho de la tarjeta y mide **64 px de alto**, la misma medida
   del botón principal de la app. Es la medida mínima de diseño para esta pantalla.
+
+### Completar actividades sin internet (HU-019)
+
+- Cada marca se guarda primero en el celular (`localStorage`), antes de intentar el envío. Sin
+  conexión, la actividad se ve completada igual y no se pierde.
+- La cola se envía sola: al recuperar la conexión, al volver a la app y cada 15 segundos. El
+  criterio de menos de un minuto se cumple con el evento `online` más ese ciclo.
+- Se envía `completedAt` con la hora real del toque, no la del envío. El backend la valida (solo
+  tolera 10 minutos de reloj adelantado) y la guarda en la marca.
+- Un fallo pasajero no pierde la marca: se reintenta sin intervención. Solo se descarta si el
+  servidor responde que la actividad ya no aplica (`400` o `404`).
+- "Deshacer" funciona sin conexión mientras la marca siga en la cola.
+- HU-028 (avisos de incumplimiento) todavía no existe. Lo que sí queda resuelto es el dato que
+  necesita: la marca conserva la hora real del toque aunque llegue tarde.
 
 ### Validación antes de commitear
 

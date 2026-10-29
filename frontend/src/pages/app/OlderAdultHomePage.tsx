@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConsentContent } from '../../components/app/ConsentContent';
 import { AppApiError, olderAdultAppService } from '../../services/olderAdultAppService';
+import {
+  enqueueCompletion,
+  findQueuedCompletion,
+  readCompletionQueue,
+  removeQueuedCompletion,
+  subscribeToCompletionQueue,
+} from '../../services/completionQueue';
+import type { QueuedCompletion } from '../../services/completionQueue';
 import { getPermission, isSupported } from '../../services/reminderService';
 import type {
   AppActivitiesResponse,
@@ -45,6 +53,10 @@ export function OlderAdultHomePage() {
   const [clock, setClock] = useState(() => Date.now());
   // Un segundo toque mientras la primera llamada sigue en curso no cuenta.
   const inFlightRef = useRef<Set<string>>(new Set());
+  // HU-019: marcas guardadas en el celular que todavía no llegaron al servidor.
+  const [queuedCompletions, setQueuedCompletions] = useState<QueuedCompletion[]>(() =>
+    readCompletionQueue()
+  );
 
   const needsConsent = consentState?.required === true;
 
@@ -135,6 +147,23 @@ export function OlderAdultHomePage() {
 
     return () => window.clearInterval(timer);
   }, [undoWindows]);
+
+  // HU-019: la cola de marcas sin enviar puede cambiar desde el envio automatico,
+  // que vive fuera de esta pantalla.
+  useEffect(() => {
+    let previousCount = readCompletionQueue().length;
+    setQueuedCompletions(readCompletionQueue());
+
+    return subscribeToCompletionQueue(() => {
+      const next = readCompletionQueue();
+      setQueuedCompletions(next);
+
+      // Si la cola bajó, el servidor ya tiene esas marcas: se refresca la lista.
+      if (next.length < previousCount) void refresh();
+      previousCount = next.length;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadConsentText() {
     try {
@@ -286,10 +315,7 @@ export function OlderAdultHomePage() {
   }
 
   async function handleComplete(activity: AppActivity) {
-    if (offline || !activities) {
-      setNotice('Necesitas conexión a internet para marcar la actividad.');
-      return;
-    }
+    if (!activities) return;
 
     // HU-018: dos toques seguidos cuentan como una sola confirmación.
     if (inFlightRef.current.has(activity._id)) return;
@@ -299,25 +325,51 @@ export function OlderAdultHomePage() {
     setError('');
     setNotice('');
 
-    // El cambio se ve antes de que responda el servidor.
-    patchActivity(activity._id, { completed: true, completedAt: new Date().toISOString() });
+    // HU-019: la marca se guarda en el celular antes de intentar el envío.
+    const completedAt = new Date().toISOString();
+    enqueueCompletion({ activityId: activity._id, date: activities.date, completedAt });
+    patchActivity(activity._id, { completed: true, completedAt });
     openUndoWindow(activity._id);
 
+    if (offline) {
+      setNotice('Quedó guardada en tu celular. Se enviará sola cuando vuelva la conexión.');
+      inFlightRef.current.delete(activity._id);
+      setCompletingId(null);
+      return;
+    }
+
     try {
-      const response = await olderAdultAppService.completeActivity(activity._id, activities.date);
+      const response = await olderAdultAppService.completeActivity(
+        activity._id,
+        activities.date,
+        completedAt
+      );
+
+      removeQueuedCompletion(activity._id, activities.date);
       // Se muestra la hora que guardó el servidor, no la del reloj del celular.
       patchActivity(activity._id, {
         completed: true,
-        completedAt: response.completion?.completedAt ?? new Date().toISOString(),
+        completedAt: response.completion?.completedAt ?? completedAt,
       });
     } catch (err) {
-      // Si no se pudo guardar, vuelve a pendiente y se retira "Deshacer".
-      patchActivity(activity._id, { completed: false, completedAt: null });
-      closeUndoWindow(activity._id);
-      await handleAppError(err, {
-        fallback: 'No pudimos marcar la actividad. Inténtalo de nuevo.',
-        offline: 'Necesitas conexión a internet para marcar la actividad.',
-      });
+      if (err instanceof AppApiError && (err.status === 404 || err.status === 400)) {
+        // La actividad ya no aplica: no tiene sentido reintentar.
+        removeQueuedCompletion(activity._id, activities.date);
+        patchActivity(activity._id, { completed: false, completedAt: null });
+        closeUndoWindow(activity._id);
+        setError(err.message);
+      } else if (
+        err instanceof AppApiError &&
+        (err.status === 401 || err.code === 'CONSENT_VERSION_OUTDATED')
+      ) {
+        await handleAppError(err, {
+          fallback: 'No pudimos marcar la actividad. Inténtalo de nuevo.',
+          offline: 'Necesitas conexión a internet para marcar la actividad.',
+        });
+      } else {
+        // Sin conexión o fallo pasajero: queda en cola y se reintenta sola.
+        setNotice('Quedó guardada en tu celular. Se enviará sola cuando haya conexión.');
+      }
     } finally {
       inFlightRef.current.delete(activity._id);
       setCompletingId(null);
@@ -327,7 +379,10 @@ export function OlderAdultHomePage() {
   async function handleUndo(activity: AppActivity) {
     if (!activities || undoingId) return;
 
-    if (offline) {
+    // HU-019: si la marca nunca salió del celular, deshacer no necesita internet.
+    const queued = findQueuedCompletion(activity._id, activities.date);
+
+    if (!queued && offline) {
       setNotice('Necesitas conexión a internet para deshacer la marca.');
       return;
     }
@@ -338,6 +393,25 @@ export function OlderAdultHomePage() {
     setUndoingId(activity._id);
     setError('');
     setNotice('');
+
+    if (queued) {
+      removeQueuedCompletion(activity._id, activities.date);
+      closeUndoWindow(activity._id);
+      patchActivity(activity._id, { completed: false, completedAt: null });
+
+      if (!offline) {
+        // Por si el envío llegó al servidor y se perdió la respuesta.
+        try {
+          await olderAdultAppService.undoCompleteActivity(activity._id, activities.date);
+        } catch {
+          // El siguiente refresco reconcilia el estado con el servidor.
+        }
+      }
+
+      setUndoingId(null);
+      return;
+    }
+
     closeUndoWindow(activity._id);
     patchActivity(activity._id, { completed: false, completedAt: null });
 
@@ -497,7 +571,20 @@ export function OlderAdultHomePage() {
   const todayKey = getDeviceDateKey();
   const dateKey = activities?.date ?? todayKey;
   const isToday = dateKey === todayKey;
-  const visibleActivities = activities ? sortActivitiesByTime(activities.activities) : [];
+
+  // HU-019: lo que sigue en la cola se muestra como completado aunque un
+  // refresco haya traído la lista del servidor todavía sin la marca.
+  const queuedByActivity = new Map(queuedCompletions.map((item) => [item.activityId, item]));
+  const visibleActivities = activities
+    ? sortActivitiesByTime(
+        activities.activities.map((activity) => {
+          const queued = queuedByActivity.get(activity._id);
+          if (!queued || queued.date !== activities.date || activity.completed) return activity;
+
+          return { ...activity, completed: true, completedAt: queued.completedAt };
+        })
+      )
+    : [];
 
   return (
     <main className="senior-app">
@@ -518,6 +605,14 @@ export function OlderAdultHomePage() {
             {activities
               ? 'Sin conexión: esta es tu última lista guardada.'
               : 'Sin conexión: todavía no hay una lista guardada.'}
+          </p>
+        ) : null}
+
+        {queuedCompletions.length > 0 ? (
+          <p className="senior-offline" role="status">
+            {queuedCompletions.length === 1
+              ? '1 actividad guardada en tu celular. Se enviará sola.'
+              : `${queuedCompletions.length} actividades guardadas en tu celular. Se enviarán solas.`}
           </p>
         ) : null}
 
@@ -610,7 +705,7 @@ export function OlderAdultHomePage() {
                           className="senior-btn senior-btn-primary senior-activity-action"
                           type="button"
                           onClick={() => void handleComplete(activity)}
-                          disabled={completingId === activity._id || offline}
+                          disabled={completingId === activity._id}
                         >
                           Ya la hice
                         </button>

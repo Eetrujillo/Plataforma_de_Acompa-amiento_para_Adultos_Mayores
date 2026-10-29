@@ -18,6 +18,9 @@ const TOKEN_KEY = 'gap_older_adult_token';
 const CONSENT_CACHE_KEY = 'gap_older_adult_consent';
 const ROUTINE_CACHE_KEY = 'gap_older_adult_routine';
 
+/** HU-019: marcas hechas sin conexion, pendientes de enviar. */
+export const PENDING_COMPLETIONS_KEY = 'gap_older_adult_pending_completions';
+
 interface ApiErrorBody {
   error?: string;
   code?: string;
@@ -170,11 +173,12 @@ export const olderAdultAppService = {
   completeActivity(
     id: string,
     date: string,
+    completedAt?: string,
     token = olderAdultAppService.getToken() ?? ''
   ): Promise<AppCompleteActivityResponse> {
     return request<AppCompleteActivityResponse>(`/app/activities/${id}/complete`, {
       method: 'POST',
-      body: { date },
+      body: completedAt ? { date, completedAt } : { date },
       token,
     });
   },
@@ -251,5 +255,6 @@ export const olderAdultAppService = {
   clearAll(): void {
     olderAdultAppService.clearToken();
     olderAdultAppService.clearRoutineCache();
+    getStorage()?.removeItem(PENDING_COMPLETIONS_KEY);
   },
 };
