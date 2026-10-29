@@ -1381,10 +1381,42 @@ a:hover {
   color: var(--senior-muted);
 }
 
-.senior-done {
+.senior-status {
   margin: 0;
-  color: var(--senior-success-text);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.75rem;
+  border: 2px solid;
+  border-radius: 999px;
+  font-size: 1em;
   font-weight: 800;
+  line-height: 1.4;
+}
+
+.senior-status-pending {
+  border-color: #8a6d1f;
+  background: #fff6dc;
+  color: #4a3600;
+}
+
+.senior-status-done {
+  border-color: var(--senior-success-text);
+  background: var(--senior-success-bg);
+  color: var(--senior-success-text);
+}
+
+/* --- HU-017: aviso discreto de falta de conexion --- */
+
+.senior-offline {
+  margin: 0;
+  justify-self: start;
+  padding: 0.35rem 0.85rem;
+  border: 2px solid #8a6d1f;
+  border-radius: 999px;
+  background: #fff6dc;
+  color: #4a3600;
+  font-size: 1em;
+  font-weight: 700;
 }
 
 .senior-footer-note {

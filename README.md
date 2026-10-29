@@ -84,7 +84,7 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 
 ### Alcance y compatibilidad
 
-- Mantener el comportamiento de **HU-001 a HU-015**. Un cambio no puede romper una HU anterior.
+- Mantener el comportamiento de **HU-001 a HU-017**. Un cambio no puede romper una HU anterior.
 - Trabajar por módulo y por HU, de forma incremental.
 - El stack es MongoDB + Express + React. No introducir otra base de datos ni otro framework sin decisión de equipo.
 - Todo cambio debe funcionar con Docker Compose; es el entorno de despliegue.
@@ -138,6 +138,16 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
   cerrada el navegador no ejecuta temporizadores, y sin internet no hay Web Push. Cubrir ese caso
   requiere Web Push con servidor o una app nativa.
 
+### Actividades del día (HU-017)
+
+- **"Hoy" se calcula con la zona horaria del celular**, no con la del perfil. La pantalla envía
+  el día como `GET /api/app/activities?date=YYYY-MM-DD` y el backend respeta esa fecha.
+- La hora visible también se calcula desde `scheduledAt` en la zona del celular, para que la
+  fecha y la hora de la lista no se contradigan si el perfil tiene otra zona.
+- La lista se ordena por hora en el cliente además de venir ordenada del backend.
+- El estado se escribe con texto (`Pendiente` / `Hecha`), no solo con color.
+- Sin conexión se muestra la última lista guardada con un aviso compacto, nunca una pantalla vacía.
+
 ### Validación antes de commitear
 
 ```bash
@@ -175,6 +185,7 @@ npm run build
 | HU-014 | Edición de actividades con conservación del historial |
 | HU-015 | Eliminación lógica de actividades |
 | HU-016 | Recordatorio de actividades a su hora, con segundo aviso si sigue sin marcar |
+| HU-017 | Lista de actividades del día con su estado, calculada en la zona horaria del celular |
 
 ## Endpoints
 

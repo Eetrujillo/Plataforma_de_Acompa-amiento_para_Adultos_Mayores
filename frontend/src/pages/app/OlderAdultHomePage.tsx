@@ -10,7 +10,13 @@ import type {
   ConsentText,
   OlderAdultAppProfile,
 } from '../../types';
-import { formatDateLabel, formatTimeLabel, getTodayDateKey } from '../../utils/activity';
+import {
+  formatDateLabel,
+  formatTimeFromInstant,
+  formatTimeLabel,
+  getDeviceDateKey,
+  sortActivitiesByTime,
+} from '../../utils/activity';
 
 export function OlderAdultHomePage() {
   const navigate = useNavigate();
@@ -134,7 +140,8 @@ export function OlderAdultHomePage() {
         return;
       }
 
-      const response = await olderAdultAppService.activities();
+      // HU-017: "hoy" se calcula con la zona horaria del celular, no con la del perfil.
+      const response = await olderAdultAppService.activities(getDeviceDateKey());
       setActivities(response);
       setProfile(response.olderAdult);
       olderAdultAppService.saveRoutineCache(response);
@@ -362,8 +369,10 @@ export function OlderAdultHomePage() {
     );
   }
 
-  const timeZone = profile?.timeZone ?? activities?.timeZone ?? 'America/Bogota';
-  const dateKey = activities?.date ?? getTodayDateKey(timeZone);
+  const todayKey = getDeviceDateKey();
+  const dateKey = activities?.date ?? todayKey;
+  const isToday = dateKey === todayKey;
+  const visibleActivities = activities ? sortActivitiesByTime(activities.activities) : [];
 
   return (
     <main className="senior-app">
@@ -380,11 +389,11 @@ export function OlderAdultHomePage() {
         </header>
 
         {offline ? (
-          <div className="senior-notice" role="status">
+          <p className="senior-offline" role="status">
             {activities
-              ? 'Sin internet. Estás viendo tu última rutina guardada.'
-              : 'Sin internet. Necesitas conexión para ver tus actividades.'}
-          </div>
+              ? 'Sin conexión: esta es tu última lista guardada.'
+              : 'Sin conexión: todavía no hay una lista guardada.'}
+          </p>
         ) : null}
 
         {isSupported() && reminderPermission !== 'granted' ? (
@@ -413,17 +422,21 @@ export function OlderAdultHomePage() {
         ) : null}
 
         <section className="senior-card">
-          <h2>Lo que tienes para hoy</h2>
+          <h2>{isToday ? 'Lo que tienes para hoy' : 'Tu última lista guardada'}</h2>
 
           {loading && !activities ? (
             <p>Cargando tus actividades…</p>
           ) : !activities ? (
             <p>No pudimos cargar tus actividades. Revisa tu conexión.</p>
-          ) : activities.activities.length === 0 ? (
-            <p>No tienes actividades para hoy.</p>
+          ) : visibleActivities.length === 0 ? (
+            <p>
+              {isToday
+                ? 'Hoy no tienes actividades'
+                : 'No hay actividades guardadas para ese día.'}
+            </p>
           ) : (
             <div className="senior-activity-list">
-              {activities.activities.map((activity) => (
+              {visibleActivities.map((activity) => (
                 <article
                   className={`senior-activity${activity.completed ? ' senior-activity-done' : ''}`}
                   key={activity._id}
@@ -434,11 +447,18 @@ export function OlderAdultHomePage() {
                   <div className="senior-activity-body">
                     <h3>{activity.title}</h3>
                     <p className="senior-activity-time">
-                      {formatTimeLabel(activity.time)} · {activity.repeatSummary}
+                      {formatTimeFromInstant(activity.scheduledAt, formatTimeLabel(activity.time))}
+                      {' · '}
+                      {activity.repeatSummary}
                     </p>
-                    {activity.completed ? (
-                      <p className="senior-done">Hecha ✓</p>
-                    ) : (
+                    <p
+                      className={`senior-status ${
+                        activity.completed ? 'senior-status-done' : 'senior-status-pending'
+                      }`}
+                    >
+                      {activity.completed ? 'Hecha ✓' : 'Pendiente'}
+                    </p>
+                    {activity.completed ? null : (
                       <button
                         className="senior-btn senior-btn-primary senior-btn-small"
                         type="button"
