@@ -1,6 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
+const DISABLE_AUTH = import.meta.env.VITE_DISABLE_AUTH === 'true';
+
 interface ProtectedRouteProps {
   requireVerified?: boolean;
 }
@@ -8,6 +10,11 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ requireVerified = false }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const location = useLocation();
+
+  // Modo prueba: permite acceso sin autenticación
+  if (DISABLE_AUTH) {
+    return <Outlet />;
+  }
 
   if (loading) {
     return (

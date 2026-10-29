@@ -2,8 +2,35 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
+const DISABLE_AUTH = process.env.DISABLE_AUTH === 'true';
+
+/**
+ * Usuario mock para pruebas sin autenticación.
+ * Se usa solo cuando DISABLE_AUTH=true.
+ */
+function getMockUser() {
+  return {
+    _id: '000000000000000000000000',
+    name: 'Usuario Demo',
+    email: 'demo@local.test',
+    role: 'familiar',
+    emailVerified: true,
+    emailVerifiedAt: new Date().toISOString(),
+    tokenVersion: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    save: async () => {},
+    select: () => {},
+  };
+}
 
 module.exports = async function requireAuth(req, res, next) {
+  // Modo prueba: inyecta usuario mock y continúa
+  if (DISABLE_AUTH) {
+    req.user = getMockUser();
+    return next();
+  }
+
   try {
     const header = req.headers.authorization || '';
     const [scheme, token] = header.split(' ');

@@ -1663,3 +1663,42 @@ a:hover {
     width: 100%;
   }
 }
+
+/* --- MODO PRUEBA: banner de autenticación desactivada --- */
+
+.auth-disabled-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-bottom: 3px solid #b45309;
+  background: #fff8e8;
+  color: #5c4308;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(16, 24, 32, 0.15);
+}
+
+.auth-disabled-banner strong {
+  color: #b45309;
+}
+
+/* Ajuste del main para que no quede tapado por el banner fijo */
+.dashboard {
+  padding-top: 60px;
+}
+
+@media (max-width: 640px) {
+  .auth-disabled-banner {
+    font-size: 0.9rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .dashboard {
+    padding-top: 55px;
+  }
+}

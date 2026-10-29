@@ -29,6 +29,8 @@ import {
 /** HU-018: ventana para deshacer una marca recién hecha. */
 const UNDO_WINDOW_MS = 10000;
 
+const DISABLE_AUTH = import.meta.env.VITE_DISABLE_AUTH === 'true';
+
 export function OlderAdultHomePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<OlderAdultAppProfile | null>(null);
@@ -588,6 +590,12 @@ export function OlderAdultHomePage() {
 
   return (
     <main className="senior-app">
+      {DISABLE_AUTH && (
+        <div className="auth-disabled-banner" role="alert">
+          ⚠️ <strong>MODO PRUEBA:</strong> Autenticación desactivada (VITE_DISABLE_AUTH=true).
+          Se usa un adulto mayor mock. No se guarda nada en la base de datos real.
+        </div>
+      )}
       <div className="senior-shell">
         <header className="senior-header">
           <div>

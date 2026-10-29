@@ -10,6 +10,8 @@ const ROLE_LABELS: Record<string, string> = {
   familiar: 'Familiar',
 };
 
+const DISABLE_AUTH = import.meta.env.VITE_DISABLE_AUTH === 'true';
+
 export function Dashboard() {
   const { user, logout, welcomePending, consumeWelcome, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -40,6 +42,13 @@ export function Dashboard() {
 
   return (
     <main className="dashboard">
+      {DISABLE_AUTH && (
+        <div className="auth-disabled-banner" role="alert">
+          ⚠️ <strong>MODO PRUEBA:</strong> Autenticación desactivada (VITE_DISABLE_AUTH=true).
+          Se usa un usuario mock. No se guarda nada en la base de datos real.
+        </div>
+      )}
+
       {showWelcome ? (
         <Notification type="success">
           ¡Bienvenido/a, {user.name}! Tu cuenta de familiar fue creada correctamente.
@@ -50,11 +59,17 @@ export function Dashboard() {
         <div>
           <p className="eyebrow">Sesión iniciada</p>
           <h1>Hola, {user.name}</h1>
-          <p className="muted">Tu cuenta de familiar está conectada a la base de datos.</p>
+          <p className="muted">
+            {DISABLE_AUTH
+              ? 'Modo prueba: usuario mock (demo@local.test).'
+              : 'Tu cuenta de familiar está conectada a la base de datos.'}
+          </p>
         </div>
-        <button className="btn-secondary" type="button" onClick={handleLogout}>
-          Cerrar sesión
-        </button>
+        {!DISABLE_AUTH && (
+          <button className="btn-secondary" type="button" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
+        )}
       </header>
 
       <section className="card">
