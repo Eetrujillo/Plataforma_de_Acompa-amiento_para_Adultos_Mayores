@@ -1405,6 +1405,13 @@ a:hover {
   color: var(--senior-success-text);
 }
 
+/* --- HU-018: boton grande de marcar, a todo el ancho de la tarjeta --- */
+
+.senior-activity-action {
+  justify-self: stretch;
+  width: 100%;
+}
+
 /* --- HU-017: aviso discreto de falta de conexion --- */
 
 .senior-offline {

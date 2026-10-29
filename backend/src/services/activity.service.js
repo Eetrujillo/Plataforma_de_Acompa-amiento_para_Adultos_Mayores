@@ -419,12 +419,14 @@ async function completeOccurrence({ olderAdult, activityId, dateKey, now = new D
     return { status: 'not_occurred' };
   }
 
+  // La hora se fija solo al crear el registro. Si el adulto mayor toca el botón
+  // dos veces seguidas, la segunda llamada no mueve la hora de la primera
+  // confirmación: queda una sola marca con la hora real del primer toque.
   const completion = await ActivityCompletion.findOneAndUpdate(
     { activity: activity._id, occurrenceDate: targetDate },
     {
       $set: {
         olderAdult: olderAdult._id,
-        completedAt: now,
         snapshot: {
           title: activity.title,
           icon: activity.icon,
@@ -432,6 +434,9 @@ async function completeOccurrence({ olderAdult, activityId, dateKey, now = new D
           timeZone: olderAdult.timeZone,
           repeatSummary: formatRepeatSummary(activity.repeatType, activity.weekdays),
         },
+      },
+      $setOnInsert: {
+        completedAt: now,
       },
     },
     { new: true, upsert: true, setDefaultsOnInsert: true }

@@ -138,6 +138,25 @@ export interface AppActivitiesResponse {
   activities: AppActivity[];
 }
 
+export interface AppCompletion {
+  _id: string;
+  activity: string;
+  occurrenceDate: string;
+  completedAt: string;
+  snapshot: {
+    title: string;
+    icon: string;
+    time: string;
+    timeZone: string;
+    repeatSummary: string;
+  };
+}
+
+export interface AppCompleteActivityResponse {
+  message: string;
+  completion: AppCompletion;
+}
+
 export type OlderAdultRepeatType = 'once' | 'daily' | 'weekly';
 
 export interface Activity {

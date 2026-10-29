@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConsentContent } from '../../components/app/ConsentContent';
 import { AppApiError, olderAdultAppService } from '../../services/olderAdultAppService';
@@ -18,6 +18,9 @@ import {
   sortActivitiesByTime,
 } from '../../utils/activity';
 
+/** HU-018: ventana para deshacer una marca recién hecha. */
+const UNDO_WINDOW_MS = 10000;
+
 export function OlderAdultHomePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<OlderAdultAppProfile | null>(null);
@@ -36,6 +39,12 @@ export function OlderAdultHomePage() {
   const [consentSubmitting, setConsentSubmitting] = useState(false);
   const [consentError, setConsentError] = useState('');
   const [reminderPermission, setReminderPermission] = useState(() => getPermission());
+  // HU-018: ventana de "Deshacer" por actividad (id -> instante de vencimiento).
+  const [undoWindows, setUndoWindows] = useState<Record<string, number>>({});
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
+  // Un segundo toque mientras la primera llamada sigue en curso no cuenta.
+  const inFlightRef = useRef<Set<string>>(new Set());
 
   const needsConsent = consentState?.required === true;
 
@@ -102,6 +111,30 @@ export function OlderAdultHomePage() {
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offline, needsConsent, unlinked]);
+
+  // HU-018: mientras haya una marca recién hecha, el reloj avanza cada segundo
+  // para mostrar cuánto queda de "Deshacer" y retirar la ventana al vencer.
+  useEffect(() => {
+    if (Object.keys(undoWindows).length === 0) return;
+
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setClock(now);
+      setUndoWindows((current) => {
+        const next: Record<string, number> = {};
+        let expired = false;
+
+        for (const [activityId, expiresAt] of Object.entries(current)) {
+          if (expiresAt > now) next[activityId] = expiresAt;
+          else expired = true;
+        }
+
+        return expired ? next : current;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [undoWindows]);
 
   async function loadConsentText() {
     try {
@@ -182,56 +215,148 @@ export function OlderAdultHomePage() {
     }
   }
 
+  function patchActivity(activityId: string, patch: Partial<AppActivity>) {
+    setActivities((current) => {
+      if (!current) return current;
+
+      const next: AppActivitiesResponse = {
+        ...current,
+        activities: current.activities.map((item) =>
+          item._id === activityId ? { ...item, ...patch } : item
+        ),
+      };
+
+      olderAdultAppService.saveRoutineCache(next);
+      return next;
+    });
+  }
+
+  function openUndoWindow(activityId: string) {
+    const now = Date.now();
+    setClock(now);
+    setUndoWindows((current) => ({ ...current, [activityId]: now + UNDO_WINDOW_MS }));
+  }
+
+  function closeUndoWindow(activityId: string) {
+    setUndoWindows((current) => {
+      if (!(activityId in current)) return current;
+
+      const next = { ...current };
+      delete next[activityId];
+      return next;
+    });
+  }
+
+  function secondsLeft(activityId: string): number {
+    const expiresAt = undoWindows[activityId];
+    if (!expiresAt) return 0;
+
+    return Math.max(0, Math.ceil((expiresAt - clock) / 1000));
+  }
+
+  async function handleAppError(
+    err: unknown,
+    messages: { fallback: string; offline: string }
+  ) {
+    if (!(err instanceof AppApiError)) {
+      setError(messages.fallback);
+      return;
+    }
+
+    if (err.offline) {
+      // No se marca la app como "sin conexión" por un fallo puntual: el estado
+      // global lo cambian los eventos del navegador y el refresco periódico.
+      setNotice(messages.offline);
+    } else if (err.status === 401) {
+      olderAdultAppService.clearAll();
+      setUnlinked(true);
+      setError(err.message);
+    } else if (err.code === 'CONSENT_VERSION_OUTDATED') {
+      setConsentState(
+        err.consent ?? {
+          currentVersion: 'actual',
+          acceptedVersion: null,
+          required: true,
+        }
+      );
+      await loadConsentText();
+    } else {
+      setError(err.message);
+    }
+  }
+
   async function handleComplete(activity: AppActivity) {
     if (offline || !activities) {
       setNotice('Necesitas conexión a internet para marcar la actividad.');
       return;
     }
 
+    // HU-018: dos toques seguidos cuentan como una sola confirmación.
+    if (inFlightRef.current.has(activity._id)) return;
+
+    inFlightRef.current.add(activity._id);
     setCompletingId(activity._id);
     setError('');
+    setNotice('');
+
+    // El cambio se ve antes de que responda el servidor.
+    patchActivity(activity._id, { completed: true, completedAt: new Date().toISOString() });
+    openUndoWindow(activity._id);
 
     try {
-      await olderAdultAppService.completeActivity(activity._id, activities.date);
-      setActivities((current) => {
-        if (!current) return current;
-
-        const next: AppActivitiesResponse = {
-          ...current,
-          activities: current.activities.map((item) =>
-            item._id === activity._id
-              ? { ...item, completed: true, completedAt: new Date().toISOString() }
-              : item
-          ),
-        };
-
-        olderAdultAppService.saveRoutineCache(next);
-        return next;
+      const response = await olderAdultAppService.completeActivity(activity._id, activities.date);
+      // Se muestra la hora que guardó el servidor, no la del reloj del celular.
+      patchActivity(activity._id, {
+        completed: true,
+        completedAt: response.completion?.completedAt ?? new Date().toISOString(),
       });
-      setNotice('¡Muy bien! La actividad quedó marcada como hecha.');
     } catch (err) {
-      if (err instanceof AppApiError && err.offline) {
-        setNotice('Necesitas conexión a internet para marcar la actividad.');
-      } else if (err instanceof AppApiError && err.status === 401) {
-        olderAdultAppService.clearAll();
-        setUnlinked(true);
-        setError(err.message);
-      } else if (err instanceof AppApiError && err.code === 'CONSENT_VERSION_OUTDATED') {
-        setConsentState(
-          err.consent ?? {
-            currentVersion: 'actual',
-            acceptedVersion: null,
-            required: true,
-          }
-        );
-        await loadConsentText();
-      } else if (err instanceof AppApiError) {
-        setError(err.message);
-      } else {
-        setError('No pudimos marcar la actividad. Inténtalo de nuevo.');
-      }
+      // Si no se pudo guardar, vuelve a pendiente y se retira "Deshacer".
+      patchActivity(activity._id, { completed: false, completedAt: null });
+      closeUndoWindow(activity._id);
+      await handleAppError(err, {
+        fallback: 'No pudimos marcar la actividad. Inténtalo de nuevo.',
+        offline: 'Necesitas conexión a internet para marcar la actividad.',
+      });
     } finally {
+      inFlightRef.current.delete(activity._id);
       setCompletingId(null);
+    }
+  }
+
+  async function handleUndo(activity: AppActivity) {
+    if (!activities || undoingId) return;
+
+    if (offline) {
+      setNotice('Necesitas conexión a internet para deshacer la marca.');
+      return;
+    }
+
+    const previousCompletedAt = activity.completedAt;
+    const previousWindow = undoWindows[activity._id];
+
+    setUndoingId(activity._id);
+    setError('');
+    setNotice('');
+    closeUndoWindow(activity._id);
+    patchActivity(activity._id, { completed: false, completedAt: null });
+
+    try {
+      await olderAdultAppService.undoCompleteActivity(activity._id, activities.date);
+      patchActivity(activity._id, { completed: false, completedAt: null });
+    } catch (err) {
+      patchActivity(activity._id, { completed: true, completedAt: previousCompletedAt });
+
+      if (previousWindow) {
+        setUndoWindows((current) => ({ ...current, [activity._id]: previousWindow }));
+      }
+
+      await handleAppError(err, {
+        fallback: 'No pudimos deshacer la marca. Inténtalo de nuevo.',
+        offline: 'Necesitas conexión a internet para deshacer la marca.',
+      });
+    } finally {
+      setUndoingId(null);
     }
   }
 
@@ -436,41 +561,64 @@ export function OlderAdultHomePage() {
             </p>
           ) : (
             <div className="senior-activity-list">
-              {visibleActivities.map((activity) => (
-                <article
-                  className={`senior-activity${activity.completed ? ' senior-activity-done' : ''}`}
-                  key={activity._id}
-                >
-                  <span className="senior-activity-icon" aria-hidden="true">
-                    {activity.iconEmoji}
-                  </span>
-                  <div className="senior-activity-body">
-                    <h3>{activity.title}</h3>
-                    <p className="senior-activity-time">
-                      {formatTimeFromInstant(activity.scheduledAt, formatTimeLabel(activity.time))}
-                      {' · '}
-                      {activity.repeatSummary}
-                    </p>
-                    <p
-                      className={`senior-status ${
-                        activity.completed ? 'senior-status-done' : 'senior-status-pending'
-                      }`}
-                    >
-                      {activity.completed ? 'Hecha ✓' : 'Pendiente'}
-                    </p>
-                    {activity.completed ? null : (
-                      <button
-                        className="senior-btn senior-btn-primary senior-btn-small"
-                        type="button"
-                        onClick={() => void handleComplete(activity)}
-                        disabled={completingId === activity._id || offline}
+              {visibleActivities.map((activity) => {
+                const remaining = secondsLeft(activity._id);
+                const doneAt = activity.completedAt
+                  ? formatTimeFromInstant(activity.completedAt, '')
+                  : '';
+
+                return (
+                  <article
+                    className={`senior-activity${activity.completed ? ' senior-activity-done' : ''}`}
+                    key={activity._id}
+                  >
+                    <span className="senior-activity-icon" aria-hidden="true">
+                      {activity.iconEmoji}
+                    </span>
+                    <div className="senior-activity-body">
+                      <h3>{activity.title}</h3>
+                      <p className="senior-activity-time">
+                        {formatTimeFromInstant(activity.scheduledAt, formatTimeLabel(activity.time))}
+                        {' · '}
+                        {activity.repeatSummary}
+                      </p>
+                      <p
+                        className={`senior-status ${
+                          activity.completed ? 'senior-status-done' : 'senior-status-pending'
+                        }`}
                       >
-                        {completingId === activity._id ? 'Guardando…' : 'Ya la hice'}
-                      </button>
-                    )}
-                  </div>
-                </article>
-              ))}
+                        {activity.completed ? 'Completada ✓' : 'Pendiente'}
+                      </p>
+                      {activity.completed && doneAt ? (
+                        <p className="senior-activity-time">La marcaste a las {doneAt}</p>
+                      ) : null}
+                      {activity.completed ? (
+                        remaining > 0 ? (
+                          <button
+                            className="senior-btn senior-btn-secondary senior-activity-action"
+                            type="button"
+                            onClick={() => void handleUndo(activity)}
+                            disabled={undoingId === activity._id || completingId === activity._id}
+                          >
+                            {undoingId === activity._id
+                              ? 'Deshaciendo…'
+                              : `Deshacer (${remaining} s)`}
+                          </button>
+                        ) : null
+                      ) : (
+                        <button
+                          className="senior-btn senior-btn-primary senior-activity-action"
+                          type="button"
+                          onClick={() => void handleComplete(activity)}
+                          disabled={completingId === activity._id || offline}
+                        >
+                          Ya la hice
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>

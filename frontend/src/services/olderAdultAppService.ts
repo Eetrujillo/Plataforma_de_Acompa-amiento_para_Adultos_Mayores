@@ -1,6 +1,7 @@
 import type {
   AcceptConsentResponse,
   AppActivitiesResponse,
+  AppCompleteActivityResponse,
   ConsentResponse,
   ConsentState,
   ConsentText,
@@ -170,8 +171,8 @@ export const olderAdultAppService = {
     id: string,
     date: string,
     token = olderAdultAppService.getToken() ?? ''
-  ): Promise<{ message: string }> {
-    return request<{ message: string }>(`/app/activities/${id}/complete`, {
+  ): Promise<AppCompleteActivityResponse> {
+    return request<AppCompleteActivityResponse>(`/app/activities/${id}/complete`, {
       method: 'POST',
       body: { date },
       token,

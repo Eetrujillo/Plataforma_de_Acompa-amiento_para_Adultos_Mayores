@@ -84,7 +84,7 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 
 ### Alcance y compatibilidad
 
-- Mantener el comportamiento de **HU-001 a HU-017**. Un cambio no puede romper una HU anterior.
+- Mantener el comportamiento de **HU-001 a HU-018**. Un cambio no puede romper una HU anterior.
 - Trabajar por módulo y por HU, de forma incremental.
 - El stack es MongoDB + Express + React. No introducir otra base de datos ni otro framework sin decisión de equipo.
 - Todo cambio debe funcionar con Docker Compose; es el entorno de despliegue.
@@ -145,8 +145,21 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 - La hora visible también se calcula desde `scheduledAt` en la zona del celular, para que la
   fecha y la hora de la lista no se contradigan si el perfil tiene otra zona.
 - La lista se ordena por hora en el cliente además de venir ordenada del backend.
-- El estado se escribe con texto (`Pendiente` / `Hecha`), no solo con color.
+- El estado se escribe con texto (`Pendiente` / `Completada`), no solo con color.
 - Sin conexión se muestra la última lista guardada con un aviso compacto, nunca una pantalla vacía.
+
+### Marcar una actividad como hecha (HU-018)
+
+- El cambio se ve **antes** de que responda el servidor. Si la llamada falla, la actividad vuelve
+  a "Pendiente" y se avisa del error.
+- Después de marcar aparece **"Deshacer" durante 10 segundos**, con la cuenta atrás en el propio
+  botón. Al vencer, la acción desaparece.
+- Dos toques seguidos cuentan como una sola confirmación: el segundo toque se ignora mientras la
+  primera llamada sigue en curso, y el backend guarda una sola marca por actividad y día.
+- La hora que se muestra es la que guardó el servidor (`completedAt`), no la del reloj del
+  celular. Un segundo toque no mueve esa hora.
+- El botón de marcar ocupa todo el ancho de la tarjeta y mide **64 px de alto**, la misma medida
+  del botón principal de la app. Es la medida mínima de diseño para esta pantalla.
 
 ### Validación antes de commitear
 
@@ -186,6 +199,7 @@ npm run build
 | HU-015 | Eliminación lógica de actividades |
 | HU-016 | Recordatorio de actividades a su hora, con segundo aviso si sigue sin marcar |
 | HU-017 | Lista de actividades del día con su estado, calculada en la zona horaria del celular |
+| HU-018 | Marcar una actividad como hecha con deshacer durante 10 segundos |
 
 ## Endpoints
 
