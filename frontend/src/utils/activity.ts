@@ -1,4 +1,4 @@
-import type { OlderAdultRepeatType } from '../types';
+import type { AppActivity, OlderAdultRepeatType } from '../types';
 
 export const ACTIVITY_ICONS = [
   { key: 'medicina', label: 'Medicina', emoji: '💊' },
@@ -67,6 +67,60 @@ export function getTodayDateKey(timeZone: string): string {
   } catch {
     return new Date().toISOString().slice(0, 10);
   }
+}
+
+/**
+ * Fecha de hoy según la zona horaria del celular (regla de negocio de HU-017).
+ * Se usan los componentes locales de `Date`, que el navegador ya expresa en la
+ * zona del dispositivo, sin pasar por la zona del perfil.
+ */
+export function getDeviceDateKey(now: Date = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Hora visible de una actividad, calculada desde `scheduledAt` (instante
+ * absoluto) en la zona del celular. Si el instante no es válido se usa la hora
+ * que ya calculó el backend.
+ */
+export function formatTimeFromInstant(scheduledAt: string, fallback = ''): string {
+  const date = new Date(scheduledAt);
+  if (Number.isNaN(date.getTime())) return fallback;
+
+  try {
+    return new Intl.DateTimeFormat('es-CO', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Orden por hora. El backend ya entrega la lista ordenada; esto la protege de
+ * cambios futuros y de una caché guardada con otro orden.
+ */
+export function sortActivitiesByTime(activities: AppActivity[]): AppActivity[] {
+  return [...activities].sort((left, right) => {
+    const leftInstant = Date.parse(left.scheduledAt);
+    const rightInstant = Date.parse(right.scheduledAt);
+
+    if (
+      !Number.isNaN(leftInstant) &&
+      !Number.isNaN(rightInstant) &&
+      leftInstant !== rightInstant
+    ) {
+      return leftInstant - rightInstant;
+    }
+
+    return left.time.localeCompare(right.time);
+  });
 }
 
 export function formatDateLabel(dateKey: string): string {

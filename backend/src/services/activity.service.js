@@ -18,6 +18,13 @@ const {
   weekdayFromDateKey,
 } = require('../utils/dateTime');
 
+/**
+ * HU-019: la marca puede llegar desde el celular despues de un rato sin
+ * conexion, asi que el cliente envia la hora real del toque. Solo se tolera un
+ * desfase de reloj pequeno hacia el futuro; una hora pasada se acepta tal cual.
+ */
+const COMPLETION_CLOCK_SKEW_MS = 10 * 60 * 1000;
+
 const MESSAGES = {
   titleRequired: 'Ingresa el título de la actividad.',
   titleTooLong: 'El título no puede superar los 60 caracteres.',
@@ -395,7 +402,29 @@ async function listOccurrencesForDate({ olderAdult, dateKey, now = new Date() })
   };
 }
 
-async function completeOccurrence({ olderAdult, activityId, dateKey, now = new Date() }) {
+function resolveCompletionInstant(value, now) {
+  if (value === undefined || value === null || value === '') {
+    return { status: 'valid', date: now };
+  }
+
+  if (typeof value !== 'string') return { status: 'invalid' };
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { status: 'invalid' };
+  if (date.getTime() > now.getTime() + COMPLETION_CLOCK_SKEW_MS) {
+    return { status: 'invalid' };
+  }
+
+  return { status: 'valid', date };
+}
+
+async function completeOccurrence({
+  olderAdult,
+  activityId,
+  dateKey,
+  completedAt,
+  now = new Date(),
+}) {
   if (!mongoose.Types.ObjectId.isValid(activityId)) {
     return { status: 'not_found' };
   }
@@ -419,12 +448,20 @@ async function completeOccurrence({ olderAdult, activityId, dateKey, now = new D
     return { status: 'not_occurred' };
   }
 
+  // HU-019: la hora que se guarda es la del toque en el celular, no la de llegada.
+  const completionInstant = resolveCompletionInstant(completedAt, now);
+  if (completionInstant.status !== 'valid') {
+    return { status: 'invalid_completed_at' };
+  }
+
+  // La hora se fija solo al crear el registro. Si el adulto mayor toca el botón
+  // dos veces seguidas, la segunda llamada no mueve la hora de la primera
+  // confirmación: queda una sola marca con la hora real del primer toque.
   const completion = await ActivityCompletion.findOneAndUpdate(
     { activity: activity._id, occurrenceDate: targetDate },
     {
       $set: {
         olderAdult: olderAdult._id,
-        completedAt: now,
         snapshot: {
           title: activity.title,
           icon: activity.icon,
@@ -432,6 +469,9 @@ async function completeOccurrence({ olderAdult, activityId, dateKey, now = new D
           timeZone: olderAdult.timeZone,
           repeatSummary: formatRepeatSummary(activity.repeatType, activity.weekdays),
         },
+      },
+      $setOnInsert: {
+        completedAt: completionInstant.date,
       },
     },
     { new: true, upsert: true, setDefaultsOnInsert: true }

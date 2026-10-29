@@ -127,7 +127,16 @@ router.post(
         olderAdult: req.olderAdult,
         activityId: req.params.id,
         dateKey: req.body?.date,
+        // HU-019: hora real del toque, enviada desde el celular.
+        completedAt: req.body?.completedAt,
       });
+
+      if (result.status === 'invalid_completed_at') {
+        return res.status(400).json({
+          error: 'La hora de la marca no es válida.',
+          code: 'ACTIVITY_COMPLETED_AT_INVALID',
+        });
+      }
 
       if (result.status === 'not_found') {
         return res.status(404).json({

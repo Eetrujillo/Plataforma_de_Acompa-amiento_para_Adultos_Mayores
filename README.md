@@ -84,7 +84,7 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 
 ### Alcance y compatibilidad
 
-- Mantener el comportamiento de **HU-001 a HU-015**. Un cambio no puede romper una HU anterior.
+- Mantener el comportamiento de **HU-001 a HU-019**. Un cambio no puede romper una HU anterior.
 - Trabajar por módulo y por HU, de forma incremental.
 - El stack es MongoDB + Express + React. No introducir otra base de datos ni otro framework sin decisión de equipo.
 - Todo cambio debe funcionar con Docker Compose; es el entorno de despliegue.
@@ -126,6 +126,56 @@ Estas reglas son obligatorias para cualquier cambio. Un PR que las incumpla no s
 - No introducir texto pequeño ni depender del color como único indicador.
 - El QR es opcional: el campo de texto para el código siempre debe estar disponible.
 
+### Avisos de actividades (HU-016)
+
+- El aviso se calcula desde `scheduledAt`, que ya es un instante absoluto: no se hacen cuentas
+  de zona horaria en el cliente.
+- El segundo aviso depende del estado real de la actividad. Si se marca como hecha antes, no se
+  envía.
+- El aviso en pantalla (`ActivityReminderHost`) funciona aunque las notificaciones del sistema
+  estén bloqueadas. Es el canal de respaldo, no un extra.
+- **Límite de la plataforma web:** los avisos se disparan con la app abierta. Con la pestaña
+  cerrada el navegador no ejecuta temporizadores, y sin internet no hay Web Push. Cubrir ese caso
+  requiere Web Push con servidor o una app nativa.
+
+### Actividades del día (HU-017)
+
+- **"Hoy" se calcula con la zona horaria del celular**, no con la del perfil. La pantalla envía
+  el día como `GET /api/app/activities?date=YYYY-MM-DD` y el backend respeta esa fecha.
+- La hora visible también se calcula desde `scheduledAt` en la zona del celular, para que la
+  fecha y la hora de la lista no se contradigan si el perfil tiene otra zona.
+- La lista se ordena por hora en el cliente además de venir ordenada del backend.
+- El estado se escribe con texto (`Pendiente` / `Completada`), no solo con color.
+- Sin conexión se muestra la última lista guardada con un aviso compacto, nunca una pantalla vacía.
+
+### Marcar una actividad como hecha (HU-018)
+
+- El cambio se ve **antes** de que responda el servidor.
+- Si el servidor rechaza la marca (la actividad ya no existe o no corresponde al día), vuelve a
+  "Pendiente" y se avisa del error. Si el fallo es de conexión, la marca queda en cola (HU-019).
+- Después de marcar aparece **"Deshacer" durante 10 segundos**, con la cuenta atrás en el propio
+  botón. Al vencer, la acción desaparece.
+- Dos toques seguidos cuentan como una sola confirmación: el segundo toque se ignora mientras la
+  primera llamada sigue en curso, y el backend guarda una sola marca por actividad y día.
+- La hora que se muestra es la que guardó el servidor (`completedAt`), no la del reloj del
+  celular. Un segundo toque no mueve esa hora.
+- El botón de marcar ocupa todo el ancho de la tarjeta y mide **64 px de alto**, la misma medida
+  del botón principal de la app. Es la medida mínima de diseño para esta pantalla.
+
+### Completar actividades sin internet (HU-019)
+
+- Cada marca se guarda primero en el celular (`localStorage`), antes de intentar el envío. Sin
+  conexión, la actividad se ve completada igual y no se pierde.
+- La cola se envía sola: al recuperar la conexión, al volver a la app y cada 15 segundos. El
+  criterio de menos de un minuto se cumple con el evento `online` más ese ciclo.
+- Se envía `completedAt` con la hora real del toque, no la del envío. El backend la valida (solo
+  tolera 10 minutos de reloj adelantado) y la guarda en la marca.
+- Un fallo pasajero no pierde la marca: se reintenta sin intervención. Solo se descarta si el
+  servidor responde que la actividad ya no aplica (`400` o `404`).
+- "Deshacer" funciona sin conexión mientras la marca siga en la cola.
+- HU-028 (avisos de incumplimiento) todavía no existe. Lo que sí queda resuelto es el dato que
+  necesita: la marca conserva la hora real del toque aunque llegue tarde.
+
 ### Validación antes de commitear
 
 ```bash
@@ -145,23 +195,12 @@ npm run build
 
 ## Historias de usuario
 
-| HU | Alcance |
-|---|---|
-| HU-001 | Registro de familiar con aceptación de política de privacidad |
-| HU-002 | Confirmación de correo y acceso restringido sin verificar |
-| HU-003 | Inicio de sesión, bloqueo por intentos fallidos y vencimiento de sesión |
-| HU-004 | Recuperación de contraseña con token de un solo uso |
-| HU-005 | Perfiles de adultos mayores por cuenta familiar |
-| HU-006 | Generación de código y QR de vinculación |
-| HU-007 | Vinculación de la app del adulto mayor con el código |
-| HU-008 | Consentimiento informado antes de compartir datos |
-| HU-009 | Sesión persistente de la app del adulto mayor |
-| HU-010 | Desvinculación del perfil |
-| HU-011 | Cierre de sesión de la app con PIN |
-| HU-012 | Creación de actividades |
-| HU-013 | Repetición diaria y semanal |
-| HU-014 | Edición de actividades con conservación del historial |
-| HU-015 | Eliminación lógica de actividades |
+El alcance y el estado de cada historia viven en el tablero de Jira del proyecto:
+
+<https://unimayor-team-qv3i018t.atlassian.net/jira/software/projects/SCRUM/boards/1/backlog?selectedIssue=SCRUM-30>
+
+Este README documenta cómo está construida la plataforma y qué se puede verificar en el
+código; Jira es la fuente única para el seguimiento de las HU.
 
 ## Endpoints
 
@@ -211,5 +250,6 @@ OpenCode descubre estas skills locales en `.opencode/skills/`:
 - El texto menciona alertas de ayuda y ubicación al pedir ayuda; esas funciones no están
   implementadas. Decidir si se retiran del texto o se implementan en una HU posterior.
 - Confirmar el uso del PIN para cerrar sesión (HU-011).
+- Confirmar el segundo aviso a los 10 minutos y si ese plazo es el definitivo (HU-016).
 - Definir si el historial se muestra tras una nueva vinculación.
 - Añadir suite de pruebas automatizadas al repositorio.
