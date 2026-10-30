@@ -65,6 +65,14 @@ cd frontend && npm install && npm run dev
 Sin `SMTP_HOST`, el backend imprime en consola los enlaces de confirmación y
 recuperación. El contenedor corre con `NODE_ENV=production` y **no** los imprime.
 
+Para crear una cuenta de familiar verificada (o verificar una cuenta existente) en un despliegue sin SMTP, ejecuta
+`docker compose exec -it backend npm run user:create` en el servidor. El comando
+solicita nombre y correo; si la cuenta ya existe sin verificar, pide confirmación
+antes de marcarla verificada. Para cuentas nuevas también solicita contraseña y
+confirmación de aceptación de privacidad; la contraseña no se muestra en pantalla.
+Después inicia sesión desde `/login`. Úsalo solo para aprovisionar cuentas autorizadas:
+no desactiva la autenticación.
+
 ## Variables de entorno
 
 Ver `.env.example` para la lista completa. Las críticas:

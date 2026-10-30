@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "migrate:familiar-role": "node src/scripts/migrate-familiar-role.js"
+    "migrate:familiar-role": "node src/scripts/migrate-familiar-role.js",
+    "user:create": "node src/scripts/create-verified-user.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
