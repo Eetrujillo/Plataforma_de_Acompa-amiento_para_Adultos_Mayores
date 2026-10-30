@@ -4,6 +4,26 @@ import type { LoginPayload, RegisterPayload, User } from '../types';
 import { ApiError, SESSION_EXPIRED_EVENT } from '../services/apiClient';
 import { authService } from '../services/authService';
 
+const DISABLE_AUTH = import.meta.env.VITE_DISABLE_AUTH === 'true';
+
+/**
+ * Usuario mock para pruebas sin autenticación.
+ * Se usa solo cuando VITE_DISABLE_AUTH=true.
+ */
+function getMockUser(): User {
+  return {
+    _id: '000000000000000000000000',
+    name: 'Usuario Demo',
+    email: 'demo@local.test',
+    role: 'familiar',
+    emailVerified: true,
+    emailVerifiedAt: new Date().toISOString(),
+    privacyPolicy: { acceptedAt: new Date().toISOString(), version: '1' },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -27,6 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+
+    // Modo prueba: auto-login con usuario mock
+    if (DISABLE_AUTH) {
+      const mockUser = getMockUser();
+      setUser(mockUser);
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
 
     if (!authService.hasToken()) {
       setLoading(false);
@@ -61,6 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // En modo prueba no escuchamos eventos de expiración
+    if (DISABLE_AUTH) return;
+
     function handleSessionExpired() {
       setSessionExpired(true);
     }
@@ -94,6 +127,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
+    // En modo prueba no hacemos refresh real
+    if (DISABLE_AUTH) return;
+
     if (!authService.hasToken()) return;
 
     const requestId = ++userRequestRef.current;

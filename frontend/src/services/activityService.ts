@@ -1,6 +1,7 @@
 import { apiClient } from './apiClient';
 import type {
   ActivityCreatePayload,
+  ActivityDayResponse,
   ActivityListResponse,
   ActivityResponse,
   ActivityUpdatePayload,
@@ -12,6 +13,14 @@ export const activityService = {
       olderAdultId
         ? `/activities?olderAdultId=${encodeURIComponent(olderAdultId)}`
         : '/activities'
+    ),
+
+  /** HU-020: actividades de hoy con su estado, vistas por el familiar. */
+  today: (olderAdultId: string, date?: string): Promise<ActivityDayResponse> =>
+    apiClient.get<ActivityDayResponse>(
+      `/activities/today?olderAdultId=${encodeURIComponent(olderAdultId)}${
+        date ? `&date=${encodeURIComponent(date)}` : ''
+      }`
     ),
 
   create: (payload: ActivityCreatePayload): Promise<ActivityResponse> =>

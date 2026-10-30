@@ -25,6 +25,14 @@ const {
  */
 const COMPLETION_CLOCK_SKEW_MS = 10 * 60 * 1000;
 
+/**
+ * HU-020: una actividad queda vencida 30 minutos despues de su hora si el
+ * adulto mayor no la marco. El umbral vive solo aqui: el cliente recibe
+ * `expiresAt` ya calculado y no repite la regla de negocio.
+ */
+const EXPIRATION_GRACE_MINUTES = 30;
+const EXPIRATION_GRACE_MS = EXPIRATION_GRACE_MINUTES * 60 * 1000;
+
 const MESSAGES = {
   titleRequired: 'Ingresa el título de la actividad.',
   titleTooLong: 'El título no puede superar los 60 caracteres.',
@@ -402,6 +410,60 @@ async function listOccurrencesForDate({ olderAdult, dateKey, now = new Date() })
   };
 }
 
+/**
+ * HU-020: estado de una ocurrencia. Se separa del acceso a datos para poder
+ * probar el umbral de 30 minutos sin MongoDB.
+ */
+function dayStatus({ completed, expiresAt, now }) {
+  if (completed) return 'completed';
+
+  return now.getTime() >= expiresAt.getTime() ? 'expired' : 'pending';
+}
+
+/**
+ * HU-020 - Estado del dia visto por el familiar.
+ *
+ * Reutiliza el mismo calculo de ocurrencias de la app del adulto mayor, pero
+ * acotado al familiar autenticado. Cada actividad sale como `pending`,
+ * `completed` o `expired`, y con `expiresAt` para que el cliente pueda pasar a
+ * "Vencida" sin esperar al siguiente refresco.
+ */
+async function listDayForFamily({ familiarId, olderAdultId, dateKey, now = new Date() }) {
+  if (!olderAdultId) return { status: 'older_adult_required' };
+  if (!mongoose.Types.ObjectId.isValid(olderAdultId)) return { status: 'not_found' };
+
+  const olderAdult = await OlderAdult.findOne({ _id: olderAdultId, familiar: familiarId });
+  if (!olderAdult) return { status: 'not_found' };
+
+  if (dateKey !== undefined && dateKey !== null && String(dateKey).trim() !== '') {
+    if (!parseDateKey(dateKey)) return { status: 'invalid_date' };
+  }
+
+  const day = await listOccurrencesForDate({ olderAdult, dateKey, now });
+
+  return {
+    status: 'ok',
+    day: {
+      date: day.date,
+      timeZone: day.timeZone,
+      olderAdult: {
+        _id: olderAdult._id,
+        name: olderAdult.name,
+        timeZone: olderAdult.timeZone,
+      },
+      activities: day.activities.map((activity) => {
+        const expiresAt = new Date(activity.scheduledAt.getTime() + EXPIRATION_GRACE_MS);
+
+        return {
+          ...activity,
+          expiresAt,
+          status: dayStatus({ completed: activity.completed, expiresAt, now }),
+        };
+      }),
+    },
+  };
+}
+
 function resolveCompletionInstant(value, now) {
   if (value === undefined || value === null || value === '') {
     return { status: 'valid', date: now };
@@ -503,13 +565,16 @@ async function undoOccurrence({ olderAdult, activityId, dateKey }) {
 }
 
 module.exports = {
+  EXPIRATION_GRACE_MINUTES,
   MESSAGES,
   activityOccursOnDate,
   completeOccurrence,
   createActivity,
+  dayStatus,
   deleteActivity,
   getActivity,
   listActivities,
+  listDayForFamily,
   listOccurrencesForDate,
   occurrenceForDate,
   publicActivity,

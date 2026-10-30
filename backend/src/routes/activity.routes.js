@@ -4,6 +4,7 @@ const {
   deleteActivity,
   getActivity,
   listActivities,
+  listDayForFamily,
   MESSAGES,
   updateActivity,
 } = require('../services/activity.service');
@@ -75,6 +76,38 @@ router.post('/', async (req, res, next) => {
       message: 'Actividad creada.',
       activity: result.activity,
     });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// HU-020: estado del dia del adulto mayor, para el familiar.
+// Va antes de `/:id` para que "today" no se interprete como un id.
+router.get('/today', async (req, res, next) => {
+  try {
+    const result = await listDayForFamily({
+      familiarId: req.user._id,
+      olderAdultId: req.query?.olderAdultId,
+      dateKey: req.query?.date,
+    });
+
+    if (result.status === 'older_adult_required') {
+      return res.status(400).json({
+        error: 'Selecciona a tu adulto mayor.',
+        code: 'OLDER_ADULT_REQUIRED',
+      });
+    }
+
+    if (result.status === 'invalid_date') {
+      return res.status(400).json({
+        error: 'La fecha no es válida.',
+        code: 'ACTIVITY_DATE_INVALID',
+      });
+    }
+
+    if (result.status === 'not_found') return sendOlderAdultNotFound(res);
+
+    return res.json(result.day);
   } catch (err) {
     return next(err);
   }

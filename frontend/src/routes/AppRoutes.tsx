@@ -9,6 +9,7 @@ import { OlderAdultsPage } from '../pages/OlderAdultsPage';
 import { PrivacyPolicyPage } from '../pages/PrivacyPolicyPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
+import { TodayPage } from '../pages/TodayPage';
 import { VerificationRequiredPage } from '../pages/VerificationRequiredPage';
 import { OlderAdultHomePage } from '../pages/app/OlderAdultHomePage';
 import { OlderAdultLinkPage } from '../pages/app/OlderAdultLinkPage';
@@ -36,6 +37,7 @@ export function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/adultos-mayores" element={<OlderAdultsPage />} />
         <Route path="/actividades" element={<ActivitiesPage />} />
+        <Route path="/hoy" element={<TodayPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
