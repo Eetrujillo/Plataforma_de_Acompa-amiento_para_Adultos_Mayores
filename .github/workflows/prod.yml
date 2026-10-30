@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - prod
+      - prueba-sin-auth
   workflow_dispatch:
 jobs:
   # Nombre del job
