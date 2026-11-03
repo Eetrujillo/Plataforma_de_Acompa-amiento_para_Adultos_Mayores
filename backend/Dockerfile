@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# Prisma's query engine links against OpenSSL; Alpine images do not ship it.
+RUN apk add --no-cache openssl
+
 WORKDIR /usr/src/app
 
 # Prisma needs the schema before install so the client can be generated.

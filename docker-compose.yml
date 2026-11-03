@@ -10,6 +10,12 @@ services:
     volumes:
       - mongo_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
     networks:
       - mearn-net
 
@@ -28,12 +34,12 @@ services:
       - MONGO_URL=${MONGO_URL:-mongodb://mongo:27017/mearn_db}
       - BACKEND_INTERNAL_PORT=${BACKEND_INTERNAL_PORT:-3500}
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     ports:
       - "${BACKEND_PORT:-3500}:${BACKEND_INTERNAL_PORT:-3500}"
-    volumes:
-      - ./backend:/usr/src/app
-      - /usr/src/app/node_modules
+    # The container runs the built image: no bind mount and no anonymous volume
+    # in front of node_modules, so what was built is exactly what runs.
     networks:
       - mearn-net
 
