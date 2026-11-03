@@ -3,6 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { resolveDatabaseUrl } = require('./databaseUrl');
+
 const ENV_CANDIDATES = [
   path.resolve(__dirname, '../../.env'),
   path.resolve(__dirname, '../../../.env')
@@ -44,8 +46,10 @@ const config = Object.freeze({
   isProduction,
   port: Number.parseInt(process.env.BACKEND_INTERNAL_PORT || process.env.PORT || '3500', 10),
   corsOrigin: process.env.CORS_ORIGIN || '*',
-  databaseUrl:
-    process.env.DATABASE_URL || process.env.MONGO_URL || 'mongodb://localhost:27017/mearn_db',
+  databaseUrl: resolveDatabaseUrl({
+    explicit: process.env.DATABASE_URL,
+    fallback: process.env.MONGO_URL
+  }),
   jwt: Object.freeze({
     secret: resolveJwtSecret(),
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
