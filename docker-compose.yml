@@ -10,12 +10,6 @@ services:
     volumes:
       - mongo_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     networks:
       - mearn-net
 
@@ -25,31 +19,21 @@ services:
       dockerfile: Dockerfile
     container_name: mearn-backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=production
+      # Defaults keep the stack bootable even before .env is filled in; the
+      # env_file above supplies the real values (including the JWT secret).
+      - DATABASE_URL=${DATABASE_URL:-mongodb://mongo:27017/mearn_db}
       - MONGO_URL=${MONGO_URL:-mongodb://mongo:27017/mearn_db}
-      - JWT_SECRET=${JWT_SECRET:-dev-only-secret-change-me}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - CORS_ORIGIN=${CORS_ORIGIN:-}
-      - APP_URL=${APP_URL:-http://localhost:3201}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_SECURE=${SMTP_SECURE:-false}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
-      - SMTP_FROM=${SMTP_FROM:-}
-      - LINK_QR_BASE_URL=${LINK_QR_BASE_URL:-acompanamiento://vincular}
+      - BACKEND_INTERNAL_PORT=${BACKEND_INTERNAL_PORT:-3500}
     depends_on:
-      mongo:
-        condition: service_healthy
+      - mongo
     ports:
-      - "${BACKEND_PORT:-3505}:3701"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3701/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+      - "${BACKEND_PORT:-3500}:${BACKEND_INTERNAL_PORT:-3500}"
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
     networks:
       - mearn-net
 
@@ -57,15 +41,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_API_BASE: /api
     container_name: mearn-frontend
     restart: unless-stopped
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
+    # The SPA is compiled at image build time and served by nginx, which also
+    # proxies /api and /socket.io to the backend service.
     ports:
-      - "3201:80"
+      - "3201:3201"
     networks:
       - mearn-net
 
