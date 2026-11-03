@@ -13,6 +13,7 @@ export function RegisterScreen() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(null);
   const [registeredEmail, setRegisteredEmail] = useState(null);
+  const [verificationSent, setVerificationSent] = useState(true);
   const [notice, setNotice] = useState(null);
 
   function handleChange(event) {
@@ -26,8 +27,9 @@ export function RegisterScreen() {
     setError(null);
 
     try {
-      await registerRequest(form);
+      const result = await registerRequest(form);
       setRegisteredEmail(form.email);
+      setVerificationSent(result.verificationSent !== false);
       setForm(EMPTY_FORM);
     } catch (caught) {
       setError(caught.message);
@@ -51,13 +53,29 @@ export function RegisterScreen() {
     return (
       <PageShell eyebrow="Registro" title="Revisá tu correo">
         <section className="card">
-          <p className="alert alert--success" role="status">
-            Te enviamos un enlace de verificación a <strong>{registeredEmail}</strong>.
-          </p>
-          <p>
-            Abrí el correo y tocá el botón para activar la cuenta. El enlace vence en 24 horas y se
-            puede usar una sola vez.
-          </p>
+          {verificationSent ? (
+            <p className="alert alert--success" role="status">
+              Te enviamos un enlace de verificación a <strong>{registeredEmail}</strong>.
+            </p>
+          ) : (
+            <p className="alert alert--error" role="alert">
+              La cuenta de <strong>{registeredEmail}</strong> se creó, pero el envío de correo no está
+              configurado en el servidor. Avisale a quien administra el sistema para que active el
+              SMTP y volvé a pedir el enlace desde acá.
+            </p>
+          )}
+
+          {verificationSent ? (
+            <p>
+              Abrí el correo y tocá el botón para activar la cuenta. El enlace vence en 24 horas y se
+              puede usar una sola vez.
+            </p>
+          ) : (
+            <p>
+              No hace falta que crees la cuenta de nuevo: cuando el SMTP esté activo, usá “Reenviar el
+              enlace”.
+            </p>
+          )}
 
           {notice ? (
             <p className="alert alert--success" role="status">

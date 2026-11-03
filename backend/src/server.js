@@ -74,6 +74,12 @@ async function start() {
 
   console.log(`[server] listening on port ${config.port} (${config.nodeEnv})`);
 
+  if (config.smtp.host) {
+    console.log(`[server] email delivery: smtp (${config.smtp.host}:${config.smtp.port})`);
+  } else {
+    console.log('[server] email delivery: console (SMTP_HOST is not set, verification links are printed here)');
+  }
+
   let shuttingDown = false;
 
   const shutdown = async (signal) => {
