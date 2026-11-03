@@ -84,3 +84,18 @@ test('only the known prisma code is mapped', () => {
   assert.equal(mapPrismaError(null), null);
   assert.equal(mapPrismaError({ code: 'P2031' }).statusCode, 503);
 });
+
+test('a connectivity failure inside P2010 is translated, other raw failures are not', () => {
+  const selectionTimeout = mapPrismaError({
+    code: 'P2010',
+    meta: {
+      message:
+        'Kind: Server selection timeout: No available servers. Topology: { Type: ReplicaSetNoPrimary }'
+    }
+  });
+
+  assert.equal(selectionTimeout.statusCode, 503);
+  assert.equal(selectionTimeout.code, 'DATABASE_UNAVAILABLE');
+
+  assert.equal(mapPrismaError({ code: 'P2010', meta: { message: 'bad aggregation stage' } }), null);
+});

@@ -40,7 +40,20 @@ services:
       - |
         set -e
         mongosh --host mongo:27017 --quiet --eval '
-          try { rs.status(); } catch (error) { rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] }); }
+          const desiredHost = "mongo:27017";
+          try {
+            const conf = rs.conf();
+            if (conf.members.length === 1 && conf.members[0].host !== desiredHost) {
+              conf.members[0].host = desiredHost;
+              rs.reconfig(conf, { force: true });
+              print("replica set member host corrected to " + desiredHost);
+            } else {
+              print("replica set config ok (" + conf.members[0].host + ")");
+            }
+          } catch (error) {
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: desiredHost }] });
+            print("replica set initiated with " + desiredHost);
+          }
           for (let attempt = 0; attempt < 60; attempt += 1) {
             if (db.hello().isWritablePrimary) { print("replica set primary ready"); quit(0); }
             sleep(500);

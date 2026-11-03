@@ -19,7 +19,23 @@ const PRISMA_HINTS = Object.freeze({
 
 function mapPrismaError(error) {
   const hint = PRISMA_HINTS[error?.code];
-  return hint ? { ...hint } : null;
+
+  if (hint) {
+    return { ...hint };
+  }
+
+  // P2010 is a raw query failure; only the connectivity flavour is worth translating.
+  const detail = String(error?.meta?.message ?? error?.message ?? '');
+
+  if (error?.code === 'P2010' && /server selection|no available servers|connection refused/i.test(detail)) {
+    return {
+      statusCode: 503,
+      code: 'DATABASE_UNAVAILABLE',
+      message: 'No se pudo contactar la base de datos.'
+    };
+  }
+
+  return null;
 }
 
 /**
