@@ -7,6 +7,8 @@ function createAuthRouter({ controller, authMiddleware }) {
 
   router.post('/register', controller.register);
   router.post('/login', controller.login);
+  router.post('/verify-email', controller.verifyEmail);
+  router.post('/resend-verification', controller.resendVerification);
   router.get('/me', authMiddleware, controller.me);
 
   return router;

@@ -17,11 +17,25 @@ model User {
   role         String
   phone        String?
   caregiverId  String?  @db.ObjectId
+  emailVerifiedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@index([role])
   @@index([caregiverId])
+}
+
+/// Single use token that proves the account owner controls the email address.
+/// Only the SHA-256 hash of the raw token is stored.
+model EmailVerificationToken {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 /// Short lived 6 digit code that binds a senior device to a caregiver account.

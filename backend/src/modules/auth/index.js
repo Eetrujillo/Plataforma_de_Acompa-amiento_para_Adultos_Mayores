@@ -3,9 +3,13 @@
 const { RegisterCaregiver } = require('./application/RegisterCaregiver');
 const { Login } = require('./application/Login');
 const { GetCurrentUser } = require('./application/GetCurrentUser');
+const { VerifyEmail } = require('./application/VerifyEmail');
+const { ResendVerificationEmail } = require('./application/ResendVerificationEmail');
 const { BcryptPasswordHasher } = require('./infrastructure/BcryptPasswordHasher');
 const { JwtTokenService } = require('./infrastructure/JwtTokenService');
 const { PrismaUserRepository } = require('./infrastructure/PrismaUserRepository');
+const { PrismaEmailVerificationRepository } = require('./infrastructure/PrismaEmailVerificationRepository');
+const { createEmailSender } = require('./infrastructure/EmailSender');
 const { createAuthController } = require('./infrastructure/AuthController');
 const { createAuthRouter } = require('./infrastructure/authRoutes');
 const { createAuthMiddleware } = require('../../shared/middlewares/authMiddleware');
@@ -15,17 +19,34 @@ const { createAuthMiddleware } = require('../../shared/middlewares/authMiddlewar
  *
  * Returns the router plus the ports other slices and the shared middleware need.
  */
-function createAuthModule({ prisma, config }) {
+function createAuthModule({ prisma, config, logger = console }) {
   const userRepository = new PrismaUserRepository({ prisma });
+  const verificationRepository = new PrismaEmailVerificationRepository({ prisma });
   const passwordHasher = new BcryptPasswordHasher();
   const tokenService = new JwtTokenService(config.jwt);
+  const emailSender = createEmailSender({ smtp: config.smtp, logger });
 
   const authMiddleware = createAuthMiddleware({ verifyToken: (token) => tokenService.verify(token) });
 
   const controller = createAuthController({
-    registerCaregiver: new RegisterCaregiver({ userRepository, passwordHasher }),
+    registerCaregiver: new RegisterCaregiver({
+      userRepository,
+      passwordHasher,
+      verificationRepository,
+      emailSender,
+      config,
+      logger
+    }),
     login: new Login({ userRepository, passwordHasher, tokenService }),
-    getCurrentUser: new GetCurrentUser({ userRepository })
+    getCurrentUser: new GetCurrentUser({ userRepository }),
+    verifyEmail: new VerifyEmail({ verificationRepository, userRepository, tokenService }),
+    resendVerificationEmail: new ResendVerificationEmail({
+      userRepository,
+      verificationRepository,
+      emailSender,
+      config,
+      logger
+    })
   });
 
   return {

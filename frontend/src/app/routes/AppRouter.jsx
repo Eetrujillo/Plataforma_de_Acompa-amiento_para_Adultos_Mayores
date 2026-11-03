@@ -3,6 +3,8 @@ import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router
 import { DEFAULT_ROUTE, IS_NATIVE_PLATFORM } from '../config/runtime.js';
 import { useAuth } from '../../features/auth/application/AuthContext.jsx';
 import { LoginScreen } from '../../features/auth/ui/LoginScreen.jsx';
+import { RegisterScreen } from '../../features/auth/ui/RegisterScreen.jsx';
+import { VerifyEmailScreen } from '../../features/auth/ui/VerifyEmailScreen.jsx';
 import { DashboardPage } from '../../pages/caregiver/DashboardPage.jsx';
 import { SeniorHomePage } from '../../pages/senior/SeniorHomePage.jsx';
 
@@ -32,6 +34,8 @@ export function AppRouter() {
       <Routes>
         <Route path="/" element={<Navigate to={DEFAULT_ROUTE} replace />} />
         <Route path="/login" element={<LoginScreen />} />
+        <Route path="/register" element={<RegisterScreen />} />
+        <Route path="/verify-email" element={<VerifyEmailScreen />} />
         <Route
           path="/caregiver"
           element={

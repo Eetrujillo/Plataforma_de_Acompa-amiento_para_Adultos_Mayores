@@ -71,7 +71,7 @@ function normalizePhone(phone) {
  * identity data the same way.
  */
 class User {
-  constructor({ id = null, email, passwordHash = null, fullName, role, phone = null, caregiverId = null, createdAt = null }) {
+  constructor({ id = null, email, passwordHash = null, fullName, role, phone = null, caregiverId = null, emailVerifiedAt = null, createdAt = null }) {
     this.id = id;
     this.email = email;
     this.passwordHash = passwordHash;
@@ -79,6 +79,7 @@ class User {
     this.role = role;
     this.phone = phone;
     this.caregiverId = caregiverId;
+    this.emailVerifiedAt = emailVerifiedAt;
     this.createdAt = createdAt;
   }
 
@@ -105,8 +106,14 @@ class User {
       fullName: normalizeFullName(fullName),
       phone: normalizePhone(phone),
       role: ROLES.SENIOR,
-      caregiverId
+      caregiverId,
+      // Seniors have no mailbox: pairing is their credential, so they are verified on creation.
+      emailVerifiedAt: new Date()
     });
+  }
+
+  isEmailVerified() {
+    return this.emailVerifiedAt instanceof Date || typeof this.emailVerifiedAt === 'string';
   }
 
   isCaregiver() {
@@ -130,6 +137,7 @@ function toPublicUser(user) {
     role: user.role,
     phone: user.phone ?? null,
     caregiverId: user.caregiverId ?? null,
+    emailVerified: Boolean(user.emailVerifiedAt),
     createdAt: user.createdAt ?? null
   };
 }

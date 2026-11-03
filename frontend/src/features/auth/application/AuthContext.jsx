@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
         startSession(result);
         return true;
       } catch (caught) {
-        setError(caught.message);
+        setError({ message: caught.message, code: caught.code ?? 'UNKNOWN' });
         return false;
       } finally {
         setPending(false);

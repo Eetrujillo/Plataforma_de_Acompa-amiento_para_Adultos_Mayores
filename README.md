@@ -76,6 +76,8 @@ npm run dev              # http://localhost:3201 (proxy /api -> :3500)
 | GET | `/api/health` | público |
 | POST | `/api/auth/register` | público |
 | POST | `/api/auth/login` | público |
+| POST | `/api/auth/verify-email` | público (token del correo) |
+| POST | `/api/auth/resend-verification` | público (siempre 202) |
 | GET | `/api/auth/me` | autenticado |
 | POST | `/api/pairing/codes` | cuidador |
 | GET | `/api/pairing/seniors` | cuidador |

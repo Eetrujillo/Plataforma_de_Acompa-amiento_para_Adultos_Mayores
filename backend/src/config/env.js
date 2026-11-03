@@ -54,6 +54,18 @@ const config = Object.freeze({
     codeLength: 6,
     ttlMinutes: Number.parseInt(process.env.PAIRING_TTL_MINUTES || '15', 10),
     maxGenerationAttempts: 5
+  }),
+  appUrl: (process.env.APP_URL || 'http://localhost:3201').replace(/\/+$/, ''),
+  verification: Object.freeze({
+    ttlHours: Number.parseInt(process.env.EMAIL_VERIFICATION_TTL_HOURS || '24', 10)
+  }),
+  smtp: Object.freeze({
+    host: process.env.SMTP_HOST || '',
+    port: Number.parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || 'Plataforma de Acompañamiento <no-reply@example.com>'
   })
 });
 

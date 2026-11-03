@@ -1,7 +1,7 @@
 'use strict';
 
 const { normalizeEmail, toPublicUser } = require('../domain/User');
-const { UnauthorizedError, ValidationError } = require('../../../shared/errors');
+const { UnauthorizedError, ValidationError, EmailNotVerifiedError } = require('../../../shared/errors');
 
 /**
  * Authenticates a user and issues a JWT.
@@ -31,6 +31,10 @@ class Login {
 
     if (!matches) {
       throw new UnauthorizedError('Invalid credentials');
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new EmailNotVerifiedError();
     }
 
     const token = this.tokenService.sign({ sub: user.id, role: user.role, email: user.email });

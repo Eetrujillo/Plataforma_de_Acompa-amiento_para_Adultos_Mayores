@@ -20,10 +20,10 @@ class PrismaUserRepository {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
-  async create({ email, fullName, phone, role, passwordHash = null, caregiverId = null }) {
+  async create({ email, fullName, phone, role, passwordHash = null, caregiverId = null, emailVerifiedAt = null }) {
     try {
       return await this.prisma.user.create({
-        data: { email, fullName, phone, role, passwordHash, caregiverId }
+        data: { email, fullName, phone, role, passwordHash, caregiverId, emailVerifiedAt }
       });
     } catch (error) {
       if (error.code === UNIQUE_CONSTRAINT_CODE) {
@@ -36,6 +36,10 @@ class PrismaUserRepository {
 
   async listSeniorsByCaregiver(caregiverId) {
     return this.prisma.user.findMany({ where: { caregiverId, role: 'SENIOR' } });
+  }
+
+  async markEmailVerified(id) {
+    return this.prisma.user.update({ where: { id }, data: { emailVerifiedAt: new Date() } });
   }
 }
 

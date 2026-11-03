@@ -7,7 +7,17 @@ export async function loginRequest({ email, password }) {
 
 export async function registerRequest({ email, password, fullName, phone }) {
   const { data } = await apiClient.post('/auth/register', { email, password, fullName, phone });
-  return data.user;
+  return data;
+}
+
+export async function verifyEmailRequest(token) {
+  const { data } = await apiClient.post('/auth/verify-email', { token });
+  return data;
+}
+
+export async function resendVerificationRequest(email) {
+  const { data } = await apiClient.post('/auth/resend-verification', { email });
+  return data;
 }
 
 export async function fetchCurrentUser() {
