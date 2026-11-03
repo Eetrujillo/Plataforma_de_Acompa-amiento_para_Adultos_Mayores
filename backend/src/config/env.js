@@ -48,7 +48,8 @@ const config = Object.freeze({
   corsOrigin: process.env.CORS_ORIGIN || '*',
   databaseUrl: resolveDatabaseUrl({
     explicit: process.env.DATABASE_URL,
-    fallback: process.env.MONGO_URL
+    fallback: process.env.MONGO_URL,
+    inContainer: fs.existsSync('/.dockerenv')
   }),
   jwt: Object.freeze({
     secret: resolveJwtSecret(),

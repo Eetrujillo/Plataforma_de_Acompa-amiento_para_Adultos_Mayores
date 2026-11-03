@@ -52,3 +52,33 @@ test('a stale non mongo value is rejected even when a valid fallback exists', ()
     /got "postgresql:\/\/"/
   );
 });
+
+test('inside a container a loopback database host is rejected with the fix', () => {
+  assert.throws(
+    () =>
+      resolveDatabaseUrl({
+        fallback: 'mongodb://localhost:27017/mearn_db?replicaSet=rs0',
+        inContainer: true
+      }),
+    (error) =>
+      error.message.includes('localhost is the backend itself') &&
+      error.message.includes('mongodb://mongo:27017/mearn_db')
+  );
+
+  assert.throws(
+    () => resolveDatabaseUrl({ fallback: 'mongodb://127.0.0.1:27017/mearn_db', inContainer: true }),
+    /localhost is the backend itself/
+  );
+});
+
+test('the compose service name is accepted inside a container, and loopback is fine outside', () => {
+  assert.equal(
+    resolveDatabaseUrl({ fallback: 'mongodb://mongo:27017/mearn_db', inContainer: true }),
+    'mongodb://mongo:27017/mearn_db'
+  );
+
+  assert.equal(
+    resolveDatabaseUrl({ fallback: 'mongodb://localhost:27017/mearn_db', inContainer: false }),
+    'mongodb://localhost:27017/mearn_db'
+  );
+});

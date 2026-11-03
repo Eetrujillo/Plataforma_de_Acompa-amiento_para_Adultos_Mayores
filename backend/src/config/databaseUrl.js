@@ -1,6 +1,7 @@
 'use strict';
 
 const MONGO_URL_PATTERN = /^mongodb(\+srv)?:\/\/.+/;
+const LOOPBACK_PATTERN = /(^|[@,/])(localhost|127\.0\.0\.1)(:|\/|$)/;
 
 /**
  * Validates that a connection string is a MongoDB URI.
@@ -23,10 +24,39 @@ function assertMongoUrl(value, { name = 'DATABASE_URL' } = {}) {
 }
 
 /**
- * Resolution order: explicit DATABASE_URL, then MONGO_URL, then the local default.
+ * Inside a container, localhost is the container itself, never the database.
+ * Failing here turns a per-request "Server selection timeout" into one line that
+ * names the fix.
  */
-function resolveDatabaseUrl({ explicit, fallback, defaultUrl = 'mongodb://localhost:27017/mearn_db' }) {
-  return assertMongoUrl(explicit || fallback || defaultUrl);
+function assertReachableFromContainer(value, { inContainer = false } = {}) {
+  if (inContainer && LOOPBACK_PATTERN.test(String(value))) {
+    throw new Error(
+      'MONGO_URL points at localhost, but the backend runs inside a container: ' +
+        'localhost is the backend itself. Use the compose service name, for example ' +
+        'mongodb://mongo:27017/mearn_db'
+    );
+  }
+
+  return value;
 }
 
-module.exports = { MONGO_URL_PATTERN, assertMongoUrl, resolveDatabaseUrl };
+/**
+ * Resolution order: explicit DATABASE_URL, then MONGO_URL, then the local default.
+ */
+function resolveDatabaseUrl({
+  explicit,
+  fallback,
+  defaultUrl = 'mongodb://localhost:27017/mearn_db',
+  inContainer = false
+}) {
+  const url = assertMongoUrl(explicit || fallback || defaultUrl);
+  return assertReachableFromContainer(url, { inContainer });
+}
+
+module.exports = {
+  MONGO_URL_PATTERN,
+  LOOPBACK_PATTERN,
+  assertMongoUrl,
+  assertReachableFromContainer,
+  resolveDatabaseUrl
+};

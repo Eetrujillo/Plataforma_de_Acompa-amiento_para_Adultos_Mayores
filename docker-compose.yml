@@ -3,7 +3,12 @@ services:
     image: mongo:7
     container_name: mearn-mongo
     restart: unless-stopped
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    # Standalone mongod on purpose: the application never opens multi-document
+    # transactions, which is the only Prisma feature that requires a replica set.
+    # If transactions are ever added, start with --replSet plus a real
+    # rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}) and add
+    # ?replicaSet=rs0 to MONGO_URL. A declared but uninitiated set has no primary
+    # and every query fails with ReplicaSetNoPrimary.
     environment:
       MONGO_INITDB_DATABASE: mearn_db
     ports:
