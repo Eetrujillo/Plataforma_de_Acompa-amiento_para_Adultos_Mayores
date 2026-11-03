@@ -44,14 +44,14 @@ S10. Final check: `npm run build` succeeds in both folders and no import is brok
 
 | ID | Specs | Route | Commit |
 |----|-------|-------|--------|
-| T1 | S1,S2 | inline | chore: reset legacy sources |
-| T2 | S3,S4 | inline | feat(backend): prisma schema, shared kernel, auth and pairing slices |
-| T3 | S3 | inline | feat(backend): activities and sos emergency slices with socket adapter |
-| T4 | S5,S10 | inline | feat(backend): server entrypoint on 3500 with health contract |
-| T5 | S6,S7,S9 | inline | feat(frontend): app shell, router and shared services |
-| T6 | S6,S8 | inline | feat(frontend): feature slices and accessible senior/caregiver pages |
-| T7 | S1,S9,S10 | inline | chore: align docker, nginx and env for port 3500 |
-| T8 | S10 | inline | verify: builds and health smoke test |
+| T1 | S1,S2 | inline | `1b11be3` |
+| T2 | S3,S4 | inline | `639ebc8` |
+| T3 | S3 | inline | `6e15842` |
+| T4 | S5,S10 | inline | `6e15842` |
+| T5 | S6,S7,S9 | inline | `1efea73` |
+| T6 | S6,S8 | inline | `915664c` |
+| T7 | S1,S9,S10 | inline | this commit |
+| T8 | S10 | inline | verified, see L5 |
 
 ## Log
 
@@ -91,3 +91,32 @@ L3 (decision). Technical conflicts resolved without touching product scope:
 - Mongo host port stays `4301` (S1 preserve); flagged to the user.
 - Prisma MongoDB does not support `enum`, so role/status fields are `String`; ids use `@id @default(auto()) @map("_id") @db.ObjectId`.
 - Backend is CommonJS (matches legacy runtime, zero transpile risk); frontend is ESM/JSX.
+
+L4 (decision). Adjustments forced by the environment, not by preference:
+- The tool policy blocks writing any `.env` file, so the repo carries `env.sample`
+  (root, for compose) and `backend/env.sample` (host development). The human copies them;
+  the exact commands are in README. `.env` stays gitignored.
+- Because `.env` may not exist yet, `npm run build` in the backend supplies a
+  throwaway `DATABASE_URL` default: `prisma generate` only resolves the URL, it never
+  connects. Compose interpolated vars got `:-default` fallbacks for the same reason.
+- `docker-compose.yml` frontend service lost its bind mount (the SPA is compiled into
+  the nginx image) and its `VITE_API_BASE` build-time-only env var.
+- `frontend/vite.config.mjs` proxy now targets `localhost:3500` (dev) instead of the
+  legacy `backend:3701`; `base: './'` keeps one bundle valid for nginx and Capacitor.
+- `.gitignore` gained `dist/` and `*.log`; the legacy committed bundle was deleted.
+
+L5 (evidence). Verification actually observed on this machine:
+- `backend`: `npm run build` -> `Generated Prisma Client (v6.19.3)`; `npm test` -> 18 tests, 18 pass, 0 fail.
+- `frontend`: `npm run build` -> 120 modules transformed, `dist/` emitted, exit 0.
+- Import audit script over `frontend/src`: 0 broken relative imports.
+- `docker compose config` (validated in a scratch dir with a throwaway env):
+  backend `3500:3500`, frontend `3201:3201`, mongo `4301:27017`.
+- Health contract covered by a real HTTP request in `tests/health.test.js`
+  (status 200, `content-type` json, body exactly `{"status":"ok","db":"mongodb"}`).
+- Local `npm` 12 blocked `prisma`/`esbuild` install scripts; generation and the Vite build
+  still succeeded because both fetch their artifacts on demand.
+
+L6 (slice boundary). The first backend-progress commit was rewritten locally with
+`git reset --soft` because it had swept in the frontend shell; the branch now holds one
+concern per commit (reset / backend kernel+auth+pairing / backend activities+sos /
+frontend shell+auth / frontend slices / delivery config+docs). Nothing was pushed.

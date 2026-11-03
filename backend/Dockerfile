@@ -2,11 +2,19 @@ FROM node:20-alpine
 
 WORKDIR /usr/src/app
 
+# Prisma needs the schema before install so the client can be generated.
 COPY package*.json ./
-RUN npm install --only=production
+COPY prisma ./prisma
+
+RUN npm install --omit=dev
+
+# Generation only resolves the datasource URL, it does not connect.
+ENV DATABASE_URL="mongodb://mongo:27017/mearn_db"
+RUN npx prisma generate
 
 COPY . .
 
-EXPOSE 3505
+ENV NODE_ENV=production
+EXPOSE 3500
 
 CMD ["npm", "start"]

@@ -22,11 +22,15 @@ services:
     env_file:
       - .env
     environment:
-      - MONGO_URL=${MONGO_URL}
+      # Defaults keep the stack bootable even before .env is filled in; the
+      # env_file above supplies the real values (including the JWT secret).
+      - DATABASE_URL=${DATABASE_URL:-mongodb://mongo:27017/mearn_db}
+      - MONGO_URL=${MONGO_URL:-mongodb://mongo:27017/mearn_db}
+      - BACKEND_INTERNAL_PORT=${BACKEND_INTERNAL_PORT:-3500}
     depends_on:
       - mongo
     ports:
-      - "${BACKEND_PORT}:${BACKEND_INTERNAL_PORT}"
+      - "${BACKEND_PORT:-3500}:${BACKEND_INTERNAL_PORT:-3500}"
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
@@ -41,13 +45,10 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    environment:
-      - VITE_API_BASE=/api
+    # The SPA is compiled at image build time and served by nginx, which also
+    # proxies /api and /socket.io to the backend service.
     ports:
       - "3201:3201"
-    volumes:
-      - ./frontend:/usr/src/app
-      - /usr/src/app/node_modules
     networks:
       - mearn-net
 
