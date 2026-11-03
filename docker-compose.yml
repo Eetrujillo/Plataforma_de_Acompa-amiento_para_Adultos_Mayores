@@ -33,12 +33,14 @@ services:
       # another project (the Prisma CLI reads the variable raw and rejects it).
       - DATABASE_URL=${MONGO_URL:-mongodb://mongo:27017/mearn_db}
       - MONGO_URL=${MONGO_URL:-mongodb://mongo:27017/mearn_db}
-      - BACKEND_INTERNAL_PORT=${BACKEND_INTERNAL_PORT:-3500}
+      # Fixed on purpose: nginx proxies to backend:3500 and the image EXPOSEs 3500.
+      # Only the published host port is configurable (BACKEND_PORT).
+      - BACKEND_INTERNAL_PORT=3500
     depends_on:
       mongo:
         condition: service_healthy
     ports:
-      - "${BACKEND_PORT:-3500}:${BACKEND_INTERNAL_PORT:-3500}"
+      - "${BACKEND_PORT:-3500}:3500"
     # The container runs the built image: no bind mount and no anonymous volume
     # in front of node_modules, so what was built is exactly what runs.
     networks:

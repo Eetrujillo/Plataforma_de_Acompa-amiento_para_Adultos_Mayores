@@ -80,6 +80,12 @@ async function start() {
     console.log('[server] email delivery: console (SMTP_HOST is not set, verification links are printed here)');
   }
 
+  if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(config.appUrl)) {
+    console.warn(
+      `[server] APP_URL is ${config.appUrl}: verification links will not open outside this machine. Set the public URL.`
+    );
+  }
+
   let shuttingDown = false;
 
   const shutdown = async (signal) => {
