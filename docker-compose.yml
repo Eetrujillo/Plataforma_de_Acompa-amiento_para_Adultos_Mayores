@@ -3,6 +3,7 @@ services:
     image: mongo:7
     container_name: mearn-mongo
     restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     environment:
       MONGO_INITDB_DATABASE: mearn_db
     ports:
