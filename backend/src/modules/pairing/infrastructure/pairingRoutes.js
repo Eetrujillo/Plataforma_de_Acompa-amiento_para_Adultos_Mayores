@@ -7,6 +7,7 @@ const { requireRole } = require('../../../shared/middlewares/authMiddleware');
 function createPairingRouter({ controller, authMiddleware }) {
   const router = express.Router();
 
+  router.get('/seniors', authMiddleware, requireRole(ROLES.CAREGIVER), controller.seniors);
   router.post('/codes', authMiddleware, requireRole(ROLES.CAREGIVER), controller.generate);
   // Public: the senior device has no account yet, the code is the credential.
   router.post('/link', controller.link);

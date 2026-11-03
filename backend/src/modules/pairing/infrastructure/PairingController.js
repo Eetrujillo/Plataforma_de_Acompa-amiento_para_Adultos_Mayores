@@ -5,8 +5,13 @@ const { asyncHandler } = require('../../../shared/middlewares/asyncHandler');
 /**
  * Express controller for the pairing slice.
  */
-function createPairingController({ generatePairingCode, linkSeniorApp, qrGenerator }) {
+function createPairingController({ generatePairingCode, linkSeniorApp, listLinkedSeniors, qrGenerator }) {
   return {
+    seniors: asyncHandler(async (req, res) => {
+      const result = await listLinkedSeniors.execute({ caregiverId: req.user.id });
+      res.status(200).json(result);
+    }),
+
     generate: asyncHandler(async (req, res) => {
       const pairing = await generatePairingCode.execute({ caregiverId: req.user.id });
       const qrCodeDataUrl = await qrGenerator.toDataUrl(pairing.code);

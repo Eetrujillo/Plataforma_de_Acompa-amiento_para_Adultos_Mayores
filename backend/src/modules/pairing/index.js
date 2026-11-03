@@ -2,6 +2,7 @@
 
 const { GeneratePairingCode } = require('./application/GeneratePairingCode');
 const { LinkSeniorApp } = require('./application/LinkSeniorApp');
+const { ListLinkedSeniors } = require('./application/ListLinkedSeniors');
 const { PrismaPairingRepository } = require('./infrastructure/PrismaPairingRepository');
 const { QrGenerator } = require('./infrastructure/QrGenerator');
 const { createPairingController } = require('./infrastructure/PairingController');
@@ -16,6 +17,7 @@ function createPairingModule({ prisma, config, userRepository, tokenService, aut
   const controller = createPairingController({
     generatePairingCode: new GeneratePairingCode({ pairingRepository, config }),
     linkSeniorApp: new LinkSeniorApp({ pairingRepository, userRepository, tokenService }),
+    listLinkedSeniors: new ListLinkedSeniors({ userRepository }),
     qrGenerator: new QrGenerator()
   });
 
