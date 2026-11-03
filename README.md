@@ -69,6 +69,12 @@ npm install
 npm run dev              # http://localhost:3201 (proxy /api -> :3500)
 ```
 
+## Correo de verificación
+
+El registro manda un enlace por SMTP. Sin `SMTP_HOST` el enlace solo se imprime en el log del
+backend: alcanza para probar, no para usuarios reales. Configuración paso a paso, con Gmail, SMTP
+del dominio o un servicio transaccional: **[docs/smtp-setup.md](docs/smtp-setup.md)**.
+
 ## Endpoints
 
 | Método | Ruta | Rol |
