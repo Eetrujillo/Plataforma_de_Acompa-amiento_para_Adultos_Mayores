@@ -1,18 +1,17 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from './context/AuthProvider';
-import { SessionExpiredModal } from './components/auth/SessionExpiredModal';
-import { AppRoutes } from './routes/AppRoutes';
+import { createRoot } from 'react-dom/client';
+
+import App from './app/App.jsx';
 import './styles/globals.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const container = document.getElementById('root');
+
+if (!container) {
+  throw new Error('Root container #root is missing from index.html');
+}
+
+createRoot(container).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <SessionExpiredModal />
-      </AuthProvider>
-    </BrowserRouter>
+    <App />
   </React.StrictMode>
 );

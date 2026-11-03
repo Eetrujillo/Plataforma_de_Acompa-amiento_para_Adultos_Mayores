@@ -1,0 +1,8 @@
+{
+  "appId": "top.apolobyte.acompanamiento",
+  "appName": "Acompanamiento",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
