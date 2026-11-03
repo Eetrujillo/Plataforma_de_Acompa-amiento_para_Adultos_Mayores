@@ -32,6 +32,15 @@ Regla de dependencia: `domain` no importa nada de `application` ni de
 `tokenService`, `notifier`, ...) y la composition root de cada slice decide qué
 adaptador concreto inyectar.
 
+## Base de datos
+
+Mongo corre como **replica set de un nodo** (`rs0`) y el servicio `mongo-rs-init` lo inicializa en
+cada `up` (idempotente). No es capricho: Prisma envuelve las escrituras en una transacción y MongoDB
+solo soporta transacciones sobre un replica set; en modo standalone todo `create` falla con `P2031`.
+
+La URL queda fijada en `docker-compose.yml` (`mongodb://mongo:27017/mearn_db?replicaSet=rs0`), así que
+un valor viejo en `.env` no puede romper el arranque.
+
 ## Puertos
 
 | Servicio | Host | Contenedor |

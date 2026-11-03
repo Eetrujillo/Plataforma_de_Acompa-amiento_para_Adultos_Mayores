@@ -3,12 +3,11 @@ services:
     image: mongo:7
     container_name: mearn-mongo
     restart: unless-stopped
-    # Standalone mongod on purpose: the application never opens multi-document
-    # transactions, which is the only Prisma feature that requires a replica set.
-    # If transactions are ever added, start with --replSet plus a real
-    # rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}) and add
-    # ?replicaSet=rs0 to MONGO_URL. A declared but uninitiated set has no primary
-    # and every query fails with ReplicaSetNoPrimary.
+    # Single node replica set. Prisma wraps writes in a transaction, and MongoDB
+    # only supports transactions on a replica set, so standalone mongod breaks
+    # every create/update with P2031. The set must also be INITIATED, which is
+    # what the mongo-rs-init service below does on every start (idempotent).
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     environment:
       MONGO_INITDB_DATABASE: mearn_db
     ports:
@@ -25,6 +24,33 @@ services:
     networks:
       - mearn-net
 
+  # One shot: initiates the replica set if it is not initiated yet and waits for a
+  # primary. Running it on every `up` is safe, and it makes the deploy repeatable
+  # instead of requiring a manual rs.initiate().
+  mongo-rs-init:
+    image: mongo:7
+    container_name: mearn-mongo-rs-init
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        mongosh --host mongo:27017 --quiet --eval '
+          try { rs.status(); } catch (error) { rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] }); }
+          for (let attempt = 0; attempt < 60; attempt += 1) {
+            if (db.hello().isWritablePrimary) { print("replica set primary ready"); quit(0); }
+            sleep(500);
+          }
+          print("replica set primary never came up");
+          quit(1);
+        '
+    networks:
+      - mearn-net
+
   backend:
     build:
       context: ./backend
@@ -34,17 +60,20 @@ services:
     env_file:
       - .env
     environment:
-      # Mongo is the only datastore, so the Prisma URL is derived from MONGO_URL.
-      # Setting it explicitly also overrides a stale DATABASE_URL left in .env by
-      # another project (the Prisma CLI reads the variable raw and rejects it).
-      - DATABASE_URL=${MONGO_URL:-mongodb://mongo:27017/mearn_db}
-      - MONGO_URL=${MONGO_URL:-mongodb://mongo:27017/mearn_db}
+      # The mongo topology is fixed by this file (single node replica set rs0 on
+      # host `mongo`), so the URL is pinned here: .env can no longer point the
+      # backend at localhost or drop ?replicaSet. To use Atlas, replace both
+      # values with your cluster URI.
+      - MONGO_URL=mongodb://mongo:27017/mearn_db?replicaSet=rs0
+      - DATABASE_URL=mongodb://mongo:27017/mearn_db?replicaSet=rs0
       # Fixed on purpose: nginx proxies to backend:3500 and the image EXPOSEs 3500.
       # Only the published host port is configurable (BACKEND_PORT).
       - BACKEND_INTERNAL_PORT=3500
     depends_on:
       mongo:
         condition: service_healthy
+      mongo-rs-init:
+        condition: service_completed_successfully
     ports:
       - "${BACKEND_PORT:-3500}:3500"
     # The container runs the built image: no bind mount and no anonymous volume
