@@ -53,6 +53,13 @@ S10. Final check: `npm run build` succeeds in both folders and no import is brok
 | T7 | S1,S9,S10 | inline | this commit |
 | T8 | S10 | inline | verified, see L5 |
 
+Risk: item 2 (JWT issuance/verification, bcrypt hashing, role guards and the
+single-use pairing credential are security surface across four slices); item 5
+(Dockerfiles, compose networking, and a new dependency set change how the stack
+is built and delivered). Neither is inferred to be safe from the green build.
+
+Verification: independent `gentle-ai-verify` over S1-S10 plus the security checks.
+
 ## Log
 
 L1 (user, verbatim):
