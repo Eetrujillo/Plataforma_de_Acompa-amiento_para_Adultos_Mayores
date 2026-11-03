@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+/// Caregiver or senior account.
+/// MongoDB has no native enums, so `role` is a validated String (CAREGIVER | SENIOR).
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String?
+  fullName     String
+  role         String
+  phone        String?
+  caregiverId  String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([role])
+  @@index([caregiverId])
+}
+
+/// Short lived 6 digit code that binds a senior device to a caregiver account.
+model PairingCode {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  code        String    @unique
+  caregiverId String    @db.ObjectId
+  seniorId    String?   @db.ObjectId
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([caregiverId])
+}
+
+/// Daily routine item assigned by a caregiver to a senior.
+model Activity {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId      String    @db.ObjectId
+  createdBy     String    @db.ObjectId
+  title         String
+  description   String?
+  scheduledTime String
+  scheduledDate String
+  status        String    @default("PENDING")
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([seniorId, scheduledDate])
+  @@index([status])
+}
+
+/// Emergency alert raised from a senior device with its GPS position.
+model SosAlert {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId   String    @db.ObjectId
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  message    String?
+  status     String    @default("ACTIVE")
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  resolvedBy String?   @db.ObjectId
+
+  @@index([seniorId, status])
+  @@index([status])
+}
