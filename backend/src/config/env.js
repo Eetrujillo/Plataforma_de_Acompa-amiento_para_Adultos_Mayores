@@ -61,6 +61,11 @@ const config = Object.freeze({
     maxGenerationAttempts: 5
   }),
   appUrl: (process.env.APP_URL || 'http://localhost:3201').replace(/\/+$/, ''),
+  terms: Object.freeze({
+    // Version of the data treatment policy the account accepts. Bumping it here is what
+    // makes new registrations record the new policy; old records keep their own version.
+    version: process.env.TERMS_VERSION || '1.0'
+  }),
   verification: Object.freeze({
     ttlHours: Number.parseInt(process.env.EMAIL_VERIFICATION_TTL_HOURS || '24', 10)
   }),

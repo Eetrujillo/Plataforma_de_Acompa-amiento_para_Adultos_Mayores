@@ -9,56 +9,106 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_PATTERN = /^[+\d][\d\s-]{5,19}$/;
 const MIN_PASSWORD_LENGTH = 8;
 const MIN_FULL_NAME_LENGTH = 3;
+const DIGIT_PATTERN = /\d/;
+const LETTER_PATTERN = /[a-z]/i;
 
-function normalizeEmail(email) {
+/**
+ * Validation texts per flow.
+ *
+ * The register screen renders the message as it arrives, so it needs Spanish.
+ * Pairing and login reuse these functions with their own already published
+ * wording: localizing one flow must never change the answers of the others.
+ */
+const MESSAGES = Object.freeze({
+  emailRequired: 'email is required',
+  emailFormat: 'email format is invalid',
+  fullNameRequired: 'fullName is required',
+  fullNameTooShort: (min) => `fullName must be at least ${min} characters`,
+  phoneNotString: 'phone must be a string',
+  phoneFormat: 'phone format is invalid'
+});
+
+const REGISTER_MESSAGES = Object.freeze({
+  emailRequired: 'El correo es obligatorio',
+  emailFormat: 'El correo no tiene un formato válido',
+  fullNameRequired: 'El nombre completo es obligatorio',
+  fullNameTooShort: (min) => `El nombre completo debe tener al menos ${min} caracteres`,
+  phoneNotString: 'El teléfono debe ser texto',
+  phoneFormat: 'El teléfono no tiene un formato válido'
+});
+
+function normalizeEmail(email, messages = MESSAGES) {
   if (typeof email !== 'string') {
-    throw new ValidationError('email is required');
+    throw new ValidationError(messages.emailRequired);
   }
 
   const normalized = email.trim().toLowerCase();
 
   if (!EMAIL_PATTERN.test(normalized)) {
-    throw new ValidationError('email format is invalid');
+    throw new ValidationError(messages.emailFormat);
   }
 
   return normalized;
 }
 
+// Only the register flow checks password strength, so its text lives here.
 function assertPassword(password) {
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
-    throw new ValidationError(`password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    throw new ValidationError(
+      `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`
+    );
+  }
+
+  if (!LETTER_PATTERN.test(password) || !DIGIT_PATTERN.test(password)) {
+    throw new ValidationError('La contraseña debe combinar letras y números');
   }
 
   return password;
 }
 
-function normalizeFullName(fullName) {
+/**
+ * Ley 1581 consent gate.
+ *
+ * Only an explicit boolean `true` counts: silence, a missing flag and a
+ * pre-checked box are not consent (SIC, Ley 1581 art. 3 y 9).
+ */
+function assertTermsAcceptance(acceptedTerms) {
+  if (acceptedTerms !== true) {
+    throw new ValidationError(
+      'Tenés que aceptar los términos y la política de tratamiento de datos personales'
+    );
+  }
+
+  return true;
+}
+
+function normalizeFullName(fullName, messages = MESSAGES) {
   if (typeof fullName !== 'string') {
-    throw new ValidationError('fullName is required');
+    throw new ValidationError(messages.fullNameRequired);
   }
 
   const normalized = fullName.trim().replace(/\s+/g, ' ');
 
   if (normalized.length < MIN_FULL_NAME_LENGTH) {
-    throw new ValidationError(`fullName must be at least ${MIN_FULL_NAME_LENGTH} characters`);
+    throw new ValidationError(messages.fullNameTooShort(MIN_FULL_NAME_LENGTH));
   }
 
   return normalized;
 }
 
-function normalizePhone(phone) {
+function normalizePhone(phone, messages = MESSAGES) {
   if (phone === undefined || phone === null || phone === '') {
     return null;
   }
 
   if (typeof phone !== 'string') {
-    throw new ValidationError('phone must be a string');
+    throw new ValidationError(messages.phoneNotString);
   }
 
   const normalized = phone.trim();
 
   if (!PHONE_PATTERN.test(normalized)) {
-    throw new ValidationError('phone format is invalid');
+    throw new ValidationError(messages.phoneFormat);
   }
 
   return normalized;
@@ -71,7 +121,20 @@ function normalizePhone(phone) {
  * identity data the same way.
  */
 class User {
-  constructor({ id = null, email, passwordHash = null, fullName, role, phone = null, caregiverId = null, emailVerifiedAt = null, createdAt = null }) {
+  constructor({
+    id = null,
+    email,
+    passwordHash = null,
+    fullName,
+    role,
+    phone = null,
+    caregiverId = null,
+    emailVerifiedAt = null,
+    acceptedTermsAt = null,
+    termsVersion = null,
+    ipAddress = null,
+    createdAt = null
+  }) {
     this.id = id;
     this.email = email;
     this.passwordHash = passwordHash;
@@ -80,17 +143,38 @@ class User {
     this.phone = phone;
     this.caregiverId = caregiverId;
     this.emailVerifiedAt = emailVerifiedAt;
+    this.acceptedTermsAt = acceptedTermsAt;
+    this.termsVersion = termsVersion;
+    this.ipAddress = ipAddress;
     this.createdAt = createdAt;
   }
 
-  static registerCaregiver({ email, password, fullName, phone }) {
+  static registerCaregiver({
+    email,
+    password,
+    fullName,
+    phone,
+    acceptedTerms,
+    termsVersion,
+    ipAddress = null,
+    now = new Date()
+  }) {
     assertPassword(password);
+    assertTermsAcceptance(acceptedTerms);
+
+    if (typeof termsVersion !== 'string' || termsVersion.length === 0) {
+      throw new ValidationError('La versión de los términos es obligatoria');
+    }
 
     return new User({
-      email: normalizeEmail(email),
-      fullName: normalizeFullName(fullName),
-      phone: normalizePhone(phone),
-      role: ROLES.CAREGIVER
+      email: normalizeEmail(email, REGISTER_MESSAGES),
+      fullName: normalizeFullName(fullName, REGISTER_MESSAGES),
+      phone: normalizePhone(phone, REGISTER_MESSAGES),
+      role: ROLES.CAREGIVER,
+      // Consent evidence is stamped here, never taken from the request body.
+      acceptedTermsAt: now,
+      termsVersion,
+      ipAddress
     });
   }
 
@@ -150,5 +234,6 @@ module.exports = {
   normalizeFullName,
   normalizePhone,
   assertPassword,
+  assertTermsAcceptance,
   MIN_PASSWORD_LENGTH
 };

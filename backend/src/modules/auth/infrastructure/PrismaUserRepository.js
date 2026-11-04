@@ -20,10 +20,32 @@ class PrismaUserRepository {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
-  async create({ email, fullName, phone, role, passwordHash = null, caregiverId = null, emailVerifiedAt = null }) {
+  async create({
+    email,
+    fullName,
+    phone,
+    role,
+    passwordHash = null,
+    caregiverId = null,
+    emailVerifiedAt = null,
+    acceptedTermsAt = null,
+    termsVersion = null,
+    ipAddress = null
+  }) {
     try {
       return await this.prisma.user.create({
-        data: { email, fullName, phone, role, passwordHash, caregiverId, emailVerifiedAt }
+        data: {
+          email,
+          fullName,
+          phone,
+          role,
+          passwordHash,
+          caregiverId,
+          emailVerifiedAt,
+          acceptedTermsAt,
+          termsVersion,
+          ipAddress
+        }
       });
     } catch (error) {
       if (error.code === UNIQUE_CONSTRAINT_CODE) {

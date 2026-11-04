@@ -18,6 +18,10 @@ model User {
   phone        String?
   caregiverId  String?  @db.ObjectId
   emailVerifiedAt DateTime?
+  /// Ley 1581 consent evidence: stamped by the server when the account is created.
+  acceptedTermsAt DateTime?
+  termsVersion    String?
+  ipAddress       String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

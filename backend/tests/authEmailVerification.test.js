@@ -19,7 +19,7 @@ const {
   ResendVerificationEmail
 } = require('../src/modules/auth/application/ResendVerificationEmail');
 const {
-  ConflictError,
+  EmailAlreadyRegisteredError,
   EmailNotVerifiedError,
   ValidationError
 } = require('../src/shared/errors');
@@ -137,9 +137,10 @@ function buildScenario() {
 
 const VALID_REGISTRATION = Object.freeze({
   email: 'Cuidador@Example.com',
-  password: 'secreto-largo',
+  password: 'secreto-largo1',
   fullName: 'Esteban Trujillo',
-  phone: '+54 11 5555 1234'
+  phone: '+54 11 5555 1234',
+  acceptedTerms: true
 });
 
 function tokenFromLink(link) {
@@ -190,7 +191,7 @@ test('registering creates an unverified caregiver and sends exactly one email', 
 
   const stored = [...scenario.userRepository.users.values()][0];
   assert.equal(stored.emailVerifiedAt, null);
-  assert.equal(stored.passwordHash, 'hashed:secreto-largo');
+  assert.equal(stored.passwordHash, 'hashed:secreto-largo1');
   assert.equal('verificationToken' in result, false);
 
   const link = scenario.emailSender.sent[0].link;
@@ -205,7 +206,10 @@ test('registering an existing email is rejected and sends nothing', async () => 
 
   await assert.rejects(
     () => scenario.register.execute(VALID_REGISTRATION),
-    (error) => error instanceof ConflictError && error.message === 'Email is already registered'
+    (error) =>
+      error instanceof EmailAlreadyRegisteredError &&
+      error.statusCode === 400 &&
+      error.message === 'Este correo ya tiene una cuenta'
   );
   assert.equal(scenario.emailSender.sent.length, 1);
 });
@@ -215,7 +219,7 @@ test('login is blocked until the email is verified, then it works', async () => 
   await scenario.register.execute(VALID_REGISTRATION);
 
   await assert.rejects(
-    () => scenario.login.execute({ email: 'cuidador@example.com', password: 'secreto-largo' }),
+    () => scenario.login.execute({ email: 'cuidador@example.com', password: 'secreto-largo1' }),
     (error) =>
       error instanceof EmailNotVerifiedError &&
       error.code === 'EMAIL_NOT_VERIFIED' &&
@@ -231,7 +235,7 @@ test('login is blocked until the email is verified, then it works', async () => 
 
   const session = await scenario.login.execute({
     email: 'cuidador@example.com',
-    password: 'secreto-largo'
+    password: 'secreto-largo1'
   });
 
   assert.equal(session.user.emailVerified, true);

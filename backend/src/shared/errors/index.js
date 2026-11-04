@@ -7,6 +7,7 @@ const { ForbiddenError } = require('./ForbiddenError');
 const { EmailNotVerifiedError } = require('./EmailNotVerifiedError');
 const { NotFoundError } = require('./NotFoundError');
 const { ConflictError } = require('./ConflictError');
+const { EmailAlreadyRegisteredError } = require('./EmailAlreadyRegisteredError');
 
 module.exports = {
   AppError,
@@ -15,5 +16,6 @@ module.exports = {
   ForbiddenError,
   EmailNotVerifiedError,
   NotFoundError,
-  ConflictError
+  ConflictError,
+  EmailAlreadyRegisteredError
 };

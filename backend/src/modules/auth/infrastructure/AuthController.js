@@ -8,7 +8,8 @@ const { asyncHandler } = require('../../../shared/middlewares/asyncHandler');
 function createAuthController({ registerCaregiver, login, getCurrentUser, verifyEmail, resendVerificationEmail }) {
   return {
     register: asyncHandler(async (req, res) => {
-      const result = await registerCaregiver.execute(req.body);
+      // `req.ip` wins over any client supplied address: consent evidence is server owned.
+      const result = await registerCaregiver.execute({ ...(req.body ?? {}), ipAddress: req.ip });
       res.status(201).json(result);
     }),
 
