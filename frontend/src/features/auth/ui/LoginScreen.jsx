@@ -271,11 +271,12 @@ export function LoginScreen() {
               <button type="button" className="login__forgot-button" disabled>
                 ¿Olvidaste tu contraseña?
               </button>
-              <span className="login__forgot-note">
-                La recuperación de contraseña todavía no está disponible.
-              </span>
             </div>
           </div>
+
+          <p className="login__forgot-note">
+            La recuperación de contraseña todavía no está disponible.
+          </p>
 
           <PrimaryButton type="submit" block className="login__submit" disabled={pending}>
             <span>{pending ? 'Ingresando…' : 'Iniciar sesión'}</span>
