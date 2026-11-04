@@ -19,6 +19,9 @@ const {
   ResendVerificationEmail
 } = require('../src/modules/auth/application/ResendVerificationEmail');
 const {
+  PrismaEmailVerificationRepository
+} = require('../src/modules/auth/infrastructure/PrismaEmailVerificationRepository');
+const {
   EmailAlreadyRegisteredError,
   EmailNotVerifiedError,
   ValidationError
@@ -306,4 +309,82 @@ test('resending for an unknown or already verified email reveals nothing and sen
     accepted: true
   });
   assert.equal(scenario.emailSender.sent.length, 1);
+});
+
+// The fake repository above cannot catch a filter that the real driver ignores. This
+// one mimics MongoDB: a missing field and an explicit null are different things, and
+// Prisma's `usedAt: null` only matches the second one.
+function createMongoLikePrisma() {
+  const docs = [];
+  let counter = 0;
+
+  function matches(doc, where) {
+    if (where.userId !== undefined && doc.userId !== where.userId) {
+      return false;
+    }
+
+    if (where.OR) {
+      return where.OR.some((clause) => matches(doc, clause));
+    }
+
+    if ('usedAt' in where) {
+      const filter = where.usedAt;
+
+      if (filter && filter.isSet === false) {
+        return !('usedAt' in doc);
+      }
+
+      return 'usedAt' in doc && doc.usedAt === null;
+    }
+
+    return true;
+  }
+
+  return {
+    docs,
+    emailVerificationToken: {
+      async create({ data }) {
+        const doc = { id: `doc-${(counter += 1)}`, ...data };
+        // MongoDB stores exactly the keys it is given: absent stays absent.
+        for (const key of Object.keys(doc)) {
+          if (doc[key] === undefined) {
+            delete doc[key];
+          }
+        }
+        docs.push(doc);
+        return doc;
+      },
+      async updateMany({ where, data }) {
+        const target = docs.filter((doc) => matches(doc, where));
+        for (const doc of target) {
+          Object.assign(doc, data);
+        }
+        return { count: target.length };
+      }
+    }
+  };
+}
+
+test('reiniciar el reenvío quema el enlace anterior también contra la semántica de MongoDB', async () => {
+  const prisma = createMongoLikePrisma();
+  const repository = new PrismaEmailVerificationRepository({ prisma });
+
+  const issued = await repository.create({
+    userId: 'user-1',
+    tokenHash: 'a'.repeat(64),
+    expiresAt: new Date(Date.now() + 60_000)
+  });
+
+  // A token written before `usedAt` was persisted explicitly: the field is absent.
+  prisma.docs.push({ id: 'legacy', userId: 'user-1', tokenHash: 'b'.repeat(64), expiresAt: new Date() });
+  prisma.docs.push({ id: 'other-user', userId: 'user-2', tokenHash: 'c'.repeat(64), expiresAt: new Date(), usedAt: null });
+
+  assert.equal(issued.usedAt, null);
+  assert.ok('usedAt' in prisma.docs[0], 'el token nuevo guarda usedAt nulo explícito');
+
+  await repository.invalidateForUser('user-1');
+
+  assert.ok(prisma.docs[0].usedAt instanceof Date, 'el token recién emitido queda quemado');
+  assert.ok(prisma.docs[1].usedAt instanceof Date, 'el token sin el campo también queda quemado');
+  assert.equal(prisma.docs[2].usedAt, null, 'los tokens de otro usuario no se tocan');
 });
