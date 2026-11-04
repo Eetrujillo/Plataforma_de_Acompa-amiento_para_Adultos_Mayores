@@ -13,20 +13,20 @@ export function AuthProvider({ children }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(null);
 
-  const startSession = useCallback((nextSession) => {
-    writeSession(nextSession);
+  const startSession = useCallback((nextSession, { persist = true } = {}) => {
+    writeSession(nextSession, { persist });
     setSession(nextSession);
     setError(null);
   }, []);
 
   const login = useCallback(
-    async ({ email, password }) => {
+    async ({ email, password, remember = true }) => {
       setPending(true);
       setError(null);
 
       try {
         const result = await loginRequest({ email, password });
-        startSession(result);
+        startSession(result, { persist: remember });
         return true;
       } catch (caught) {
         setError({ message: caught.message, code: caught.code ?? 'UNKNOWN' });
