@@ -39,6 +39,38 @@ function mapPrismaError(error) {
 }
 
 /**
+ * `express.json` failures (malformed or oversized bodies) carry a `type` we can
+ * translate into a precise 4xx instead of a masked 500.
+ */
+function mapBodyParserError(error) {
+  if (error?.type === 'entity.parse.failed') {
+    return {
+      statusCode: 400,
+      code: 'INVALID_JSON',
+      message: 'El cuerpo de la solicitud no es JSON válido.'
+    };
+  }
+
+  if (error?.type === 'entity.too.large') {
+    return {
+      statusCode: 413,
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'El cuerpo de la solicitud supera el límite permitido (100kb).'
+    };
+  }
+
+  return null;
+}
+
+function requestDurationMs(req) {
+  if (typeof req?.requestStartedAt !== 'bigint') {
+    return 0;
+  }
+
+  return Number(process.hrtime.bigint() - req.requestStartedAt) / 1e6;
+}
+
+/**
  * Terminal 404 handler for unknown API routes.
  */
 function notFoundHandler(req, _res, next) {
@@ -53,27 +85,52 @@ function notFoundHandler(req, _res, next) {
  * leak to clients.
  */
 function createErrorHandler({ logger = console } = {}) {
-  return function errorHandler(error, _req, res, _next) {
+  return function errorHandler(error, req, res, _next) {
     const isOperational = error instanceof AppError;
-    const hint = isOperational ? null : mapPrismaError(error);
-    const statusCode = isOperational ? error.statusCode : hint?.statusCode ?? 500;
-
-    if (statusCode >= 500) {
-      logger.error('[error]', error);
-    }
+    const parserHint = isOperational ? null : mapBodyParserError(error);
+    const hint = isOperational || parserHint ? null : mapPrismaError(error);
+    const statusCode = isOperational
+      ? error.statusCode
+      : parserHint?.statusCode ?? hint?.statusCode ?? 500;
 
     let payload;
 
     if (isOperational) {
       payload = error.toJSON();
+    } else if (parserHint) {
+      payload = { error: { code: parserHint.code, message: parserHint.message } };
     } else if (hint) {
       payload = { error: { code: hint.code, message: hint.message } };
     } else {
       payload = { error: { code: 'INTERNAL_ERROR', message: 'Unexpected server error' } };
     }
 
+    if (statusCode >= 500) {
+      logger.error('[error]', {
+        requestId: req?.id,
+        method: req?.method,
+        url: req?.originalUrl ?? req?.url,
+        status: statusCode,
+        code: payload.error.code,
+        durationMs: requestDurationMs(req),
+        error
+      });
+    }
+
+    // The correlation id is only exposed on 5xx so clients can report an
+    // incident; 4xx bodies keep their established shape.
+    if (statusCode >= 500 && req?.id) {
+      payload = { error: { ...payload.error, requestId: req.id } };
+    }
+
     res.status(statusCode).json(payload);
   };
 }
 
-module.exports = { createErrorHandler, notFoundHandler, mapPrismaError, PRISMA_HINTS };
+module.exports = {
+  createErrorHandler,
+  notFoundHandler,
+  mapPrismaError,
+  mapBodyParserError,
+  PRISMA_HINTS
+};

@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 
 const { createErrorHandler, notFoundHandler } = require('./shared/middlewares/errorHandler');
+const { createRequestContext } = require('./shared/middlewares/requestContext');
 
 const API_PREFIX = '/api';
 const HEALTH_PAYLOAD = Object.freeze({ status: 'ok', db: 'mongodb' });
@@ -17,6 +18,7 @@ function createApp({ config, modules = {}, logger = console } = {}) {
   const app = express();
 
   app.disable('x-powered-by');
+  app.use(createRequestContext());
   app.use(cors({ origin: config?.corsOrigin ?? '*' }));
   app.use(express.json({ limit: '100kb' }));
 

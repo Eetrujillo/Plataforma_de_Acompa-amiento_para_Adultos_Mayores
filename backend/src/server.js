@@ -88,7 +88,7 @@ async function start() {
 
   let shuttingDown = false;
 
-  const shutdown = async (signal) => {
+  const shutdown = async (signal, exitCode = 0) => {
     if (shuttingDown) {
       return;
     }
@@ -100,7 +100,7 @@ async function start() {
     await new Promise((resolve) => httpServer.close(resolve));
     await prisma.$disconnect();
 
-    process.exit(0);
+    process.exit(exitCode);
   };
 
   for (const signal of ['SIGINT', 'SIGTERM']) {
@@ -111,6 +111,36 @@ async function start() {
       });
     });
   }
+
+  // A crash must leave a diagnosable trace and then take the same graceful path
+  // as a signal, instead of leaving the process in an undefined state.
+  const CRASH_EXIT_TIMEOUT_MS = 5_000;
+
+  const crash = (kind, error) => {
+    console.error(`[server] ${kind}: ${error?.name ?? 'Error'}: ${error?.message ?? String(error)}`);
+    console.error(error?.stack ?? '(no stack)');
+
+    // A second crash while draining means the graceful path is already lost.
+    if (shuttingDown) {
+      process.exit(1);
+    }
+
+    // Draining sockets after a crash must be bounded: a hung shutdown would leave
+    // the process alive in exactly the indeterminate state this handler avoids.
+    const watchdog = setTimeout(() => {
+      console.error(`[server] shutdown after ${kind} did not finish, forcing exit`);
+      process.exit(1);
+    }, CRASH_EXIT_TIMEOUT_MS);
+    watchdog.unref();
+
+    shutdown(kind, 1).catch((shutdownError) => {
+      console.error('[server] shutdown failed', shutdownError);
+      process.exit(1);
+    });
+  };
+
+  process.on('unhandledRejection', (reason) => crash('unhandledRejection', reason));
+  process.on('uncaughtException', (error) => crash('uncaughtException', error));
 
   return { httpServer, io };
 }
