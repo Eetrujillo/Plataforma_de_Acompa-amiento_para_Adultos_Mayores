@@ -2,11 +2,13 @@
 
 const { RegisterCaregiver } = require('./application/RegisterCaregiver');
 const { Login } = require('./application/Login');
+const { LoginWithGoogle } = require('./application/LoginWithGoogle');
 const { GetCurrentUser } = require('./application/GetCurrentUser');
 const { VerifyEmail } = require('./application/VerifyEmail');
 const { ResendVerificationEmail } = require('./application/ResendVerificationEmail');
 const { BcryptPasswordHasher } = require('./infrastructure/BcryptPasswordHasher');
 const { JwtTokenService } = require('./infrastructure/JwtTokenService');
+const { GoogleIdTokenVerifier } = require('./infrastructure/GoogleIdTokenVerifier');
 const { PrismaUserRepository } = require('./infrastructure/PrismaUserRepository');
 const { PrismaEmailVerificationRepository } = require('./infrastructure/PrismaEmailVerificationRepository');
 const { createEmailSender } = require('./infrastructure/EmailSender');
@@ -38,6 +40,16 @@ function createAuthModule({ prisma, config, logger = console }) {
       logger
     }),
     login: new Login({ userRepository, passwordHasher, tokenService }),
+    loginWithGoogle: new LoginWithGoogle({
+      userRepository,
+      tokenService,
+      idTokenVerifier: new GoogleIdTokenVerifier(),
+      config
+    }),
+    googleConfig: {
+      enabled: Boolean(config.google?.clientId),
+      clientId: config.google?.clientId || null
+    },
     getCurrentUser: new GetCurrentUser({ userRepository }),
     verifyEmail: new VerifyEmail({ verificationRepository, userRepository, tokenService }),
     resendVerificationEmail: new ResendVerificationEmail({

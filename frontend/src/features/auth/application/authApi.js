@@ -32,3 +32,21 @@ export async function fetchCurrentUser() {
   const { data } = await apiClient.get('/auth/me');
   return data.user;
 }
+
+/**
+ * Runtime Google client config. The client id is never baked into the build.
+ * A missing or failing config simply means Google is not available yet.
+ */
+export async function fetchGoogleConfig() {
+  const { data } = await apiClient.get('/auth/google/config');
+  return data;
+}
+
+/**
+ * Signs in an existing account with the id_token issued by Google Identity Services.
+ * The backend only authenticates accounts that already exist: it never creates one.
+ */
+export async function googleLoginRequest(idToken) {
+  const { data } = await apiClient.post('/auth/google', { idToken });
+  return data;
+}

@@ -5,7 +5,15 @@ const { asyncHandler } = require('../../../shared/middlewares/asyncHandler');
 /**
  * Express controller for the auth slice.
  */
-function createAuthController({ registerCaregiver, login, getCurrentUser, verifyEmail, resendVerificationEmail }) {
+function createAuthController({
+  registerCaregiver,
+  login,
+  getCurrentUser,
+  verifyEmail,
+  resendVerificationEmail,
+  loginWithGoogle,
+  googleConfig = { enabled: false, clientId: null }
+}) {
   return {
     register: asyncHandler(async (req, res) => {
       // `req.ip` wins over any client supplied address: consent evidence is server owned.
@@ -15,6 +23,16 @@ function createAuthController({ registerCaregiver, login, getCurrentUser, verify
 
     login: asyncHandler(async (req, res) => {
       const result = await login.execute(req.body);
+      res.status(200).json(result);
+    }),
+
+    googleConfig: asyncHandler(async (_req, res) => {
+      // Public, secret free: the client id is the only thing the bundle needs at runtime.
+      res.status(200).json({ enabled: googleConfig.enabled, clientId: googleConfig.clientId });
+    }),
+
+    googleLogin: asyncHandler(async (req, res) => {
+      const result = await loginWithGoogle.execute({ idToken: req.body?.idToken });
       res.status(200).json(result);
     }),
 

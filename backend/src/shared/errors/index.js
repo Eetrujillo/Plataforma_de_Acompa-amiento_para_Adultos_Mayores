@@ -8,6 +8,8 @@ const { EmailNotVerifiedError } = require('./EmailNotVerifiedError');
 const { NotFoundError } = require('./NotFoundError');
 const { ConflictError } = require('./ConflictError');
 const { EmailAlreadyRegisteredError } = require('./EmailAlreadyRegisteredError');
+const { EmailNotRegisteredError } = require('./EmailNotRegisteredError');
+const { GoogleNotConfiguredError } = require('./GoogleNotConfiguredError');
 
 module.exports = {
   AppError,
@@ -17,5 +19,7 @@ module.exports = {
   EmailNotVerifiedError,
   NotFoundError,
   ConflictError,
-  EmailAlreadyRegisteredError
+  EmailAlreadyRegisteredError,
+  EmailNotRegisteredError,
+  GoogleNotConfiguredError
 };

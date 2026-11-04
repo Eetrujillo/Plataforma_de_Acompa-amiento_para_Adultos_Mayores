@@ -55,6 +55,10 @@ const config = Object.freeze({
     secret: resolveJwtSecret(),
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   }),
+  google: Object.freeze({
+    // Public OAuth client id from Google Cloud. Empty means the button stays disabled.
+    clientId: process.env.GOOGLE_CLIENT_ID || ''
+  }),
   pairing: Object.freeze({
     codeLength: 6,
     ttlMinutes: Number.parseInt(process.env.PAIRING_TTL_MINUTES || '15', 10),

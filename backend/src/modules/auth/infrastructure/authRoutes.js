@@ -7,6 +7,8 @@ function createAuthRouter({ controller, authMiddleware }) {
 
   router.post('/register', controller.register);
   router.post('/login', controller.login);
+  router.get('/google/config', controller.googleConfig);
+  router.post('/google', controller.googleLogin);
   router.post('/verify-email', controller.verifyEmail);
   router.post('/resend-verification', controller.resendVerification);
   router.get('/me', authMiddleware, controller.me);
