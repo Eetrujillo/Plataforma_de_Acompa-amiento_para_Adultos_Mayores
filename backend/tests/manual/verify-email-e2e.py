@@ -83,18 +83,30 @@ def register(email, password="secreto123", accepted=True):
     return http("POST", f"{API}/auth/register", body)
 
 
-def cleanup(emails):
-    script = (
-        "const ids = db.User.find({email: {$in: %s}}).toArray().map(u => u._id);"
-        "const t = db.EmailVerificationToken.deleteMany({userId: {$in: ids}});"
-        "const u = db.User.deleteMany({_id: {$in: ids}});"
-        "printjson({users: u.deletedCount, tokens: t.deletedCount});"
-    ) % json.dumps(emails)
+def prisma_eval(script):
+    """Runs a throwaway Node script with the backend's own Prisma client.
+
+    It goes through the container, not through a local mongosh: the backend may be
+    pointed at the local Mongo or at the deployed one, and the check has to follow
+    whatever the backend actually uses.
+    """
     out = subprocess.run(
-        ["docker", "exec", "mearn-mongo", "mongosh", "mearn_db", "--quiet", "--eval", script],
+        ["docker", "exec", "mearn-backend", "node", "-e", script],
         capture_output=True, text=True,
     )
-    return out.stdout.strip() or out.stderr.strip()
+    return (out.stdout or out.stderr).strip()
+
+
+def cleanup(emails):
+    return prisma_eval(
+        "const {PrismaClient}=require('@prisma/client');const p=new PrismaClient();"
+        "(async()=>{const us=await p.user.findMany({where:{email:{in:%s}},select:{id:true}});"
+        "const ids=us.map(u=>u.id);"
+        "const t=await p.emailVerificationToken.deleteMany({where:{userId:{in:ids}}});"
+        "const u=await p.user.deleteMany({where:{id:{in:ids}}});"
+        "console.log(JSON.stringify({users:u.count,tokens:t.count,left:await p.user.count()}));"
+        "await p.$disconnect();})();" % json.dumps(emails)
+    )
 
 
 created = []
@@ -148,10 +160,13 @@ created.append(email_c)
 register(email_c)
 time.sleep(1.5)
 _, token_c = token_from(email_c)
-subprocess.run(
-    ["docker", "exec", "mearn-mongo", "mongosh", "mearn_db", "--quiet", "--eval",
-     "db.EmailVerificationToken.updateMany({usedAt: null}, {$set: {expiresAt: new Date(Date.now() - 60000)}})"],
-    capture_output=True, text=True,
+prisma_eval(
+    "const {PrismaClient}=require('@prisma/client');const p=new PrismaClient();"
+    "(async()=>{const u=await p.user.findUnique({where:{email:'%s'},select:{id:true}});"
+    "const r=await p.emailVerificationToken.updateMany("
+    "{where:{userId:u.id},data:{expiresAt:new Date(Date.now()-60000)}});"
+    "console.log('tokens vencidos a la fuerza (solo la cuenta de prueba):',r.count);"
+    "await p.$disconnect();})();" % email_c
 )
 status, body, _ = http("POST", f"{API}/auth/verify-email", {"token": token_c})
 check("token vencido responde 400", status == 400, f"HTTP {status}")
