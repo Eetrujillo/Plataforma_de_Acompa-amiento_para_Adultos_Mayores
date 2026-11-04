@@ -5,8 +5,16 @@ export async function loginRequest({ email, password }) {
   return data;
 }
 
-export async function registerRequest({ email, password, fullName, phone }) {
-  const { data } = await apiClient.post('/auth/register', { email, password, fullName, phone });
+export async function registerRequest({ email, password, fullName, phone, acceptedTerms }) {
+  // `acceptedTerms` must travel as a real boolean: the backend rejects anything else
+  // because Ley 1581 requires prior, express and informed consent.
+  const { data } = await apiClient.post('/auth/register', {
+    email,
+    password,
+    fullName,
+    phone,
+    acceptedTerms
+  });
   return data;
 }
 

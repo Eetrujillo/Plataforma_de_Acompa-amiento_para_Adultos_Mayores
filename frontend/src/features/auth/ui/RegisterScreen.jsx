@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { registerRequest, resendVerificationRequest } from '../application/authApi.js';
+import { TERMS_VERSION } from '../../../app/config/runtime.js';
 import { PrimaryButton } from '../../../shared/components/PrimaryButton.jsx';
 import { FormField } from '../../../shared/components/FormField.jsx';
 import { PageShell } from '../../../shared/components/PageShell.jsx';
 
-const EMPTY_FORM = { fullName: '', email: '', password: '', phone: '' };
+// Unchecked on purpose: a pre-checked box is not valid consent under Ley 1581 (SIC).
+const EMPTY_FORM = { fullName: '', email: '', password: '', phone: '', acceptedTerms: false };
 
 export function RegisterScreen() {
   const [form, setForm] = useState(EMPTY_FORM);
@@ -17,8 +19,8 @@ export function RegisterScreen() {
   const [notice, setNotice] = useState(null);
 
   function handleChange(event) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    const { name, value, type, checked } = event.target;
+    setForm((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
   }
 
   async function handleSubmit(event) {
@@ -134,7 +136,7 @@ export function RegisterScreen() {
             label="Contraseña"
             type="password"
             autoComplete="new-password"
-            hint="Mínimo 8 caracteres."
+            hint="Mínimo 8 caracteres, con letras y números."
             required
             value={form.password}
             onChange={handleChange}
@@ -149,7 +151,25 @@ export function RegisterScreen() {
             onChange={handleChange}
           />
 
-          <PrimaryButton type="submit" block disabled={pending}>
+          <div className="field field--check">
+            <label className="field__check-label" htmlFor="acceptedTerms">
+              <input
+                className="field__checkbox"
+                id="acceptedTerms"
+                name="acceptedTerms"
+                type="checkbox"
+                required
+                checked={form.acceptedTerms}
+                onChange={handleChange}
+              />
+              <span>
+                Acepto los términos y autorizo el tratamiento de mis datos personales para
+                administrar las rutinas y alertas de mi adulto mayor (versión {TERMS_VERSION}).
+              </span>
+            </label>
+          </div>
+
+          <PrimaryButton type="submit" block disabled={pending || !form.acceptedTerms}>
             {pending ? 'Creando cuenta…' : 'Crear cuenta'}
           </PrimaryButton>
         </form>

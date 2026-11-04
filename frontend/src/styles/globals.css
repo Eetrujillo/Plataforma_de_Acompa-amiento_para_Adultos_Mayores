@@ -206,6 +206,25 @@ select {
   border-color: var(--color-accent);
 }
 
+/* Consent checkbox: 48px touch target and a label that can wrap on mobile. */
+.field__check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-height: 3rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.field__checkbox {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-accent);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
