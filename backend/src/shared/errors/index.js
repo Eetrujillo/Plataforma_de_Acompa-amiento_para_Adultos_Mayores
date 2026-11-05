@@ -10,6 +10,7 @@ const { ConflictError } = require('./ConflictError');
 const { EmailAlreadyRegisteredError } = require('./EmailAlreadyRegisteredError');
 const { EmailNotRegisteredError } = require('./EmailNotRegisteredError');
 const { GoogleNotConfiguredError } = require('./GoogleNotConfiguredError');
+const { TooManyRequestsError } = require('./TooManyRequestsError');
 
 module.exports = {
   AppError,
@@ -21,5 +22,6 @@ module.exports = {
   ConflictError,
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,
-  GoogleNotConfiguredError
+  GoogleNotConfiguredError,
+  TooManyRequestsError
 };

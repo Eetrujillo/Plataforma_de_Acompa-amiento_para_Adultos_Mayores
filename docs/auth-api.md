@@ -66,5 +66,36 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
   `Invalid credentials` (no revela qué falló), `403` `EMAIL_NOT_VERIFIED` hasta confirmar el correo.
 - `POST /api/auth/verify-email` — `{ token }`; `200` con `{ token, user }`, `400` si el enlace
   expiró o ya se usó.
-- `POST /api/auth/resend-verification` — `{ email }`; siempre `202`, no revela si la cuenta existe.
+- `POST /api/auth/resend-verification` — `{ email }`; `202` con `{ accepted: true }`, **3 intentos
+  por hora y por correo**; el cuarto responde `429` (ver la sección siguiente).
 - `GET /api/auth/me` — requiere `Authorization: Bearer <jwt>`.
+
+## Límite del reenvío de verificación (HU-002)
+
+`POST /api/auth/resend-verification` acepta como máximo **3 intentos por correo dentro de una
+ventana móvil de una hora**. El cuarto devuelve `429`:
+
+```json
+{
+  "error": {
+    "code": "TOO_MANY_REQUESTS",
+    "message": "Pediste demasiados enlaces de verificación. Esperá unos minutos antes de pedir otro.",
+    "details": { "retryAfterSeconds": 3600 }
+  }
+}
+```
+
+- El contador corre **antes** de buscar la cuenta y cuenta **todo** intento, exista o no el correo y
+  esté o no verificado. Eso es lo que impide que el `429` sirva para averiguar si una cuenta existe:
+  el cuarto intento responde igual para un correo registrado que para uno inventado.
+- Un correo con formato inválido sigue siendo `400` (`VALIDATION_ERROR`) y no consume cupo.
+- El intento rechazado no se registra: insistir no alarga el bloqueo.
+- La clave es el correo normalizado (minúsculas, sin espacios); `Cuidador@Example.com` y
+  `cuidador@example.com` comparten contador.
+- Configuración: `RESEND_THROTTLE_MAX` (default `3`) y `RESEND_THROTTLE_WINDOW_MINUTES`
+  (default `60`).
+- Limitación conocida: el contador vive en la memoria del proceso. Con más de una réplica del
+  backend el límite real es *3 por hora por réplica*; ese día hay que moverlo a un store
+  compartido (Redis) sin cambiar el caso de uso.
+- Código: `application/ResendThrottle.js` (ventana y reloj inyectable) y
+  `shared/errors/TooManyRequestsError.js` (contrato del `429`).

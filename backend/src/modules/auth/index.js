@@ -6,6 +6,7 @@ const { LoginWithGoogle } = require('./application/LoginWithGoogle');
 const { GetCurrentUser } = require('./application/GetCurrentUser');
 const { VerifyEmail } = require('./application/VerifyEmail');
 const { ResendVerificationEmail } = require('./application/ResendVerificationEmail');
+const { ResendThrottle } = require('./application/ResendThrottle');
 const { BcryptPasswordHasher } = require('./infrastructure/BcryptPasswordHasher');
 const { JwtTokenService } = require('./infrastructure/JwtTokenService');
 const { GoogleIdTokenVerifier } = require('./infrastructure/GoogleIdTokenVerifier');
@@ -27,6 +28,11 @@ function createAuthModule({ prisma, config, logger = console }) {
   const passwordHasher = new BcryptPasswordHasher();
   const tokenService = new JwtTokenService(config.jwt);
   const emailSender = createEmailSender({ smtp: config.smtp, logger });
+  // One limiter per process: the window is shared by every request this instance serves.
+  const resendThrottle = new ResendThrottle({
+    maxAttempts: config.resendThrottle.maxAttempts,
+    windowMs: config.resendThrottle.windowMinutes * 60 * 1000
+  });
 
   const authMiddleware = createAuthMiddleware({ verifyToken: (token) => tokenService.verify(token) });
 
@@ -57,6 +63,7 @@ function createAuthModule({ prisma, config, logger = console }) {
       verificationRepository,
       emailSender,
       config,
+      resendThrottle,
       logger
     })
   });

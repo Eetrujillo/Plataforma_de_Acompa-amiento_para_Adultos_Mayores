@@ -10,6 +10,7 @@ const { createAuthRouter } = require('../src/modules/auth/infrastructure/authRou
 const { RegisterCaregiver } = require('../src/modules/auth/application/RegisterCaregiver');
 const { Login } = require('../src/modules/auth/application/Login');
 const { ResendVerificationEmail } = require('../src/modules/auth/application/ResendVerificationEmail');
+const { ResendThrottle } = require('../src/modules/auth/application/ResendThrottle');
 const { LinkSeniorApp } = require('../src/modules/pairing/application/LinkSeniorApp');
 const { ConflictError } = require('../src/shared/errors');
 
@@ -131,7 +132,8 @@ function buildScenario(options = {}) {
       verificationRepository,
       emailSender,
       config: CONFIG,
-      logger: silentLogger
+      logger: silentLogger,
+      resendThrottle: new ResendThrottle()
     })
   });
 

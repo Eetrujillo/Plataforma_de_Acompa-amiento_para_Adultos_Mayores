@@ -18,6 +18,7 @@ const { VerifyEmail, INVALID_LINK_MESSAGE } = require('../src/modules/auth/appli
 const {
   ResendVerificationEmail
 } = require('../src/modules/auth/application/ResendVerificationEmail');
+const { ResendThrottle } = require('../src/modules/auth/application/ResendThrottle');
 const {
   PrismaEmailVerificationRepository
 } = require('../src/modules/auth/infrastructure/PrismaEmailVerificationRepository');
@@ -134,7 +135,12 @@ function buildScenario() {
     register: new RegisterCaregiver({ ...deps, passwordHasher, config: CONFIG, logger: silentLogger }),
     login: new Login({ userRepository, passwordHasher, tokenService }),
     verifyEmail: new VerifyEmail({ verificationRepository, userRepository, tokenService }),
-    resend: new ResendVerificationEmail({ ...deps, config: CONFIG, logger: silentLogger })
+    resend: new ResendVerificationEmail({
+      ...deps,
+      config: CONFIG,
+      logger: silentLogger,
+      resendThrottle: new ResendThrottle()
+    })
   };
 }
 

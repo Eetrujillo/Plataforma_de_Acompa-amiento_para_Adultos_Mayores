@@ -92,7 +92,7 @@ del dominio o un servicio transaccional: **[docs/smtp-setup.md](docs/smtp-setup.
 | POST | `/api/auth/register` | público |
 | POST | `/api/auth/login` | público |
 | POST | `/api/auth/verify-email` | público (token del correo) |
-| POST | `/api/auth/resend-verification` | público (siempre 202) |
+| POST | `/api/auth/resend-verification` | público (202; 429 si se excede el límite) |
 | GET | `/api/auth/me` | autenticado |
 | POST | `/api/pairing/codes` | cuidador |
 | GET | `/api/pairing/seniors` | cuidador |

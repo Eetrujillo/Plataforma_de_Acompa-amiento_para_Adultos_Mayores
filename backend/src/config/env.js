@@ -27,6 +27,16 @@ loadEnvFile();
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProduction = nodeEnv === 'production';
 
+/**
+ * Parses a positive integer from the environment, falling back to the documented
+ * default when the value is missing or malformed. Used for limits, where a typo must
+ * not silently remove the protection.
+ */
+function positiveInteger(raw, fallback) {
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function resolveJwtSecret() {
   const secret = process.env.JWT_SECRET;
 
@@ -72,6 +82,12 @@ const config = Object.freeze({
   }),
   verification: Object.freeze({
     ttlHours: Number.parseInt(process.env.EMAIL_VERIFICATION_TTL_HOURS || '24', 10)
+  }),
+  resendThrottle: Object.freeze({
+    // HU-002: at most N resend attempts per email inside a sliding window. A malformed
+    // value falls back to the spec number instead of disabling the limit.
+    maxAttempts: positiveInteger(process.env.RESEND_THROTTLE_MAX, 3),
+    windowMinutes: positiveInteger(process.env.RESEND_THROTTLE_WINDOW_MINUTES, 60)
   }),
   smtp: Object.freeze({
     host: process.env.SMTP_HOST || '',
