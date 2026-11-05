@@ -21,9 +21,11 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: ${{ secrets.SSH_PORT }}
           script: |
+            # Fail on the first failing command. Without this the step reported success
+            # while git fetch had failed (deploy key rejected), leaving old code running.
+            set -e
             cd ${{ secrets.WORK_DIR }}
             git fetch
             git checkout ${{ secrets.PROD_BRANCH}}
-            git pull
+            git pull --ff-only
             docker compose up -d --build
-            exit
