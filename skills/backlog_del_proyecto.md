@@ -1,8 +1,8 @@
 # Backlog del Proyecto
 
 ## 📌 Puntero de Estado Actual
-- **Última HU completada:** HU-001
-- **Siguiente HU a ejecutar:** HU-002
+- **Última HU completada:** HU-002
+- **Siguiente HU a ejecutar:** HU-003
 
 ---
 
@@ -20,7 +20,7 @@
     - [ ] Exige contraseña alfanumérica de al menos 8 caracteres.
     - [ ] Exige la aceptación de la política de tratamiento de datos.
 
-- [ ] **HU-002: Confirmar mi correo electrónico**
+- [x] **HU-002: Confirmar mi correo electrónico**
   - **Descripción:** Recibir y abrir un enlace de confirmación por correo para validar la propiedad de la cuenta.
   - **📁 Skills / Reglas a consultar:**
     - `skills/email-adapter.md`

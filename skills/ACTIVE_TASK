@@ -1,41 +1,47 @@
 # ⚡ Tarea Activa Actual
 
-- **ID:** HU-002
-- **Título:** Confirmar mi correo electrónico
-- **Descripción:** Como familiar de un adulto mayor, quiero recibir y abrir un enlace de confirmación por correo para validar la propiedad de mi cuenta.
+- **ID:** HU-003
+- **Título:** Iniciar sesión
+- **Descripción:** Iniciar sesión con correo y contraseña para acceder al panel web de administración del familiar.
 
 ---
 
 ## 📁 Skills / Reglas Obligatorias a Leer Ahora:
-1. `skills/email-adapter.md` *(todavía no existe en `skills/`: hay que crearla antes de empezar)*
-2. `skills/rate-limiting.md` *(todavía no existe en `skills/`: hay que crearla antes de empezar)*
+1. `skills/jwt-security.md` *(todavía no existe en `skills/`: hay que crearla antes de empezar)*
+2. `skills/rate-limiting.md` *(ya existe, creada al cerrar HU-002)*
 3. *(Consultar convenciones globales en `skills/RUlLES.md`)*
 
 ---
 
 ## ✅ Criterios de Aceptación a Validar:
-- [ ] Envia un correo con un token único de confirmación válido por 24 horas.
-- [ ] El endpoint de verificación cambia el estado a `isEmailVerified: true`.
-- [ ] Muestra error si el token expiró o ya fue utilizado.
-- [ ] Bloquea solicitudes de reenvío si se superan 3 intentos por hora.
+- [ ] Con datos correctos, retorna HTTP 200 y el token JWT de sesión.
+- [ ] Con datos incorrectos, devuelve HTTP 401 sin especificar qué campo falló.
+- [ ] Bloquea la cuenta por 15 minutos tras 5 intentos fallidos consecutivos.
+- [ ] Redirige al login al intentar acceder a rutas privadas sin token.
 
 ---
 
 ## 🧭 Estado de partida (leer antes de escribir código):
-- Ya existe `backend/src/modules/auth/` con verificación por enlace implementada en
-  `odd/tasks/email-auth.md`: token de 32 bytes (solo se guarda el SHA-256), TTL de 24 h, un solo uso,
-  y `resend-verification` que invalida el enlace anterior.
-- **HU-001 (cerrada)** dejó el registro con consentimiento Ley 1581 en
-  `odd/tasks/hu-001-registro-familiar.md`: campos `acceptedTermsAt`, `termsVersion`, `ipAddress`, y
-  la regla de contraseña alfanumérica.
-- Lo que falta para esta HU es, sobre todo, el **rate limiting de reenvío (3 por hora)** y revisar
-  que el resto de los criterios queden cubiertos por tests observables.
+- Ya existe `backend/src/modules/auth/application/Login.js` con `POST /api/auth/login`: responde
+  `200 { token, user }`, `401` genérico (`Invalid credentials`, no distingue correo de contraseña) y
+  `403 EMAIL_NOT_VERIFIED` mientras la cuenta no confirme el correo. El gate de verificación viene
+  de `odd/tasks/email-auth.md`.
+- El empaquetado de la sesión y la protección de rutas privadas usan
+  `backend/src/shared/middlewares/authMiddleware.js` (`GET /api/auth/me` es el ejemplo ya cubierto).
+- **HU-002 (cerrada)** dejó el rate limiting de reenvío en
+  `odd/tasks/hu-002-confirmar-correo.md`: `application/ResendThrottle.js` es el patrón a reutilizar
+  (ventana deslizante, reloj inyectable, store acotado que falla cerrado) y
+  `shared/errors/TooManyRequestsError.js` el `429` del contrato. `skills/rate-limiting.md` documenta
+  las reglas y deja anotado que `login` todavía no tiene límite.
+- Lo que falta para esta HU es el **bloqueo por 5 intentos fallidos consecutivos durante 15
+  minutos**, con su contador persistido o en el mismo store, y la verificación observable de que el
+  `401` no revela qué campo falló.
 
 ---
 
 ## 🔄 Instrucciones de Cierre para la IA al Finalizar:
 1. Pasar todos los criterios de aceptación escribiendo el código en `backend/src/modules/auth/`.
-2. Ir al archivo `BACKLOG.md` general y cambiar `- [ ] **HU-002**` por `- [x] **HU-002**`**
-   *(en este repo el backlog es `skills/backlog_del_proyecto.md`; actualizar también el puntero).*
-3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-003**) desde el `BACKLOG.md`.
-4. Informar al usuario y detener la ejecución.
+2. Ir al archivo del backlog (`skills/backlog_del_proyecto.md`) y cambiar `- [ ] **HU-003**` por
+   `- [x] **HU-003**`; actualizar además el puntero de estado.
+3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-004**)
+   desde el backlog.
