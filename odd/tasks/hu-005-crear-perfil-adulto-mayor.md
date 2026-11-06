@@ -74,11 +74,11 @@ S8. Ley 1581 (no pedido en la HU, decisión de alcance): el perfil se crea con `
 
 ## Tasks
 
-- T1 · S1–S3, S5, S7 · backend: schema + dominio + caso de uso + repositorio + controlador/ruta + tests · commit `feat(seniors): create the senior profile with a hashed PIN`
-- T2 · S4, S6 · backend: lectura por propietario (lista y detalle) + tests de aislamiento entre familiares · commit `feat(seniors): scope the profile read to its owner`
-- T3 · S5, S6 · frontend: `seniorsApi` + `SeniorProfilePanel` en el dashboard del familiar · commit `feat(seniors): add the senior profile panel`
-- T4 · S1–S8 · docs + skills (`docs/seniors-api.md`, `skills/profiles-hexagonal.md`, `skills/bcrypt-pin.md`) · commit `docs(seniors): document the profile contract and the PIN rules`
-- T5 · cierre: correr `npm test` + `npm run build`, verificar S1–S8, actualizar backlog y `ACTIVE_TASK` a HU-006 · commit `docs(odd): close HU-005 and load HU-006 as the active task`
+- [x] T1 · S1–S3, S5, S7 · backend: schema + dominio + caso de uso + repositorio + controlador/ruta + tests · `5246d3c`, `bcb982f`
+- [x] T2 · S4, S6 · backend: lectura por propietario (lista y detalle) + tests de aislamiento entre familiares · `2896b7d`
+- [x] T3 · S5, S6 · frontend: `seniorsApi` + `SeniorProfilePanel` en el dashboard del familiar · `cb62192` (selector de vinculados), `cbdc12b`
+- [x] T4 · S1–S8 · docs + skills (`docs/seniors-api.md`, `skills/profiles-hexagonal.md`, `skills/bcrypt-pin.md`) · `be1e5eb`
+- [x] T5 · cierre: suite + build, verificación S1–S8, backlog y `ACTIVE_TASK` a HU-006 · `ea8368f`, `ae956a7` y este commit
 
 ## Log
 
@@ -93,3 +93,41 @@ L4. Decisión de arquitectura: el límite de intentos del PIN **no** se implemen
 verificación de PIN en el servidor; se implementa en HU-007 (vincular app) y se documenta como regla obligatoria
 en `skills/bcrypt-pin.md`. Un PIN de 4 dígitos tiene 10 000 combinaciones: el hash encarece el ataque offline,
 pero la defensa real es el bloqueo por intentos.
+L5 (implementación). Nueve commits en la rama. Lo que vale registrar:
+- El slice nuevo reusa el `userRepository` de auth en vez de declarar un segundo adaptador sobre la misma
+  colección: el senior es un `User`, y dos adaptadores son la forma más rápida de que dos reglas de escritura
+  convivan sin que nadie lo note.
+- El PIN se valida **antes** de hashear, así un pedido rechazado no gasta bcrypt ni escribe nada; el test cuenta
+  las llamadas al hasher y falla si se invierte el orden.
+- `toPublicSenior` es una lista blanca (id, fullName, timezone, linkStatus, createdAt). No expone el correo
+  sintético del senior ni el hash.
+- Un id con forma inválida corta antes de la consulta: si llegara a Prisma, la respuesta sería `500` en vez del
+  `404` que promete el contrato.
+- La consulta de vinculados del panel pasó a filtrar `PENDING`, porque tras esta HU un senior puede existir sin
+  dispositivo y el selector alimenta el compositor de actividades. Un documento previo a HU-005 no trae
+  `linkStatus` y se interpreta como vinculado (el canje era el único camino de alta). Ese cambio está cubierto
+  con un caso explícito en `tests/pairingLinkedList.test.js`.
+L6 (verificación de mutación, hecha a mano). Ignorando la validación del PIN, falla el test de PIN inválido;
+quitando el default de zona horaria, fallan dos tests; quitando la comparación de dueño, falla el test de perfil
+ajeno. Restaurado cada vez: suite en verde.
+L7 (verificación independiente `gentle-ai-verify`, con probes reproducidos sobre una copia del árbol y contra
+`dev-Esteban-Trujillo` como base). Veredicto: S1 a S8 **met**, sin bloqueantes. Tres advertencias:
+- `america/lima` se aceptaba y se guardaba tal cual (dos perfiles podían nombrar la misma zona de dos formas).
+- El filtro del selector solo excluía `"PENDING"` exacto, así que un documento importado con `"pending"` se
+  colaba. Corregido en `ae956a7`, con la comparación sin distinguir mayúsculas.
+- `ListLinkedSeniors` cambia de salida (filtra pendientes), pero un `PENDING` no podía existir antes de esta HU:
+  toda fila representable en la base anterior se devuelve igual, comparado contra la copia base.
+El verificador dejó dos archivos de prueba durables que ahora corren en la suite (`seniorsHttp.test.js` y
+`seniorProfileProbes.test.js`): el borde HTTP real (401/403, cuerpo 201 exacto, los tres códigos de error, los
+cuatro 404 byte-idénticos), el conteo de llamadas al hasher y la regresión del hasher de contraseñas en costo 10.
+L8 (verificación final observada): `cd backend && npm test` → 154 tests, 154 pass, 0 fail, exit 0;
+`npx prisma validate` → schema válido, exit 0; `npm run build` (prisma generate) → exit 0;
+`cd frontend && npm run build` → exit 0, 273,14 kB (128 módulos). **No hay verificación en navegador**: este
+entorno no tiene navegador ni runner de tests de frontend, así que el comportamiento visual del panel no está
+observado. Es el único hueco de prueba de esta HU, igual que en HU-004.
+L9 (riesgo declarado): **item 2** (un secreto de acceso y la propiedad de un recurso: PIN, hash y aislamiento
+entre familiares) e **item 3** (contrato HTTP nuevo y cambio de salida en un listado ya consumido por el panel).
+Verificación independiente: `gentle-ai-verify`, ver L7.
+L10 (deuda que esta HU deja, para no perderla): el cambio de PIN por el familiar no existe (hoy solo se define al
+crear); la transición `PENDING → LINKED` la va a escribir HU-006/HU-007 sobre el mismo perfil, y hoy el código de
+vinculación no está atado a un perfil concreto (hay que resolverlo ahí, no acá).

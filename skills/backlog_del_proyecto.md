@@ -1,8 +1,8 @@
 # Backlog del Proyecto
 
 ## 📌 Puntero de Estado Actual
-- **Última HU completada:** HU-004
-- **Siguiente HU a ejecutar:** HU-005
+- **Última HU completada:** HU-005
+- **Siguiente HU a ejecutar:** HU-006
 
 ---
 
@@ -52,7 +52,7 @@
     - [ ] El enlace de restablecimiento funciona una sola vez y expira en 60 minutos.
     - [ ] Invalida tokens de sesión previos tras completar el cambio de clave.
 
-- [ ] **HU-005: Crear el perfil de mi adulto mayor**
+- [x] **HU-005: Crear el perfil de mi adulto mayor**
   - **Descripción:** Registrar el perfil del adulto mayor con su nombre, PIN de 4 dígitos y zona horaria.
   - **📁 Skills / Reglas a consultar:**
     - `skills/profiles-hexagonal.md`

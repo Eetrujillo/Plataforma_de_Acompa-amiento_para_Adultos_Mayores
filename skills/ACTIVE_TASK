@@ -1,50 +1,51 @@
 # ⚡ Tarea Activa Actual
 
-- **ID:** HU-005
-- **Título:** Crear el perfil de mi adulto mayor
-- **Descripción:** Registrar el perfil del adulto mayor con su nombre, PIN de 4 dígitos y zona horaria.
+- **ID:** HU-006
+- **Título:** Generar un código de vinculación
+- **Descripción:** Generar un código alfanumérico de 6 dígitos y un QR para conectar la app móvil del adulto mayor.
 
 ---
 
 ## 📁 Skills / Reglas Obligatorias a Leer Ahora:
-1. `skills/profiles-hexagonal.md` *(no existe todavía: hay que crearla antes de empezar)*
-2. `skills/bcrypt-pin.md` *(no existe todavía: hay que crearla antes de empezar)*
-3. `skills/ley-1581.md` *(existe: el adulto mayor es un titular de datos, no solo un registro)*
-4. *(Consultar convenciones globales en `skills/RUlLES.md`)*
+1. `skills/pairing-generator.md` *(no existe todavía: hay que crearla antes de empezar)*
+2. `skills/qr-adapter.md` *(no existe todavía: hay que crearla antes de empezar)*
+3. `skills/profiles-hexagonal.md` *(nueva, de HU-005: el código ahora apunta a un perfil concreto)*
+4. `skills/ley-1581.md` *(el consentimiento del titular sigue pendiente hasta HU-008)*
+5. *(Consultar convenciones globales en `skills/RUlLES.md`)*
 
 ---
 
 ## ✅ Criterios de Aceptación a Validar:
-- [ ] Crea el perfil asociado al familiar con estado pendiente de vinculación.
-- [ ] Exige que el PIN sea exactamente de 4 dígitos numéricos y lo almacena cifrado.
-- [ ] Asigna por defecto la zona horaria `America/Bogota` si no se especifica.
-- [ ] Restringe la vista del perfil únicamente al familiar propietario.
+- [ ] Genera un código de 6 dígitos y una imagen QR con vigencia de 24 horas.
+- [ ] Invalida automáticamente cualquier código de vinculación previo no usado.
+- [ ] Impide generar nuevos códigos si el perfil ya figura como vinculado.
 
 ---
 
 ## 🧭 Estado de partida (leer antes de escribir código):
-- Ya existe el slice `backend/src/modules/pairing/` con `LinkSeniorApp` y `POST /api/pairing/link`:
-  el adulto mayor se crea **vinculando un código**, no por un alta directa. Esta HU tiene que
-  convivir con eso; conviene leer `LinkSeniorApp` antes de diseñar el endpoint de alta para no
-  terminar con dos caminos que crean seniors con reglas distintas.
-- El rol `SENIOR` ya está en `domain/User.js` (`ROLES`), y `toPublicUser` enumera los campos públicos:
-  un PIN cifrado **no** puede aparecer ahí. `PrismaUserRepository.listSeniorsByCaregiver` ya existe y
-  es el punto por donde hoy se listan los perfiles del familiar.
-- El hasher del proyecto es `infrastructure/BcryptPasswordHasher`. `skills/bcrypt-pin.md` tiene que
-  decir explícitamente si el PIN usa bcrypt (lento a propósito, resistente a fuerza bruta sobre 10 000
-  combinaciones) o si hace falta otra cosa; un PIN de 4 dígitos tiene un espacio de búsqueda mínimo, así
-  que la defensa real es limitar intentos (ya existe el patrón en `application/ResendThrottle.js` y
-  `domain/loginLockout.js`), no solo el hash.
-- La propiedad del recurso (`caregiverId === req.user.id`) es el criterio 4 y es seguridad: se resuelve
-  en el caso de uso, no en el controlador, y hay que probarlo con un familiar distinto al dueño.
-- HU-004 (cerrada) dejó `authMiddleware` leyendo el usuario por request y validando el claim `sv`; los
-  endpoints nuevos heredan ese guard sin hacer nada.
+- El slice `backend/src/modules/pairing/` ya existe y hoy genera un código **suelto**: `POST /api/pairing/codes`
+  no recibe `seniorId`, el código se guarda con el `caregiverId` y el TTL sale de la config (15 minutos, no 24
+  horas). HU-005 cambió el escenario: un perfil nace `PENDING` sin teléfono, así que el código tiene que apuntar a
+  **ese** perfil, y el canje (`LinkSeniorApp`) tiene que pasar ese perfil a `LINKED` en vez de crear uno nuevo.
+  Ese es el cambio de diseño central de esta HU; sin él, el criterio 3 no tiene sujeto ("el perfil ya vinculado")
+  y el 2 tampoco (¿qué código previo se invalida?).
+- La invariante ya está escrita en `skills/profiles-hexagonal.md` §2: solo el canje pasa un perfil a `LINKED`.
+  `POST /api/seniors` y el panel nunca lo marcan a mano.
+- `QrGenerator` (`pairing/infrastructure/QrGenerator.js`) ya devuelve un data URL; el contrato de salida del
+  panel (`qrCodeDataUrl`) no debería romperse.
+- La invalidación del código previo pide una condición atómica en la base (como el `updateMany` condicionado que
+  HU-004 usó para quemar el token de reseteo): "invalidar los previos no usados" y "crear el nuevo" no pueden
+  quedar en dos pasos donde un segundo pedido simultáneo gane la carrera.
+- Texto del backlog a resolver antes de escribir: dice "código **alfanumérico** de 6 dígitos". Son dos cosas
+  distintas y hoy el generador produce 6 dígitos numéricos. Hay que elegir uno explícitamente y registrarlo en
+  el `## Log` del documento de la HU.
+- Los 15 minutos actuales están en la config y el panel los muestra en pantalla
+  (`frontend/src/features/pairing/ui/PairingCodePanel.jsx`): pasar a 24 horas toca los dos lados.
 
 ---
 
 ## 🔄 Instrucciones de Cierre para la IA al Finalizar:
 1. Pasar todos los criterios de aceptación.
-2. En el backlog (`skills/backlog_del_proyecto.md`) cambiar `- [ ] **HU-005**` por
-   `- [x] **HU-005**` y actualizar el puntero de estado.
-3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-006**)
-   desde el backlog.
+2. En el backlog (`skills/backlog_del_proyecto.md`) cambiar `- [ ] **HU-006**` por
+   `- [x] **HU-006**` y actualizar el puntero de estado.
+3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-007**) desde el backlog.
