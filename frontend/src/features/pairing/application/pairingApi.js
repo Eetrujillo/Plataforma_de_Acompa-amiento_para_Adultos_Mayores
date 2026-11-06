@@ -1,7 +1,10 @@
 import { apiClient } from '../../../shared/services/apiClient.js';
 
-export async function createPairingCode() {
-  const { data } = await apiClient.post('/pairing/codes');
+// HU-006 S3: el código pertenece a un perfil concreto, así que `seniorId` viaja siempre en el
+// cuerpo. El backend responde 400 SENIOR_ID_REQUIRED si falta y 409 SENIOR_ALREADY_LINKED si el
+// perfil ya está vinculado; ambos mensajes llegan traducidos por `apiClient`.
+export async function createPairingCode({ seniorId } = {}) {
+  const { data } = await apiClient.post('/pairing/codes', { seniorId });
   return data;
 }
 
