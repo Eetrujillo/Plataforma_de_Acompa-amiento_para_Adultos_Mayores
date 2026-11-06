@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../features/auth/application/AuthContext.jsx';
 import { listLinkedSeniors } from '../../features/pairing/application/pairingApi.js';
 import { PairingCodePanel } from '../../features/pairing/ui/PairingCodePanel.jsx';
+import { SeniorProfilePanel } from '../../features/seniors/ui/caregiver/SeniorProfilePanel.jsx';
 import { ActivityComposer } from '../../features/activities/ui/caregiver/ActivityComposer.jsx';
 import { SosAlertPanel } from '../../features/sos_emergency/ui/caregiver/SosAlertPanel.jsx';
 import { PageShell } from '../../shared/components/PageShell.jsx';
@@ -46,6 +47,8 @@ export function DashboardPage() {
       ) : null}
 
       <SosAlertPanel />
+
+      <SeniorProfilePanel />
 
       <PairingCodePanel />
 
