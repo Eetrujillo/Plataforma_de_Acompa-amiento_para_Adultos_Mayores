@@ -58,6 +58,9 @@ npx expo export --platform web
 7. **Nunca hardcodear `API_BASE`.** Toda petición pasa por `getApiBase()`
    (`services/apiBase.ts`); si se importa `API_BASE` de `config.ts` el override de
    `/conexion` deja de funcionar.
+8. **Sin modo demostración.** Se descartó `DISABLE_AUTH` / `EXPO_PUBLIC_DISABLE_AUTH`:
+   toda ruta exige cuenta verificada. No reintroducir usuarios mock ni banners de
+   prueba; para ver pantallas hay que registrar y confirmar una cuenta real.
 
 ## Backend compartido con la web
 

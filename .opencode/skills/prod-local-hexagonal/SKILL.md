@@ -79,6 +79,9 @@ habla HTTP y el controlador nunca habla Prisma.
    Devuelve `{ token, user, message }`. No montarlo nunca en producción.
 8. **Mongo sin Docker.** Atlas (`mongodb+srv://`) ya es replica set, así que
    `prisma db push` + `npm run dev` funcionan sin `rs0` local.
+9. **Sin bypass de autenticación.** `DISABLE_AUTH` / `VITE_DISABLE_AUTH` se
+   eliminaron: `ProtectedRoute`, `AuthProvider` y los dashboards ya no tienen
+   usuario mock. Toda prueba necesita cuenta registrada y correo confirmado.
 
 ## Conexión app ↔ web (una sola cuenta)
 
