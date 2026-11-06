@@ -18,6 +18,11 @@ model User {
   phone        String?
   caregiverId  String?  @db.ObjectId
   emailVerifiedAt DateTime?
+  /// HU-003 lockout state. Nullable on purpose: documents created before this field
+  /// existed do not carry it, and Mongo needs no data migration for that. A null value
+  /// means "no failed attempts" and "not locked".
+  failedLoginAttempts Int?
+  lockedUntil         DateTime?
   /// Ley 1581 consent evidence: stamped by the server when the account is created.
   acceptedTermsAt DateTime?
   termsVersion    String?

@@ -11,6 +11,7 @@ const { EmailAlreadyRegisteredError } = require('./EmailAlreadyRegisteredError')
 const { EmailNotRegisteredError } = require('./EmailNotRegisteredError');
 const { GoogleNotConfiguredError } = require('./GoogleNotConfiguredError');
 const { TooManyRequestsError } = require('./TooManyRequestsError');
+const { AccountLockedError } = require('./AccountLockedError');
 
 module.exports = {
   AppError,
@@ -23,5 +24,6 @@ module.exports = {
   EmailAlreadyRegisteredError,
   EmailNotRegisteredError,
   GoogleNotConfiguredError,
-  TooManyRequestsError
+  TooManyRequestsError,
+  AccountLockedError
 };

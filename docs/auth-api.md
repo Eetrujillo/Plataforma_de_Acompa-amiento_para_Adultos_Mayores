@@ -63,7 +63,8 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
 ## Otros endpoints del módulo
 
 - `POST /api/auth/login` — `{ email, password }`; `200` con `{ token, user }`. `401`
-  `Invalid credentials` (no revela qué falló), `403` `EMAIL_NOT_VERIFIED` hasta confirmar el correo.
+  `Invalid credentials` (no revela qué falló), `403` `EMAIL_NOT_VERIFIED` hasta confirmar el correo,
+  `429` `ACCOUNT_LOCKED` si la cuenta está bloqueada por intentos fallidos (ver abajo).
 - `POST /api/auth/verify-email` — `{ token }`; `200` con `{ token, user }`, `400` si el enlace
   expiró o ya se usó.
 - `POST /api/auth/resend-verification` — `{ email }`; `202` con `{ accepted: true }`, **3 intentos
@@ -99,3 +100,40 @@ ventana móvil de una hora**. El cuarto devuelve `429`:
   compartido (Redis) sin cambiar el caso de uso.
 - Código: `application/ResendThrottle.js` (ventana y reloj inyectable) y
   `shared/errors/TooManyRequestsError.js` (contrato del `429`).
+
+## Bloqueo de la cuenta por intentos fallidos (HU-003)
+
+`POST /api/auth/login` bloquea la cuenta **tras 5 intentos fallidos consecutivos**. El intento 5 es
+el que bloquea: del 1 al 4 la respuesta es `401` `Invalid credentials`, y el 5.º ya responde `429`:
+
+```json
+{
+  "error": {
+    "code": "ACCOUNT_LOCKED",
+    "message": "Bloqueamos tu cuenta por demasiados intentos fallidos. Esperá unos minutos antes de volver a intentar.",
+    "details": { "retryAfterSeconds": 900 }
+  }
+}
+```
+
+- Duración del bloqueo: **15 minutos** desde el último fallo. Vence solo, por reloj; no hay
+  desbloqueo manual.
+- **Estando bloqueada, la contraseña correcta también se rechaza** con el mismo `429`. Un bloqueo que
+  la clave correcta puede saltear no es un bloqueo.
+- Un login correcto **borra la racha** (`failedLoginAttempts` vuelve a cero): la cuenta no queda a un
+  error de distancia del bloqueo para siempre.
+- **Una cuenta sin verificar también acumula fallos** (la contraseña incorrecta cuenta), pero un
+  login correcto ahí responde `403` `EMAIL_NOT_VERIFIED` y **no** limpia la racha: la cuenta puede
+  bloquearse aunque todavía no haya confirmado el correo.
+- **Un correo que no existe nunca se bloquea**: sigue respondiendo `401` igual que una contraseña
+  incorrecta, y no se escribe ningún estado.
+- `code` distinto de `TOO_MANY_REQUESTS` a propósito: aquel es el límite de reenvíos de verificación,
+  este es el bloqueo de la cuenta, y el cliente tiene que poder mostrar mensajes distintos.
+- Configuración: `LOCKOUT_MAX_ATTEMPTS` (default `5`) y `LOCKOUT_MINUTES` (default `15`).
+- **Consecuencia asumida:** como el `429` solo aparece con cuentas reales, probando 5 veces un correo se
+  puede averiguar si tiene cuenta. Se aceptó a cambio de que la persona bloqueada entienda qué le
+  pasa; la alternativa (un `401` genérico durante el bloqueo) no deja rastro pero deja al usuario
+  adivinando.
+- Estado persistido en el documento `User` (`failedLoginAttempts`, `lockedUntil`, ambos nullable), así
+  que un reinicio del backend **no** desbloquea la cuenta. Código: `domain/loginLockout.js` (reglas
+  puras con reloj inyectado) y `application/Login.js`.

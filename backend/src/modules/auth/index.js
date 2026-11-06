@@ -45,7 +45,7 @@ function createAuthModule({ prisma, config, logger = console }) {
       config,
       logger
     }),
-    login: new Login({ userRepository, passwordHasher, tokenService }),
+    login: new Login({ userRepository, passwordHasher, tokenService, config }),
     loginWithGoogle: new LoginWithGoogle({
       userRepository,
       tokenService,

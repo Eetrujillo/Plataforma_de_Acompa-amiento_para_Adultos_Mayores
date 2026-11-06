@@ -45,6 +45,8 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `404` | `NOT_FOUND` | ruta o recurso inexistente |
 | `409` | `CONFLICT` | el estado actual impide la operación |
 | `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
+| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora) |
+| `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
 | `500` | `INTERNAL_ERROR` | error inesperado, o error de Prisma sin traducción |
 | `503` | `DATABASE_NOT_READY` | Prisma `P2031`: MongoDB no acepta escrituras (replica set sin iniciar) |
 | `503` | `DATABASE_UNAVAILABLE` | Prisma `P2010` de conexión: no se pudo contactar la base |

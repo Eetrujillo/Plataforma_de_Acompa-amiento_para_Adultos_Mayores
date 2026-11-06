@@ -89,6 +89,12 @@ const config = Object.freeze({
     maxAttempts: positiveInteger(process.env.RESEND_THROTTLE_MAX, 3),
     windowMinutes: positiveInteger(process.env.RESEND_THROTTLE_WINDOW_MINUTES, 60)
   }),
+  lockout: Object.freeze({
+    // HU-003: consecutive wrong passwords before the account is locked, and for how long.
+    // A malformed value falls back to the acceptance criterion (5 attempts, 15 minutes).
+    maxAttempts: positiveInteger(process.env.LOCKOUT_MAX_ATTEMPTS, 5),
+    lockMinutes: positiveInteger(process.env.LOCKOUT_MINUTES, 15)
+  }),
   smtp: Object.freeze({
     host: process.env.SMTP_HOST || '',
     port: Number.parseInt(process.env.SMTP_PORT || '587', 10),

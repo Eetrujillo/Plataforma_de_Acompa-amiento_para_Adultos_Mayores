@@ -63,6 +63,19 @@ class PrismaUserRepository {
   async markEmailVerified(id) {
     return this.prisma.user.update({ where: { id }, data: { emailVerifiedAt: new Date() } });
   }
+
+  /**
+   * Persists the consecutive-failed-login counter and its lock.
+   *
+   * Both fields are nullable in the schema on purpose: the documents that already exist
+   * in Mongo do not carry them, so a `null` means "no attempts, not locked".
+   */
+  async updateLoginLock(id, { failedLoginAttempts, lockedUntil }) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { failedLoginAttempts, lockedUntil }
+    });
+  }
 }
 
 module.exports = { PrismaUserRepository };
