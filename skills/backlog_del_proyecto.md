@@ -64,24 +64,24 @@
     - [ ] Restringe la vista del perfil únicamente al familiar propietario.
 
 - [x] **HU-006: Generar un código de vinculación**
-  - **Descripción:** Generar un código alfanumérico de 6 dígitos y un QR para conectar la app móvil del adulto mayor.
+  - **Descripción:** Generar un QR de un solo uso para conectar la app móvil del adulto mayor.
   - **📁 Skills / Reglas a consultar:**
     - `skills/pairing-generator.md`
     - `skills/qr-adapter.md`
   - **Criterios de Aceptación:**
-    - [ ] Genera un código de 6 dígitos y una imagen QR con vigencia de 24 horas.
-    - [ ] Invalida automáticamente cualquier código de vinculación previo no usado.
+    - [ ] Genera un QR de un solo uso con vigencia de 24 horas.
+    - [ ] Invalida automáticamente cualquier QR de vinculación previo no usado.
     - [ ] Impide generar nuevos códigos si el perfil ya figura como vinculado.
 
 - [ ] **HU-007: Vincular mi app con el código**
-  - **Descripción:** Ingresar o escanear el código de vinculación en la app móvil para conectar con la cuenta del familiar.
+  - **Descripción:** Escanear el QR de vinculación en la app móvil para conectar con la cuenta del familiar.
   - **📁 Skills / Reglas a consultar:**
     - `skills/senior-ui-wcag.md`
     - `skills/pairing-link.md`
   - **Criterios de Aceptación:**
-    - [ ] Con código válido y consentimiento previo, conecta la app y guarda el token de dispositivo.
-    - [ ] Muestra el mensaje claro "Pídele a tu familiar un código nuevo" si el código venció.
-    - [ ] Bloquea nuevos intentos por 15 minutos tras 5 fallos consecutivos de código.
+    - [ ] Con QR válido y consentimiento previo, conecta la app y guarda el token de dispositivo.
+    - [ ] Muestra el mensaje claro "Pídele a tu familiar un QR nuevo" si el QR venció.
+    - [ ] Bloquea nuevos intentos por 15 minutos tras 5 fallos consecutivos de QR.
 
 - [ ] **HU-008: Aceptar o rechazar el consentimiento**
   - **Descripción:** Leer y aceptar la declaración de datos compartidos (actividades, SOS y GPS) antes de usar la app.

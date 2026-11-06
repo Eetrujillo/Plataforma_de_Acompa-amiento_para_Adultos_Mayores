@@ -6,14 +6,18 @@ Riesgo: alto (item 2 — el código es la credencial con la que un teléfono rec
 
 ## Specs
 
-S1. Del backlog, criterio 1 (verbatim): "Genera un código de 6 dígitos y una imagen QR con vigencia de 24 horas."
-   - El código es de **6 dígitos numéricos** (`/^\d{6}$/`, ceros a la izquierda válidos). La descripción del
-     backlog dice "alfanumérico de 6 dígitos"; se resuelve con el criterio de aceptación y con la regla de UI del
-     adulto mayor (tipear 36 símbolos en un teléfono es peor que 10). La entropía perdida se cubre con el límite
-     de intentos, no con el alfabeto. Decisión registrada en el `## Log`.
-   - Vigencia por defecto **1440 minutos (24 h)**, configurable con `PAIRING_TTL_MINUTES`. El valor vigente hoy
-     es 15 minutos: cambia el default y la copy del panel.
-   - La respuesta sigue incluyendo `qrCodeDataUrl` (el QR no cambia de forma).
+S1. Del backlog, criterio 1 — **reescrito por el cambio de requisito de L9**: "Genera un QR de un solo uso con
+   vigencia de 24 horas."
+   - No existe código legible por una persona. La credencial es un **token opaco** de 32 bytes en base64url
+     (43 caracteres), que viaja **solo dentro del QR**. No se muestra en pantalla, no se dicta, no se tipea.
+   - En la base se guarda **solo su SHA-256** (`tokenHash`), como el token de verificación de correo: quien lea
+     la colección no puede reconstruir un QR válido.
+   - Vigencia por defecto **1440 minutos (24 h)**, configurable con `PAIRING_TTL_MINUTES`.
+   - El payload del QR es `{"type":"senior-pairing","token":"<token>"}`. Sin URL, sin `seniorId`, sin datos del
+     adulto mayor.
+   - Consecuencia buscada: desaparece el espacio de 10^6 combinaciones. Adivinar un token de 32 bytes no es
+     viable, así que el límite de intentos deja de ser lo que sostiene la seguridad del canje (se mantiene igual
+     como defensa en profundidad).
 
 S2. Del backlog, criterio 2 (verbatim): "Invalida automáticamente cualquier código de vinculación previo no usado."
    - Al generar un código para un perfil, **todos** los códigos anteriores de ese perfil que no fueron usados
@@ -132,3 +136,13 @@ dobles; la prueba contra Mongo real queda para el E2E post-deploy.
 L8 (riesgo declarado): **item 2** (el código es la credencial de un perfil; canje de un solo uso y
 propiedad) e **item 3** (cambia `POST /codes` con `seniorId` obligatorio y la semántica del canje, que
 consume el APK ya publicado — mitigado con la rama de compatibilidad y un payload que no pierde campos).
+
+L9 (cambio de requisito, verbatim del usuario): "elimina la parte del codigo solo crea el qr por que se supone que
+el codigo es para transformar a qr pero es mejor crear simpleemnte el qr y ya realiza el cambion een las hu y en el
+codigo y en bd".
+Decisión: se elimina el código tipeable de toda la cadena. El QR lleva un token opaco de 32 bytes, guardado como
+SHA-256 en `PairingToken` (renombrado desde `PairingCode`). Los endpoints pasan a `POST /api/pairing/qr` y
+`POST /api/pairing/redeem`. La rama legacy (canje sin `seniorId`) se retira: existía para que un APK con un código
+tipeado siguiera funcionando, y ese código deja de existir. Los códigos vivos (máximo 24 h) quedan inservibles al
+desplegar; se documenta como ventana de corte. Los documentos viejos de la colección `PairingCode` quedan muertos:
+se limpian por operación, no por código.
