@@ -1,8 +1,8 @@
 # Backlog del Proyecto
 
 ## 📌 Puntero de Estado Actual
-- **Última HU completada:** HU-003
-- **Siguiente HU a ejecutar:** HU-004
+- **Última HU completada:** HU-004
+- **Siguiente HU a ejecutar:** HU-005
 
 ---
 
@@ -42,7 +42,7 @@
     - [ ] Bloquea la cuenta por 15 minutos tras 5 intentos fallidos consecutivos.
     - [ ] Redirige al login al intentar acceder a rutas privadas sin token.
 
-- [ ] **HU-004: Recuperar mi contraseña**
+- [x] **HU-004: Recuperar mi contraseña**
   - **Descripción:** Recibir un enlace temporal en el correo para restablecer la contraseña en caso de olvido.
   - **📁 Skills / Reglas a consultar:**
     - `skills/email-adapter.md`

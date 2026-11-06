@@ -50,3 +50,23 @@ L3 (decisión, alcance de S3). El reset exitoso hace tres cosas en el mismo docu
 guarda la contraseña nueva, sube `sessionVersion` (mata las sesiones anteriores) y limpia
 `failedLoginAttempts`/`lockedUntil`. Lo último es necesario porque quien acaba de demostrar que
 controla el correo no debería quedar bloqueado 15 minutos por los intentos fallidos previos.
+
+L4 (evidence, observado):
+- `backend: npm test` -> **116 tests, 116 pass, 0 fail** (96 antes de esta HU). Los 20 nuevos se
+  vieron en RED primero: 11 del enlace de restablecimiento y 9 de la versión de sesión.
+- `prisma validate` y `prisma generate` OK con `PasswordResetToken` y `sessionVersion`.
+- Reparto en dos slices: `bfb69ae` (S1-S2: enlace de un solo uso, 60 min) y `4221c30` (S3: cierre de
+  sesiones con el claim `sv`). Separados porque el segundo toca un middleware compartido por cuatro
+  routers y conviene revisarlo solo.
+- No corrido: `prisma db push` (colección nueva y campo nullable; Mongo no necesita nada) ni un envío
+  SMTP real.
+
+L5 (decisión, ubicación de la regla de sesión). `sessionVersion.js` no vive en el slice de auth sino en
+`shared/session/`: el middleware compartido no puede importar de un slice —su propio comentario lo
+prohíbe y `pairing` también firma tokens—, así que la regla que comparten los cuatro emisores tampoco
+pertenece a `auth/domain`.
+
+L6 (riesgo residual aceptado). `authMiddleware` ahora lee la base en cada request autenticado. Si Mongo
+no responde, esos endpoints devuelven el error tal cual en vez de seguir con claims viejos: se eligió
+fallar cerrado. El costo de latencia es una decisión consciente y está documentada en
+`skills/jwt-security.md` regla 8.

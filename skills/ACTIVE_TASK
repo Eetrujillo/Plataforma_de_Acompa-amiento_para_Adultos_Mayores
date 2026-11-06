@@ -1,53 +1,50 @@
 # ⚡ Tarea Activa Actual
 
-- **ID:** HU-004
-- **Título:** Recuperar mi contraseña
-- **Descripción:** Recibir un enlace temporal en el correo para restablecer la contraseña en caso de olvido.
+- **ID:** HU-005
+- **Título:** Crear el perfil de mi adulto mayor
+- **Descripción:** Registrar el perfil del adulto mayor con su nombre, PIN de 4 dígitos y zona horaria.
 
 ---
 
 ## 📁 Skills / Reglas Obligatorias a Leer Ahora:
-1. `skills/email-adapter.md` *(existe, escrita al cerrar HU-002)*
-2. `skills/jwt-security.md` *(existe, escrita al cerrar HU-003)*
-3. `skills/rate-limiting.md` *(existe; el endpoint de "olvidé mi contraseña" dispara un correo, así que necesita su propio límite)*
+1. `skills/profiles-hexagonal.md` *(no existe todavía: hay que crearla antes de empezar)*
+2. `skills/bcrypt-pin.md` *(no existe todavía: hay que crearla antes de empezar)*
+3. `skills/ley-1581.md` *(existe: el adulto mayor es un titular de datos, no solo un registro)*
 4. *(Consultar convenciones globales en `skills/RUlLES.md`)*
 
 ---
 
 ## ✅ Criterios de Aceptación a Validar:
-- [ ] Retorna un mensaje genérico de confirmación exista o no el correo ingresado.
-- [ ] El enlace de restablecimiento funciona una sola vez y expira en 60 minutos.
-- [ ] Invalida tokens de sesión previos tras completar el cambio de clave.
+- [ ] Crea el perfil asociado al familiar con estado pendiente de vinculación.
+- [ ] Exige que el PIN sea exactamente de 4 dígitos numéricos y lo almacena cifrado.
+- [ ] Asigna por defecto la zona horaria `America/Bogota` si no se especifica.
+- [ ] Restringe la vista del perfil únicamente al familiar propietario.
 
 ---
 
 ## 🧭 Estado de partida (leer antes de escribir código):
-- Ya existe `backend/src/modules/auth/` con el patrón de token de un solo uso resuelto para la
-  verificación de correo: `domain/verificationToken.js` (32 bytes, solo se guarda el SHA-256, TTL
-  configurable) y `PrismaEmailVerificationRepository` (`markUsed`, `invalidateForUser`). Es el molde
-  para el token de restablecimiento, con TTL de **60 minutos** y colección o tipo propio: no se
-  reutiliza el token de verificación de correo, porque un enlace no debe poder hacer las dos cosas.
-- El adaptador de correo (`infrastructure/EmailSender.js`) tiene un solo método,
-  `sendVerificationEmail`. Siguiendo `skills/email-adapter.md`, un correo nuevo es **un método nuevo
-  en el puerto**, con su rama SMTP y su rama `console`, no un parámetro de copy.
-- El límite de peticiones ya está resuelto dos veces y hay que reutilizar el criterio:
-  `application/ResendThrottle.js` (ventana deslizante, reloj inyectable, store acotado que falla
-  cerrado) para el envío, y `domain/loginLockout.js` para el bloqueo por intentos.
-- El JWT no tiene estado ni lista de revocación: los claims son `sub`, `role`, `email` más
-  `iat`/`exp` (7 días). El tercer criterio ("invalida tokens de sesión previos") **no se resuelve
-  solo**: hoy no hay forma de invalidar un token ya emitido. Hay que decidir e implementar algo
-  (versión de sesión en el usuario que viaje como claim y se valide en `authMiddleware`, o lista de
-  revocación). Es la decisión de diseño principal de esta HU y conviene resolverla antes que el
-  endpoint.
-- HU-003 (cerrada) dejó `application/Login.js` con bloqueo por intentos fallidos
-  (`failedLoginAttempts`, `lockedUntil`) y `shared/errors/AccountLockedError.js`. Un cambio de
-  contraseña debería dejar ese estado limpio, igual que un login exitoso.
+- Ya existe el slice `backend/src/modules/pairing/` con `LinkSeniorApp` y `POST /api/pairing/link`:
+  el adulto mayor se crea **vinculando un código**, no por un alta directa. Esta HU tiene que
+  convivir con eso; conviene leer `LinkSeniorApp` antes de diseñar el endpoint de alta para no
+  terminar con dos caminos que crean seniors con reglas distintas.
+- El rol `SENIOR` ya está en `domain/User.js` (`ROLES`), y `toPublicUser` enumera los campos públicos:
+  un PIN cifrado **no** puede aparecer ahí. `PrismaUserRepository.listSeniorsByCaregiver` ya existe y
+  es el punto por donde hoy se listan los perfiles del familiar.
+- El hasher del proyecto es `infrastructure/BcryptPasswordHasher`. `skills/bcrypt-pin.md` tiene que
+  decir explícitamente si el PIN usa bcrypt (lento a propósito, resistente a fuerza bruta sobre 10 000
+  combinaciones) o si hace falta otra cosa; un PIN de 4 dígitos tiene un espacio de búsqueda mínimo, así
+  que la defensa real es limitar intentos (ya existe el patrón en `application/ResendThrottle.js` y
+  `domain/loginLockout.js`), no solo el hash.
+- La propiedad del recurso (`caregiverId === req.user.id`) es el criterio 4 y es seguridad: se resuelve
+  en el caso de uso, no en el controlador, y hay que probarlo con un familiar distinto al dueño.
+- HU-004 (cerrada) dejó `authMiddleware` leyendo el usuario por request y validando el claim `sv`; los
+  endpoints nuevos heredan ese guard sin hacer nada.
 
 ---
 
 ## 🔄 Instrucciones de Cierre para la IA al Finalizar:
-1. Pasar todos los criterios de aceptación escribiendo el código en `backend/src/modules/auth/`.
-2. Ir al backlog (`skills/backlog_del_proyecto.md`) y cambiar `- [ ] **HU-004**` por
-   `- [x] **HU-004**`; actualizar además el puntero de estado.
-3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-005**)
+1. Pasar todos los criterios de aceptación.
+2. En el backlog (`skills/backlog_del_proyecto.md`) cambiar `- [ ] **HU-005**` por
+   `- [x] **HU-005**` y actualizar el puntero de estado.
+3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-006**)
    desde el backlog.
