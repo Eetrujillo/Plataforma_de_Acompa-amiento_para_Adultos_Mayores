@@ -103,7 +103,7 @@ function toPublicSenior(user) {
     id: user.id,
     fullName: user.fullName,
     timezone: user.timezone ?? DEFAULT_TIMEZONE,
-    linkStatus: user.linkStatus ?? LINK_STATUS.PENDING,
+    linkStatus: user.linkStatus ?? LINK_STATUS.LINKED,
     createdAt: user.createdAt ?? null
   };
 }

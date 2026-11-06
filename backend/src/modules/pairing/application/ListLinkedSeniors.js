@@ -14,11 +14,16 @@ class ListLinkedSeniors {
     const seniors = await this.userRepository.listSeniorsByCaregiver(caregiverId);
 
     return {
-      seniors: seniors.map((senior) => ({
-        id: senior.id,
-        fullName: senior.fullName,
-        phone: senior.phone ?? null
-      }))
+      // Only the profiles whose device already proved ownership can be picked in the panel.
+      // A document written before HU-005 carries no `linkStatus` and was created by the
+      // pairing flow, so the missing field means linked, not pending.
+      seniors: seniors
+        .filter((senior) => senior.linkStatus !== 'PENDING')
+        .map((senior) => ({
+          id: senior.id,
+          fullName: senior.fullName,
+          phone: senior.phone ?? null
+        }))
     };
   }
 }

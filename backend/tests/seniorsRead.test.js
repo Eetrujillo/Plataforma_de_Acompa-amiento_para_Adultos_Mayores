@@ -142,6 +142,24 @@ test('a caregiver id resolves as a profile only when it is a senior', async () =
   );
 });
 
+test('a document written before HU-005 reads as LINKED, not as pending', async () => {
+  const userRepository = createFakeUserRepository([
+    {
+      id: SENIOR_ID,
+      fullName: 'Rosa Pérez',
+      role: 'SENIOR',
+      caregiverId: OWNER,
+      createdAt: new Date('2024-05-01T12:00:00.000Z')
+    }
+  ]);
+  const get = new GetSeniorProfile({ userRepository });
+
+  const result = await get.execute({ caregiverId: OWNER, seniorId: SENIOR_ID });
+
+  assert.equal(result.linkStatus, 'LINKED');
+  assert.equal(result.timezone, 'America/Bogota');
+});
+
 test('a malformed id is a 404 and never reaches the repository', async () => {
   const { get, userRepository } = build();
 
