@@ -21,6 +21,7 @@ S4. Cierre: marcar `- [x] **HU-004**` en `skills/backlog_del_proyecto.md`, actua
 | T1 | S1-S2 | inline | `bfb69ae` |
 | T2 | S3 | inline | `4221c30` |
 | T3 | S4 | inline | cierre |
+| T4 | S2 (usabilidad) | inline | `pantallas` |
 
 Bordes de slice: `bfb69ae` es el enlace de restablecimiento con sus tests; `4221c30` es el cierre de
 sesiones, que toca el middleware compartido por cuatro routers y por eso va aparte; el cierre va
@@ -110,3 +111,25 @@ L8 (otros hallazgos del verificador y qué se hizo con cada uno):
 - **B3, decisión de alcance pendiente**: el enlace apunta a `${APP_URL}/reset-password?token=…` y esa
   ruta no existe en el frontend (`AppRouter.jsx`), así que hoy la persona cae en el login. El criterio
   de la HU se cumple a nivel API; para que el flujo sea usable falta la pantalla.
+
+L9 (decisión del usuario, alcance de interfaz). Consulta: "¿qué hacemos con las pantallas que faltan
+para que el enlace funcione?". Respuesta: "Pantallas ahora, antes de mergear". Se agregaron
+`ForgotPasswordScreen` y `ResetPasswordScreen`, las rutas `/forgot-password` y `/reset-password`, las
+dos llamadas en `authApi.js`, y se habilitó el botón "¿Olvidaste tu contraseña?" del login (estaba
+deshabilitado con la nota "todavía no está disponible", ahora eliminada junto con su CSS huérfano).
+
+Detalles de la implementación que vale registrar:
+- El botón de envío de cada formulario es **solo** `type="submit"`, sin `onClick`: el `PrimaryButton`
+  renderiza `type="button"` y deja que las props lo pisen, así que pasarle además el handler habría
+  disparado **dos pedidos por click** y gastado dos de los tres cupos del límite por hora.
+- La pantalla de "olvidé mi contraseña" no promete nada sobre la existencia de la cuenta: usa la
+  misma confirmación condicional que el backend ("Si <correo> tiene una cuenta…"), porque afirmar
+  "te enviamos el correo" solo cuando existe convertiría la pantalla en el oráculo que el backend
+  evita.
+- La pantalla de contraseña nueva no valida la regla completa en el cliente (la aplica el backend y el
+  enlace no se quema si la rechaza): solo avisa si las dos contraseñas no coinciden o si faltan
+  caracteres, para que el usuario no viaje al servidor por un error obvio.
+- Verificación posible en este entorno: `npm run build` exit 0 (269,94 kB, +3,7 kB), parseo de los dos
+  archivos nuevos con esbuild, y las rutas y las dos llamadas presentes en el bundle compilado. **No
+  hay verificación en navegador**: este entorno no tiene navegador ni runner de tests de frontend, así
+  que el comportamiento visual no está observado. Queda como el único hueco de prueba de esta HU.

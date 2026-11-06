@@ -163,6 +163,10 @@ export function LoginScreen() {
     }
   }
 
+  function handleForgot() {
+    navigate('/forgot-password');
+  }
+
   async function handleResend() {
     try {
       await resendVerificationRequest(credentials.email);
@@ -268,15 +272,11 @@ export function LoginScreen() {
               Recordarme
             </label>
             <div className="login__forgot">
-              <button type="button" className="login__forgot-button" disabled>
+              <button type="button" className="login__forgot-button" onClick={handleForgot}>
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
           </div>
-
-          <p className="login__forgot-note">
-            La recuperación de contraseña todavía no está disponible.
-          </p>
 
           <PrimaryButton type="submit" block className="login__submit" disabled={pending}>
             <span>{pending ? 'Ingresando…' : 'Iniciar sesión'}</span>

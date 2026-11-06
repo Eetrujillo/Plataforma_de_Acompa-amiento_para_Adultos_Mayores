@@ -507,13 +507,6 @@ select {
   cursor: not-allowed;
 }
 
-.login__forgot-note {
-  margin: 0.2rem 0 0;
-  color: var(--color-login-muted);
-  font-size: 0.75rem;
-  line-height: 1.35;
-  text-align: right;
-}
 
 .login__submit {
   min-height: 3.4rem;

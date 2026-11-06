@@ -28,6 +28,20 @@ export async function resendVerificationRequest(email) {
   return data;
 }
 
+/**
+ * Pide el enlace de restablecimiento. La respuesta es la misma exista o no la cuenta,
+ * así que la pantalla no puede prometer nada sobre la existencia del correo.
+ */
+export async function requestPasswordResetRequest(email) {
+  const { data } = await apiClient.post('/auth/forgot-password', { email });
+  return data;
+}
+
+export async function resetPasswordRequest(token, password) {
+  const { data } = await apiClient.post('/auth/reset-password', { token, password });
+  return data;
+}
+
 export async function fetchCurrentUser() {
   const { data } = await apiClient.get('/auth/me');
   return data.user;

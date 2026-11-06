@@ -5,6 +5,8 @@ import { useAuth } from '../../features/auth/application/AuthContext.jsx';
 import { LoginScreen } from '../../features/auth/ui/LoginScreen.jsx';
 import { RegisterScreen } from '../../features/auth/ui/RegisterScreen.jsx';
 import { VerifyEmailScreen } from '../../features/auth/ui/VerifyEmailScreen.jsx';
+import { ForgotPasswordScreen } from '../../features/auth/ui/ForgotPasswordScreen.jsx';
+import { ResetPasswordScreen } from '../../features/auth/ui/ResetPasswordScreen.jsx';
 import { DashboardPage } from '../../pages/caregiver/DashboardPage.jsx';
 import { SeniorHomePage } from '../../pages/senior/SeniorHomePage.jsx';
 
@@ -36,6 +38,8 @@ export function AppRouter() {
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/register" element={<RegisterScreen />} />
         <Route path="/verify-email" element={<VerifyEmailScreen />} />
+        <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+        <Route path="/reset-password" element={<ResetPasswordScreen />} />
         <Route
           path="/caregiver"
           element={
