@@ -18,9 +18,14 @@ S4. Cierre: marcar `- [x] **HU-004**` en `skills/backlog_del_proyecto.md`, actua
 
 | ID | Specs | Route | Commit |
 |----|-------|-------|--------|
-| T1 | S1-S2 | pendiente | — |
-| T2 | S3 | pendiente | — |
-| T3 | S4 | pendiente | — |
+| T1 | S1-S2 | inline | `bfb69ae` |
+| T2 | S3 | inline | `4221c30` |
+| T3 | S4 | inline | cierre |
+
+Bordes de slice: `bfb69ae` es el enlace de restablecimiento con sus tests; `4221c30` es el cierre de
+sesiones, que toca el middleware compartido por cuatro routers y por eso va aparte; el cierre va
+último. Los tres slices son de tamaño revisable (el conteo del aviso se mide contra `origin/main`, que
+no es la base de esta rama).
 
 ## Log
 
@@ -70,3 +75,38 @@ L6 (riesgo residual aceptado). `authMiddleware` ahora lee la base en cada reques
 no responde, esos endpoints devuelven el error tal cual en vez de seguir con claims viejos: se eligió
 fallar cerrado. El costo de latencia es una decisión consciente y está documentada en
 `skills/jwt-security.md` regla 8.
+
+L7 (verificación independiente `gentle-ai-verify`, con probes reproducidos). Veredicto: S1 PASS, S3
+PASS, S4 PASS (el cierre ya estaba hecho), **S2 FAIL** por concurrencia. Dos bloqueantes reales, ambos
+en el orden de las operaciones del canje:
+- **B1** — dos pedidos simultáneos con el mismo enlace pasaban los dos: `findByHash` → mirar `usedAt` →
+  hashear (bcrypt, ~100 ms) → escribir → `markUsed`. La ventana entre mirar y marcar es enorme, así que
+  quien tenga un token robado puede correr al dueño y terminar con la contraseña. El "un solo uso" era
+  cierto solo en secuencia.
+- **B2** — la contraseña se escribía **antes** de quemar el token: si `markUsed` fallaba, la cuenta
+  quedaba con la contraseña nueva y el enlace seguía vivo, y el mismo enlace volvía a cambiarla
+  después.
+Corregido: el token se reclama con un `updateMany` condicionado a `usedAt: null` **antes** de tocar la
+cuenta, y si no lo ganó se responde el mismo `400` genérico. Consecuencia buscada: un fallo al escribir
+deja la cuenta intacta y el enlace quemado (falla cerrado). Tres tests nuevos lo pinnean (canje
+concurrente, fallo al consumir, y la vigencia tomada de la config en vez de un 60 hardcodeado), más
+uno HTTP que cruza Express de verdad. Mutación comprobada a mano: ignorando el resultado del reclamo,
+el test de concurrencia falla; restaurado, 15/15.
+
+L8 (otros hallazgos del verificador y qué se hizo con cada uno):
+- Token sin `sub` en el claim: era `500` de Prisma; ahora es `401` antes de tocar la base.
+- Fuga por tiempo en `forgot-password`: el envío se espera dentro del request, así que una cuenta real
+  tarda ~250 ms y un correo desconocido ~5 ms. El cuerpo y el status son idénticos —el criterio se
+  cumple—, pero queda como deuda anotada en `docs/auth-api.md` y en el comentario del caso de uso,
+  porque sacarlo del camino de la respuesta cambia el manejo de errores de entrega y conviene hacerlo
+  junto con el reenvío de verificación, que tiene la misma forma.
+- `skills/email-adapter.md` decía que el token nunca aparece en logs, y el canal `console` lo imprime a
+  propósito cuando no hay SMTP. Corregido con la excepción explícita y la consecuencia: producción
+  necesita SMTP configurado.
+- Deuda preexistente, fuera de esta HU: `VerifyEmail` tiene el mismo TOCTOU (doble uso re-verifica y
+  emite dos sesiones, pero no consume ningún secreto) y Socket.IO no valida token en el handshake, así
+  que el cierre de sesiones no cubre el canal en tiempo real. Se dejan anotados acá para que no se
+  pierdan.
+- **B3, decisión de alcance pendiente**: el enlace apunta a `${APP_URL}/reset-password?token=…` y esa
+  ruta no existe en el frontend (`AppRouter.jsx`), así que hoy la persona cae en el login. El criterio
+  de la HU se cumple a nivel API; para que el flujo sea usable falta la pantalla.

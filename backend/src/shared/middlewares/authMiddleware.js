@@ -50,9 +50,15 @@ function createAuthMiddleware({ verifyToken, userRepository }) {
 
     let user;
 
+    if (typeof claims.sub !== 'string' || claims.sub.length === 0) {
+      // Un token sin `sub` utilizable no es una sesión: si llegara a Prisma sería un 500.
+      return next(new UnauthorizedError('Invalid or expired token'));
+    }
+
     try {
       user = await userRepository.findById(claims.sub);
     } catch (error) {
+      // Falla cerrado: si la base no responde, no se sigue con los claims del token.
       return next(error);
     }
 

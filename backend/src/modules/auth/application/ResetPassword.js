@@ -50,6 +50,16 @@ class ResetPassword {
       throw new ValidationError(INVALID_RESET_TOKEN_MESSAGE);
     }
 
+    // El token se consume ANTES de tocar la cuenta. Dos cosas dependen de ese orden:
+    // dos pedidos simultáneos con el mismo enlace no pueden cambiar la contraseña los
+    // dos (el segundo pierde el `claim`), y si la escritura de la contraseña falla, la
+    // cuenta queda intacta con el enlace ya quemado, que es fallar cerrado.
+    const { claimed } = await this.resetRepository.markUsed({ id: record.id });
+
+    if (!claimed) {
+      throw new ValidationError(INVALID_RESET_TOKEN_MESSAGE);
+    }
+
     const passwordHash = await this.passwordHasher.hash(password);
 
     // Subir la versión es lo que cierra las sesiones abiertas: cualquier token emitido
@@ -58,7 +68,6 @@ class ResetPassword {
       passwordHash,
       sessionVersion: sessionVersionOf(user) + 1
     });
-    await this.resetRepository.markUsed({ id: record.id });
 
     return { reset: true };
   }

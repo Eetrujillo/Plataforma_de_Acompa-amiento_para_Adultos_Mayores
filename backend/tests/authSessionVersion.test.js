@@ -74,8 +74,13 @@ function createFakeResetRepository() {
     },
     async markUsed({ id }) {
       const record = [...byHash.values()].find((candidate) => candidate.id === id);
+
+      if (!record || record.usedAt) {
+        return { claimed: false };
+      }
+
       record.usedAt = new Date();
-      return record;
+      return { claimed: true };
     },
     async invalidateForUser() {}
   };

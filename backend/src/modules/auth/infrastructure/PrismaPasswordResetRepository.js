@@ -25,11 +25,20 @@ class PrismaPasswordResetRepository {
     return this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
   }
 
+  /**
+   * Consume el token de forma atómica: solo gana el primero que llega.
+   *
+   * `updateMany` con `usedAt: null` en el filtro convierte "leer y después marcar" en una
+   * sola operación, que es lo que hace cierto el "un solo uso" cuando dos pedidos llegan
+   * a la vez. Un `update` por id obligaría a confiar en que nadie más está mirando.
+   */
   async markUsed({ id }) {
-    return this.prisma.passwordResetToken.update({
-      where: { id },
+    const { count } = await this.prisma.passwordResetToken.updateMany({
+      where: { id, usedAt: null },
       data: { usedAt: new Date() }
     });
+
+    return { claimed: count === 1 };
   }
 
   /** Quema los enlaces pendientes: solo sirve el último que se envió. */

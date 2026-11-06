@@ -160,6 +160,14 @@ Detalles del enlace:
   colección propia (`PasswordResetToken`): un enlace de verificación de correo no puede cambiar la
   contraseña.
 - Pedir un enlace nuevo **quema el anterior**: solo sirve el último que se envió.
+- **El consumo es atómico.** El token se marca usado con un `updateMany` condicionado a
+  `usedAt: null` **antes** de tocar la cuenta: si dos pedidos llegan a la vez con el mismo enlace,
+  uno solo gana y el otro recibe el mismo `400` genérico. El orden también hace que un fallo al
+  escribir la contraseña deje la cuenta intacta y el enlace quemado (falla cerrado), en vez de
+  cambiar la contraseña y dejar el enlace vivo.
+- Deuda conocida: el envío del correo se espera dentro del request, así que el `202` tarda más con
+  una cuenta real que con un correo desconocido. El cuerpo es idéntico (lo que pide el criterio),
+  pero el tiempo distingue los dos casos.
 - Token inventado, ya usado, vencido o mal formado devuelven **el mismo** `400`:
   `El enlace para restablecer la contraseña no es válido o ya venció`. Distinguirlos solo le sirve a
   quien está probando enlaces.

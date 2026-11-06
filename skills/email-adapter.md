@@ -17,7 +17,11 @@ emailSender.sendVerificationEmail({ to, fullName, link, expiresInHours })
 ## Reglas Obligatorias
 1. **Un envío caído no rompe la operación.** `application/issueVerificationEmail.js` envuelve el envío en `try/catch` y devuelve `{ sent: false }` con un `logger.warn`. La cuenta ya existe y el usuario puede pedir un enlace nuevo.
 2. **El enlace lo arma el servidor.** `buildVerificationLink({ appUrl, rawToken })` usa `APP_URL` (config), nunca un `Host` del request: un header manipulado no puede redirigir la verificación a otro dominio.
-3. **El token crudo viaja solo en el correo.** A la base se persiste únicamente su SHA-256 (`hashToken`). Logs y respuestas HTTP nunca incluyen el token.
+3. **El token crudo viaja solo en el correo.** A la base se persiste únicamente su SHA-256 (`hashToken`). Las
+   respuestas HTTP nunca lo incluyen. **Excepción declarada:** sin `SMTP_HOST` el canal `console`
+   imprime el enlace con el token en el log del backend, a propósito, para poder probar el flujo en
+   desarrollo y en el arranque de la VPS. Por eso producción tiene que tener SMTP configurado: con el
+   canal `console` los enlaces quedan en los logs del servidor.
 4. **Copy en español y accesible para adultos mayores:** frases cortas, texto plano de respaldo (`text`) junto al `html`, y aviso explícito de vencimiento y de un solo uso.
 5. **Nuevo tipo de correo = método nuevo en el puerto** (`sendPasswordResetEmail`, etc.), con su rama en `console` y en `smtp`. No se reutiliza `sendVerificationEmail` cambiando el copy por parámetro.
 

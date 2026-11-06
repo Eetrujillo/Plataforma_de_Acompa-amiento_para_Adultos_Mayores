@@ -19,6 +19,13 @@ const PASSWORD_RESET_THROTTLE_MESSAGE =
  * antes de mirar la base: igual que el reenvío de verificación, este endpoint no puede
  * servir para averiguar qué correos están registrados.
  *
+ * Salvedad honesta: cuando la cuenta existe, el envío del correo se espera dentro del
+ * request, así que la respuesta tarda más que con un correo desconocido. El status y el
+ * cuerpo son idénticos —que es lo que pide el criterio—, pero el tiempo los distingue.
+ * Queda anotado como deuda: sacar el envío del camino de la respuesta cierra esa fuga y
+ * cambia el manejo de errores de entrega, así que se hace junto con el del reenvío de
+ * verificación, que tiene la misma forma.
+ *
  * Cuentas creadas con Google no tienen contraseña que restablecer: para ellas no se
  * manda nada, con la misma respuesta.
  *

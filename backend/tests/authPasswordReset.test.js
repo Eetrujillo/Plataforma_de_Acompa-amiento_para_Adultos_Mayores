@@ -81,8 +81,14 @@ function createFakeResetRepository() {
     },
     async markUsed({ id }) {
       const record = [...byHash.values()].find((candidate) => candidate.id === id);
+
+      // Contrato atómico: solo el primero en llegar se queda con el token.
+      if (!record || record.usedAt) {
+        return { claimed: false };
+      }
+
       record.usedAt = new Date();
-      return record;
+      return { claimed: true };
     },
     async invalidateForUser(userId) {
       for (const record of byHash.values()) {
@@ -334,4 +340,144 @@ test('S2: buildPasswordResetLink arma la ruta del frontend', () => {
     buildPasswordResetLink({ appUrl: 'https://app.example.com/', rawToken: 'abc123' }),
     'https://app.example.com/reset-password?token=abc123'
   );
+});
+
+test('S2: dos canjes simultáneos del mismo enlace: gana uno solo', async () => {
+  const scenario = buildScenario();
+  await scenario.request.execute({ email: 'cuidador@example.com' });
+  const rawToken = tokenFromLastEmail(scenario);
+
+  const outcomes = await Promise.allSettled([
+    scenario.reset.execute({ token: rawToken, password: 'atacante-clave1' }),
+    scenario.reset.execute({ token: rawToken, password: 'victima-clave9' })
+  ]);
+
+  const fulfilled = outcomes.filter((outcome) => outcome.status === 'fulfilled');
+  const rejected = outcomes.filter((outcome) => outcome.status === 'rejected');
+
+  assert.equal(fulfilled.length, 1, 'solo un pedido puede canjear el enlace');
+  assert.equal(rejected.length, 1);
+  assert.equal(rejected[0].reason.message, INVALID_RESET_TOKEN_MESSAGE);
+
+  // La contraseña que queda es la del ganador, no la del último que escribió.
+  const winner = fulfilled[0].value;
+  assert.deepEqual(winner, { reset: true });
+  assert.equal(
+    new Set([...scenario.userRepository.users.values()].map((user) => user.passwordHash)).size,
+    1
+  );
+});
+
+test('S2: si consumir el token falla, la contraseña no se toca', async () => {
+  const scenario = buildScenario();
+  await scenario.request.execute({ email: 'cuidador@example.com' });
+  const rawToken = tokenFromLastEmail(scenario);
+
+  scenario.resetRepository.markUsed = async () => {
+    throw new Error('fallo transitorio de escritura');
+  };
+
+  await assert.rejects(() => scenario.reset.execute({ token: rawToken, password: GOOD_PASSWORD }));
+
+  const stored = scenario.userRepository.users.get('user-1');
+  assert.equal(stored.passwordHash, 'hashed:vieja-clave1');
+  assert.equal(stored.lockedUntil !== undefined, true);
+});
+
+test('S2: la vigencia sale de la config, no de un 60 escrito a mano', async () => {
+  const clock = createClock();
+  const userRepository = createFakeUserRepository(buildUser());
+  const resetRepository = createFakeResetRepository();
+  const emailSender = createFakeEmailSender();
+
+  const request = new RequestPasswordReset({
+    userRepository,
+    resetRepository,
+    emailSender,
+    throttle: new ResendThrottle({ now: clock.now }),
+    config: { appUrl: 'http://localhost:3201', passwordReset: { ttlMinutes: 15 } },
+    logger: silentLogger,
+    now: clock.now
+  });
+
+  await request.execute({ email: 'cuidador@example.com' });
+
+  const [record] = [...resetRepository.byHash.values()];
+  assert.equal(record.expiresAt.getTime(), clock.now() + 15 * MINUTE_MS);
+});
+
+test('S1/S2: el contrato HTTP real de las dos rutas nuevas', async () => {
+  const http = require('node:http');
+  const { createApp } = require('../src/app');
+  const { createAuthController } = require('../src/modules/auth/infrastructure/AuthController');
+  const { createAuthRouter } = require('../src/modules/auth/infrastructure/authRoutes');
+
+  const scenario = buildScenario();
+
+  const unreachable = (name) => ({
+    execute: async () => {
+      throw new Error(`${name} is not part of HU-004`);
+    }
+  });
+
+  const controller = createAuthController({
+    registerCaregiver: unreachable('registerCaregiver'),
+    login: unreachable('login'),
+    getCurrentUser: unreachable('getCurrentUser'),
+    verifyEmail: unreachable('verifyEmail'),
+    resendVerificationEmail: unreachable('resendVerificationEmail'),
+    requestPasswordReset: scenario.request,
+    resetPassword: scenario.reset
+  });
+
+  const router = createAuthRouter({ controller, authMiddleware: (_req, _res, next) => next() });
+  const app = createApp({
+    config: { corsOrigin: '*' },
+    modules: { auth: router },
+    logger: silentLogger
+  });
+  const server = http.createServer(app);
+
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  const base = `http://127.0.0.1:${port}/api/auth`;
+
+  async function post(path, body) {
+    const response = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    return { status: response.status, body: await response.json() };
+  }
+
+  try {
+    await scenario.request.execute({ email: 'cuidador@example.com' });
+    const rawToken = tokenFromLastEmail(scenario);
+
+    const known = await post('/forgot-password', { email: 'cuidador@example.com' });
+    const unknown = await post('/forgot-password', { email: 'nadie@example.com' });
+
+    assert.equal(known.status, 202);
+    assert.deepEqual(known.body, { accepted: true });
+    assert.deepEqual(unknown, known);
+
+    const garbage = await post('/reset-password', { token: 'x'.repeat(64), password: 'otra-clave1' });
+    assert.equal(garbage.status, 400);
+    assert.equal(garbage.body.error.message, INVALID_RESET_TOKEN_MESSAGE);
+
+    // El enlace del último correo sigue vigente: el pedido de "nadie@example.com" no lo quemó.
+    const currentToken = tokenFromLastEmail(scenario);
+    const ok = await post('/reset-password', { token: currentToken, password: 'otra-clave1' });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.body, { reset: true });
+
+    const reuse = await post('/reset-password', { token: currentToken, password: 'otra-clave2' });
+    assert.equal(reuse.status, 400);
+    assert.equal(reuse.body.error.message, INVALID_RESET_TOKEN_MESSAGE);
+
+    assert.ok(rawToken.length === 64);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
