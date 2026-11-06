@@ -1,51 +1,54 @@
 # ⚡ Tarea Activa Actual
 
-- **ID:** HU-006
-- **Título:** Generar un código de vinculación
-- **Descripción:** Generar un código alfanumérico de 6 dígitos y un QR para conectar la app móvil del adulto mayor.
+- **ID:** HU-007
+- **Título:** Vincular mi app con el código
+- **Descripción:** Ingresar o escanear el código de vinculación en la app móvil para conectar con la cuenta del familiar.
 
 ---
 
 ## 📁 Skills / Reglas Obligatorias a Leer Ahora:
-1. `skills/pairing-generator.md` *(no existe todavía: hay que crearla antes de empezar)*
-2. `skills/qr-adapter.md` *(no existe todavía: hay que crearla antes de empezar)*
-3. `skills/profiles-hexagonal.md` *(nueva, de HU-005: el código ahora apunta a un perfil concreto)*
-4. `skills/ley-1581.md` *(el consentimiento del titular sigue pendiente hasta HU-008)*
-5. *(Consultar convenciones globales en `skills/RUlLES.md`)*
+1. `skills/pairing-link.md` *(no existe todavía: hay que crearla antes de empezar)*
+2. `skills/senior-ui-wcag.md` *(no existe todavía: hay que crearla antes de empezar)*
+3. `skills/pairing-generator.md` *(HU-006: qué es un código, cómo vence y cómo se invalida)*
+4. `skills/qr-adapter.md` *(HU-006: el QR lleva `{"type":"senior-pairing","code":"…"}`)*
+5. `skills/bcrypt-pin.md` *(el PIN recién acá se verifica: el límite de intentos es obligatorio)*
+6. `skills/profiles-hexagonal.md` *(el perfil ya existe: el canje lo pasa a `LINKED`)*
 
 ---
 
 ## ✅ Criterios de Aceptación a Validar:
-- [ ] Genera un código de 6 dígitos y una imagen QR con vigencia de 24 horas.
-- [ ] Invalida automáticamente cualquier código de vinculación previo no usado.
-- [ ] Impide generar nuevos códigos si el perfil ya figura como vinculado.
+- [ ] Con código válido y consentimiento previo, conecta la app y guarda el token de dispositivo.
+- [ ] Muestra el mensaje claro "Pídele a tu familiar un código nuevo" si el código venció.
+- [ ] Bloquea nuevos intentos por 15 minutos tras 5 fallos consecutivos de código.
 
 ---
 
 ## 🧭 Estado de partida (leer antes de escribir código):
-- El slice `backend/src/modules/pairing/` ya existe y hoy genera un código **suelto**: `POST /api/pairing/codes`
-  no recibe `seniorId`, el código se guarda con el `caregiverId` y el TTL sale de la config (15 minutos, no 24
-  horas). HU-005 cambió el escenario: un perfil nace `PENDING` sin teléfono, así que el código tiene que apuntar a
-  **ese** perfil, y el canje (`LinkSeniorApp`) tiene que pasar ese perfil a `LINKED` en vez de crear uno nuevo.
-  Ese es el cambio de diseño central de esta HU; sin él, el criterio 3 no tiene sujeto ("el perfil ya vinculado")
-  y el 2 tampoco (¿qué código previo se invalida?).
-- La invariante ya está escrita en `skills/profiles-hexagonal.md` §2: solo el canje pasa un perfil a `LINKED`.
-  `POST /api/seniors` y el panel nunca lo marcan a mano.
-- `QrGenerator` (`pairing/infrastructure/QrGenerator.js`) ya devuelve un data URL; el contrato de salida del
-  panel (`qrCodeDataUrl`) no debería romperse.
-- La invalidación del código previo pide una condición atómica en la base (como el `updateMany` condicionado que
-  HU-004 usó para quemar el token de reseteo): "invalidar los previos no usados" y "crear el nuevo" no pueden
-  quedar en dos pasos donde un segundo pedido simultáneo gane la carrera.
-- Texto del backlog a resolver antes de escribir: dice "código **alfanumérico** de 6 dígitos". Son dos cosas
-  distintas y hoy el generador produce 6 dígitos numéricos. Hay que elegir uno explícitamente y registrarlo en
-  el `## Log` del documento de la HU.
-- Los 15 minutos actuales están en la config y el panel los muestra en pantalla
-  (`frontend/src/features/pairing/ui/PairingCodePanel.jsx`): pasar a 24 horas toca los dos lados.
+- El canje ya está hecho en backend (`LinkSeniorApp`, HU-006): código atado a un perfil, reclamo
+  atómico, perfil `PENDING → LINKED`, payload con `toPublicUser` + `linkStatus`/`timezone`, y una rama
+  legacy sin `seniorId` marcada como **transitoria hasta esta HU**. HU-007 la retira.
+- **Falta la parte de la app**: la pantalla para tipear/escanear el código, el guardado del token de
+  dispositivo y la sesión persistente del adulto mayor (regla "Cero Credenciales" de `skills/RUlLES.md`:
+  el adulto mayor nunca escribe correo ni contraseña).
+- **El PIN todavía no se verifica en ningún lado.** Criterio 3 (bloqueo por 5 fallos) tiene dos sujetos
+  posibles —el código y el PIN— y hay que decidir cuál(es) bloquean; `skills/bcrypt-pin.md` ya fija que el
+  PIN necesita contador por perfil. El patrón existe en `domain/loginLockout.js` y en el límite del
+  reenvío (`ResendThrottle`), pero el del PIN no está escrito.
+- El mensaje del criterio 2 es texto exacto: hoy el backend responde un `400` genérico
+  (`pairing code is invalid or expired`); la copy de la app es la que tiene que decir la frase del criterio.
+- Consentimiento: el criterio habla de "consentimiento previo". Se resuelve en HU-008; acá hay que
+  decidir si la app lo exige antes de canjear o si se permite vincular y el consentimiento bloquea el uso.
+  No inventar el registro de consentimiento en esta HU.
+- `POST /api/pairing/link` es público a propósito: el código es la credencial. Cualquier límite de intentos
+  tiene que ser por IP + por perfil, no por sesión.
+- La app móvil está empaquetada con Capacitor (`webDir: dist`, sin `server.url`): los cambios de frontend
+  no llegan al teléfono sin APK nuevo. Verificar en navegador y en build, y decir explícitamente qué queda
+  sin probar en dispositivo.
 
 ---
 
 ## 🔄 Instrucciones de Cierre para la IA al Finalizar:
 1. Pasar todos los criterios de aceptación.
-2. En el backlog (`skills/backlog_del_proyecto.md`) cambiar `- [ ] **HU-006**` por
-   `- [x] **HU-006**` y actualizar el puntero de estado.
-3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-007**) desde el backlog.
+2. En el backlog (`skills/backlog_del_proyecto.md`) cambiar `- [ ] **HU-007**` por
+   `- [x] **HU-007**` y actualizar el puntero de estado.
+3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-008**) desde el backlog.

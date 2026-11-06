@@ -79,12 +79,12 @@ S8. Documentación y skills: `skills/pairing-generator.md` y `skills/qr-adapter.
 
 ## Tasks
 
-- T1 · S1, S3, S5 · backend: `seniorId` obligatorio, TTL 24 h, rechazos 400/404/409, schema (`invalidatedAt`)
-- T2 · S2, S4 · backend: invalidación de previos + reclamo atómico del canje + tests de concurrencia
-- T3 · S5, S6 · backend: canje que pasa el perfil a `LINKED` + rama de compatibilidad sin `seniorId`
-- T4 · S7 · frontend: selector de perfil pendiente, copy de 24 h, estados de "ya vinculado"
-- T5 · S8 · docs + skills (`pairing-generator.md`, `qr-adapter.md`, `docs/pairing-api.md`)
-- T6 · cierre: suite + build, verificación independiente, backlog y `ACTIVE_TASK` a HU-007
+- [x] T1 · S1, S3, S5 · backend · `57b875c`
+- [x] T2 · S2, S4 · backend · `57b875c`
+- [x] T3 · S5, S6 · backend · `57b875c`
+- [x] T4 · S7 · frontend · `b5eae08`
+- [x] T5 · S8 · docs + skills · `676276a`, `981b0be`
+- [x] T6 · cierre: suite + build, verificación independiente, backlog y `ACTIVE_TASK` a HU-007 · este commit
 
 T1–T3 van en un solo commit de backend: son el mismo ciclo del código (emitir → invalidar → canjear) y separarlos
 dejaría un estado intermedio donde el panel ya manda `seniorId` y el canje todavía no lo entiende.
@@ -108,3 +108,27 @@ HU-005 (`toPublicSenior`), y eso le quitaba `role`, `email`, `phone` y `caregive
 publicada ya consume: un cambio de contrato que esta HU no pide. Se corrige: el canje devuelve `toPublicUser`
 como antes, más `linkStatus` y `timezone` (aditivos). La proyección estricta queda para `GET /api/seniors`, que
 nació sin clientes viejos.
+L6. Implementación (4 commits + este cierre). Lo que vale registrar:
+- `usedAt` (canjeado) e `invalidatedAt` (reemplazado) son hechos distintos, y el mensaje al adulto mayor
+  es el mismo para vencido e invalidado: decir cuál fue sólo ayuda a quien prueba códigos.
+- T1–T3 van en un commit porque son el mismo ciclo: separarlos dejaba un estado intermedio donde el
+  panel mandaba `seniorId` y el canje no lo entendía.
+- Los mensajes de los dos errores nuevos se escribieron en español: los muestra el panel del cuidador
+  tal cual, y en inglés era un defecto visible.
+L7 (verificación independiente `gentle-ai-verify`, con probes reproducidos sobre una copia del árbol).
+Veredicto: S1 a S8 **met**, sin bloqueantes. 188/188 tests, build y `prisma validate` en verde. Ocho
+observaciones; las que se cerraron en código (`981b0be`):
+- El perfil no se revalidaba contra el `caregiverId` del código: hoy nada reasigna perfiles, pero el
+  chequeo es barato y este endpoint es donde una reasignación se volvería un vínculo entre familias.
+- Un fallo del QR tumbaba el `201` con el código ya emitido y el anterior invalidado: ahora responde
+  `qrCodeDataUrl: null`.
+- El payload real del QR es `{"type":"senior-pairing","code":"..."}`, no el código suelto; y la skill
+  prometía pantalla completa, que no existe. Corregidas las dos en `skills/qr-adapter.md`.
+- Los códigos legacy (sin `seniorId`) no entran en la invalidación por perfil: mueren por vigencia.
+  Documentado en `docs/pairing-api.md`.
+Lo que **no** se pudo probar en este entorno: la atomicidad real del `updateMany` contra MongoDB y el
+filtro `isSet: false` sobre documentos viejos. Se juzgó la forma de la escritura y el comportamiento con
+dobles; la prueba contra Mongo real queda para el E2E post-deploy.
+L8 (riesgo declarado): **item 2** (el código es la credencial de un perfil; canje de un solo uso y
+propiedad) e **item 3** (cambia `POST /codes` con `seniorId` obligatorio y la semántica del canje, que
+consume el APK ya publicado — mitigado con la rama de compatibilidad y un payload que no pierde campos).

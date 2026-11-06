@@ -1,8 +1,8 @@
 # Backlog del Proyecto
 
 ## 📌 Puntero de Estado Actual
-- **Última HU completada:** HU-005
-- **Siguiente HU a ejecutar:** HU-006
+- **Última HU completada:** HU-006
+- **Siguiente HU a ejecutar:** HU-007
 
 ---
 
@@ -63,7 +63,7 @@
     - [ ] Asigna por defecto la zona horaria `America/Bogota` si no se especifica.
     - [ ] Restringe la vista del perfil únicamente al familiar propietario.
 
-- [ ] **HU-006: Generar un código de vinculación**
+- [x] **HU-006: Generar un código de vinculación**
   - **Descripción:** Generar un código alfanumérico de 6 dígitos y un QR para conectar la app móvil del adulto mayor.
   - **📁 Skills / Reglas a consultar:**
     - `skills/pairing-generator.md`
