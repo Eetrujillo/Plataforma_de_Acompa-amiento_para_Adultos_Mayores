@@ -19,7 +19,9 @@ function createPairingController({ generatePairingCode, linkSeniorApp, listLinke
         caregiverId: req.user.id,
         seniorId: req.body?.seniorId
       });
-      const qrCodeDataUrl = await qrGenerator.toDataUrl(pairing.code);
+      // El QR es un atajo, no la credencial: si falla se responde igual el código, que ya está
+      // emitido y con el anterior invalidado. Un 500 acá dejaría al familiar sin código y sin QR.
+      const qrCodeDataUrl = await qrGenerator.toDataUrl(pairing.code).catch(() => null);
 
       res.status(201).json({ ...pairing, qrCodeDataUrl });
     }),

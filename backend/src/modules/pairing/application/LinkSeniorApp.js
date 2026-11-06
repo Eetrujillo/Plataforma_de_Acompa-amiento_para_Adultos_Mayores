@@ -49,7 +49,9 @@ class LinkSeniorApp {
 
     // Con `seniorId` el código canjea ESE perfil, y se revisa antes de quemar el código para
     // que un perfil ya vinculado no consuma un intento inútilmente.
-    const target = record.seniorId ? await this.assertLinkable(record.seniorId) : null;
+    const target = record.seniorId
+      ? await this.assertLinkable(record.seniorId, record.caregiverId)
+      : null;
 
     // El reclamo va antes de escribir el perfil. Si la escritura falla, el código queda
     // quemado y el familiar puede generar otro: falla cerrado, como el reseteo de HU-004.
@@ -71,13 +73,17 @@ class LinkSeniorApp {
   }
 
   /**
-   * El perfil de este código tiene que seguir existiendo y seguir pendiente. Un perfil que ya
-   * no está no se distingue de un código consumido: el código no puede vincular nada.
+   * El perfil de este código tiene que seguir existiendo, seguir siendo del dueño del código y
+   * seguir pendiente.
+   *
+   * Un perfil que ya no está y uno de otra cuenta dan la misma respuesta que un código consumido:
+   * el código no puede vincular nada y no se confirma la existencia de un id ajeno. Hoy nada
+   * reasigna un perfil entre familiares; el chequeo está para que eso siga siendo irrelevante.
    */
-  async assertLinkable(seniorId) {
+  async assertLinkable(seniorId, caregiverId) {
     const senior = await this.userRepository.findById(seniorId);
 
-    if (!senior) {
+    if (!senior || senior.caregiverId !== caregiverId) {
       throw new ConflictError(ALREADY_USED_MESSAGE);
     }
 

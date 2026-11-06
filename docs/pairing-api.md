@@ -84,15 +84,18 @@ operación. Solo el pedido que gana la carrera sigue; el otro recibe el mismo 40
 dos pedidos simultáneos con el mismo código creaban **dos** seniors (el mismo defecto que HU-004
 corrigió para el token de reseteo).
 
-Después del reclamo y antes de escribir el perfil, el canje valida que el perfil siga siendo del
-dueño del código y que siga pendiente. Si algo falla, el código ya quedó quemado (falla cerrado).
+Antes de reclamar, el canje valida que el perfil siga existiendo, que **siga siendo del dueño del
+código** y que siga pendiente: un perfil ya vinculado no debe quemar un código que todavía sirve.
+Un perfil ajeno responde igual que un código consumido, para no confirmar que el id existe. Si la
+escritura del perfil falla **después** del reclamo, el código ya quedó quemado (falla cerrado) y el
+familiar genera otro.
 
 ## Las dos ramas del canje
 
 | Código | Qué hace |
 | --- | --- |
 | Con `seniorId` (HU-006) | Pasa **ese** perfil a `LINKED` y emite el token para él. No crea un senior nuevo y no pisa `fullName`/`phone`: el teléfono no edita la ficha. |
-| Sin `seniorId` (legacy) | Comportamiento anterior: crea el senior y lo deja `LINKED`. **Transitorio**: existe para que un APK ya publicado con un código en la mano siga funcionando. HU-007 lo retira cuando la app exija el perfil. |
+| Sin `seniorId` (legacy) | Comportamiento anterior: crea el senior y lo deja `LINKED`. **Transitorio**: existe para que un APK ya publicado con un código en la mano siga funcionando. HU-007 lo retira cuando la app exija el perfil. No entran en la invalidación por perfil (no tienen `seniorId`): mueren por su propia vigencia. |
 
 ## Lo que este contrato NO cubre todavía
 
@@ -100,4 +103,5 @@ dueño del código y que siga pendiente. Si algo falla, el código ya quedó que
   dígitos (10^6) es adivinable con paciencia; hoy la única defensa es la vigencia de 24 h y la
   invalidación al pedir uno nuevo.
 - Consentimiento del titular antes de compartir actividades, SOS o GPS: HU-008.
-- El QR contiene solo el código, no una URL con token: ver `skills/qr-adapter.md`.
+- Si el QR no se puede generar, la emisión responde igual: `201` con `qrCodeDataUrl: null`. El QR es
+  un atajo, no la credencial (`skills/qr-adapter.md`).
