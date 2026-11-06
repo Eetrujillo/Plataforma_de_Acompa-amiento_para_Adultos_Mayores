@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { resolveDatabaseUrl } = require('./databaseUrl');
+const { PAIRING_CODE_TTL_MINUTES } = require('../modules/pairing/domain/pairingCode');
 
 const ENV_CANDIDATES = [
   path.resolve(__dirname, '../../.env'),
@@ -71,7 +72,9 @@ const config = Object.freeze({
   }),
   pairing: Object.freeze({
     codeLength: 6,
-    ttlMinutes: Number.parseInt(process.env.PAIRING_TTL_MINUTES || '15', 10),
+    // HU-006 S1: el código vive 24 horas por defecto. Un valor mal escrito cae al default en
+    // vez de dejar una fecha inválida en la base.
+    ttlMinutes: positiveInteger(process.env.PAIRING_TTL_MINUTES, PAIRING_CODE_TTL_MINUTES),
     maxGenerationAttempts: 5
   }),
   appUrl: (process.env.APP_URL || 'http://localhost:3201').replace(/\/+$/, ''),

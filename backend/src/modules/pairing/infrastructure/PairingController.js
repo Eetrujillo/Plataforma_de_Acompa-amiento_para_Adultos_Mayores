@@ -13,7 +13,12 @@ function createPairingController({ generatePairingCode, linkSeniorApp, listLinke
     }),
 
     generate: asyncHandler(async (req, res) => {
-      const pairing = await generatePairingCode.execute({ caregiverId: req.user.id });
+      // HU-006 S3: el código pertenece a un perfil. El cuidador sale de la sesión, el perfil
+      // del cuerpo, y el caso de uso verifica que sea suyo y que siga pendiente.
+      const pairing = await generatePairingCode.execute({
+        caregiverId: req.user.id,
+        seniorId: req.body?.seniorId
+      });
       const qrCodeDataUrl = await qrGenerator.toDataUrl(pairing.code);
 
       res.status(201).json({ ...pairing, qrCodeDataUrl });

@@ -1,21 +1,16 @@
 'use strict';
 
+const { isPendingLinkStatus } = require('../domain/seniorLinkState');
+
 /**
  * Lists the seniors linked to a caregiver, so the dashboard can pick one.
  *
+ * El predicado de "pendiente" vive en el dominio porque la misma regla decide para qué
+ * perfiles se puede emitir un código (HU-006 S3): un documento anterior a HU-005 no trae
+ * `linkStatus` y cuenta como vinculado.
+ *
  * Ports: userRepository
  */
-
-/**
- * Only an explicit pending state is filtered out, and the comparison ignores case: a
- * hand-edited or imported document must not sneak into the activity picker, but a document
- * written before HU-005 carries no `linkStatus` at all and was created by the pairing flow,
- * so a missing value means linked.
- */
-function isPending(linkStatus) {
-  return typeof linkStatus === 'string' && linkStatus.toUpperCase() === 'PENDING';
-}
-
 class ListLinkedSeniors {
   constructor({ userRepository }) {
     this.userRepository = userRepository;
@@ -26,7 +21,7 @@ class ListLinkedSeniors {
 
     return {
       seniors: seniors
-        .filter((senior) => !isPending(senior.linkStatus))
+        .filter((senior) => !isPendingLinkStatus(senior.linkStatus))
         .map((senior) => ({
           id: senior.id,
           fullName: senior.fullName,

@@ -68,6 +68,15 @@ class PrismaUserRepository {
     return this.prisma.user.findMany({ where: { caregiverId, role: 'SENIOR' } });
   }
 
+  /**
+   * Marca el perfil como vinculado cuando el teléfono canjea el código de ese perfil (HU-006
+   * S5). Escribe sólo el estado: el `fullName` y el `phone` del cuerpo del canje no pisan los
+   * datos del familiar, que es el dueño de la ficha.
+   */
+  async markLinked(id) {
+    return this.prisma.user.update({ where: { id }, data: { linkStatus: 'LINKED' } });
+  }
+
   async markEmailVerified(id) {
     return this.prisma.user.update({ where: { id }, data: { emailVerifiedAt: new Date() } });
   }

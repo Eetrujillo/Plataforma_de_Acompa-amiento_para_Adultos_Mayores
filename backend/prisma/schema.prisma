@@ -72,16 +72,23 @@ model PasswordResetToken {
 }
 
 /// Short lived 6 digit code that binds a senior device to a caregiver account.
+/// HU-006: el código pertenece a un perfil (`seniorId`) y vive 24 horas por defecto.
+/// `usedAt` significa "canjeado" y `invalidatedAt` "reemplazado por uno más nuevo": un
+/// código reemplazado no fue usado, así que no se puede marcar con `usedAt` sin mentir.
+/// Los dos son nullable porque los documentos que ya existen no los traen; el reclamo del
+/// canje los filtra con `isSet: false` para no dejar afuera un código ya emitido.
 model PairingCode {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  code        String    @unique
-  caregiverId String    @db.ObjectId
-  seniorId    String?   @db.ObjectId
-  expiresAt   DateTime
-  usedAt      DateTime?
-  createdAt   DateTime  @default(now())
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  code          String    @unique
+  caregiverId   String    @db.ObjectId
+  seniorId      String?   @db.ObjectId
+  expiresAt     DateTime
+  usedAt        DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime  @default(now())
 
   @@index([caregiverId])
+  @@index([caregiverId, seniorId])
 }
 
 /// Daily routine item assigned by a caregiver to a senior.

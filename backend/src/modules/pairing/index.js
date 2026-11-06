@@ -15,7 +15,7 @@ function createPairingModule({ prisma, config, userRepository, tokenService, aut
   const pairingRepository = new PrismaPairingRepository({ prisma });
 
   const controller = createPairingController({
-    generatePairingCode: new GeneratePairingCode({ pairingRepository, config }),
+    generatePairingCode: new GeneratePairingCode({ pairingRepository, userRepository, config }),
     linkSeniorApp: new LinkSeniorApp({ pairingRepository, userRepository, tokenService }),
     listLinkedSeniors: new ListLinkedSeniors({ userRepository }),
     qrGenerator: new QrGenerator()

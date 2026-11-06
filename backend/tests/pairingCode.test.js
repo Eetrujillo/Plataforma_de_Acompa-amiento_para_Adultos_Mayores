@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   PAIRING_CODE_LENGTH,
+  PAIRING_CODE_TTL_MINUTES,
   generatePairingCode,
   isValidPairingCode,
   isPairingCodeExpired,
@@ -55,4 +56,15 @@ test('expiration is computed from the now instant plus the ttl in minutes', () =
 
   assert.equal(computePairingExpiration(now, 15).toISOString(), '2024-05-01T10:15:00.000Z');
   assert.equal(computePairingExpiration(now, 1).toISOString(), '2024-05-01T10:01:00.000Z');
+});
+
+/**
+ * HU-006 S1: el criterio de aceptación pide 24 horas. La constante vive en el dominio y la
+ * configuración la usa como default, así el número no se duplica en dos archivos.
+ */
+test('HU-006 S1: a code computed without an explicit ttl lives 24 hours', () => {
+  const now = new Date('2024-05-01T10:00:00.000Z');
+
+  assert.equal(PAIRING_CODE_TTL_MINUTES, 1440);
+  assert.equal(computePairingExpiration(now).toISOString(), '2024-05-02T10:00:00.000Z');
 });

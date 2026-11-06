@@ -358,7 +358,13 @@ test('sin regresión - vincular un adulto mayor conserva sus mensajes y crea el 
         usedAt: null
       };
     },
-    async markUsed() {
+    // HU-006 S4/S6: el canje reclama el código con `claim` y, en la rama de compatibilidad,
+    // anota el senior creado con `setSenior`. La aserción de este test es la de siempre:
+    // los mensajes del factory compartido no cambiaron.
+    async claim({ id }) {
+      return { claimed: id === 'pairing-1' };
+    },
+    async setSenior() {
       return null;
     }
   };

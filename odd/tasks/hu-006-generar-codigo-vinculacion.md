@@ -49,10 +49,15 @@ POST /api/pairing/codes      auth: cuidador
 
 POST /api/pairing/link       público (la app del adulto mayor usa el código como credencial)
   body: { "code": "482913", "fullName": "...", "phone": "..." }   // fullName/phone opcionales desde esta HU
-  201:  { "token": "<jwt>", "senior": { ...proyección pública de HU-005... } }
+  201:  { "token": "<jwt>", "senior": { ...toPublicUser de auth + linkStatus + timezone } }
   400 código con formato inválido / vencido / invalidado (mensaje genérico, sin decir cuál)
   404 código inexistente · 409 ya canjeado o el perfil ya está vinculado
 ```
+
+El `senior` del canje **conserva la proyección que ya consume la app publicada** (`toPublicUser`: id, email,
+fullName, role, phone, caregiverId, emailVerified, createdAt) y se le suman `linkStatus` y `timezone`. No se
+cambia a la proyección de HU-005 (`toPublicSenior`) porque eso le quitaría campos a un cliente ya desplegado y
+no es lo que pide esta HU: `linkStatus`/`timezone` son aditivos.
 
 S6. Compatibilidad con la app publicada (no se rompe lo que ya funciona):
    - Un código **sin** `seniorId` (emitido antes de esta HU, o por un APK viejo que pide `/codes` sin perfil)
@@ -98,3 +103,8 @@ arquitectura.
 L4. Decisión de compatibilidad (S6): no se puede romper el canje de la app ya publicada. La rama sin `seniorId`
 se conserva y se marca como transitoria, con test, para que HU-007 la pueda retirar cuando el APK nuevo exija el
 perfil.
+L5 (corrección de S5 durante la implementación). La primera versión congelaba `senior` como la proyección de
+HU-005 (`toPublicSenior`), y eso le quitaba `role`, `email`, `phone` y `caregiverId` a la respuesta que la app
+publicada ya consume: un cambio de contrato que esta HU no pide. Se corrige: el canje devuelve `toPublicUser`
+como antes, más `linkStatus` y `timezone` (aditivos). La proyección estricta queda para `GET /api/seniors`, que
+nació sin clientes viejos.
