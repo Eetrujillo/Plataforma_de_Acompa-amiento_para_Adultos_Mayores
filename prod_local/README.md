@@ -92,6 +92,11 @@ docker compose up -d --build
 - API: http://localhost:3500/api/health
 - Mongo: `localhost:4301`
 
+Para el despliegue real (TLS, dominios, SMTP, CI/CD, checklist y verificación
+post-despliegue) ver [`docs/despliegue.md`](docs/despliegue.md). Resumen: un solo
+backend y una sola base para web y app; la web usa `/api` relativo y la app usa
+`EXPO_PUBLIC_API_BASE=https://DOMINIO/api`.
+
 ## Ejecución local
 
 ```bash

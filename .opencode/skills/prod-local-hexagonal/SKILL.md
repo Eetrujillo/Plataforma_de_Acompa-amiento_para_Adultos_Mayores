@@ -93,6 +93,13 @@ Override en caliente: pantalla `/conexion` → `gap_api_base` en AsyncStorage.
 El backend escucha en todas las interfaces (`httpServer.listen(config.port)`), y
 `CORS_ORIGIN` por defecto es `*`.
 
+## Despliegue
+
+`prod_local/docs/despliegue.md` es el plano: topología Nginx → backend 3500 → Mongo
+`rs0`, variables por entorno, opciones de URL, checklist y verificación
+post-despliegue. Regla que no se negocia: **un backend y una base para los dos
+clientes**. La rama `prod` desplegada solo tiene 5 rutas y no sirve para la app.
+
 ## Validación
 
 ```bash
