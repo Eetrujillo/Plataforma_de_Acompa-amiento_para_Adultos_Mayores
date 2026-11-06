@@ -1,47 +1,53 @@
 # ⚡ Tarea Activa Actual
 
-- **ID:** HU-003
-- **Título:** Iniciar sesión
-- **Descripción:** Iniciar sesión con correo y contraseña para acceder al panel web de administración del familiar.
+- **ID:** HU-004
+- **Título:** Recuperar mi contraseña
+- **Descripción:** Recibir un enlace temporal en el correo para restablecer la contraseña en caso de olvido.
 
 ---
 
 ## 📁 Skills / Reglas Obligatorias a Leer Ahora:
-1. `skills/jwt-security.md` *(todavía no existe en `skills/`: hay que crearla antes de empezar)*
-2. `skills/rate-limiting.md` *(ya existe, creada al cerrar HU-002)*
-3. *(Consultar convenciones globales en `skills/RUlLES.md`)*
+1. `skills/email-adapter.md` *(existe, escrita al cerrar HU-002)*
+2. `skills/jwt-security.md` *(existe, escrita al cerrar HU-003)*
+3. `skills/rate-limiting.md` *(existe; el endpoint de "olvidé mi contraseña" dispara un correo, así que necesita su propio límite)*
+4. *(Consultar convenciones globales en `skills/RUlLES.md`)*
 
 ---
 
 ## ✅ Criterios de Aceptación a Validar:
-- [ ] Con datos correctos, retorna HTTP 200 y el token JWT de sesión.
-- [ ] Con datos incorrectos, devuelve HTTP 401 sin especificar qué campo falló.
-- [ ] Bloquea la cuenta por 15 minutos tras 5 intentos fallidos consecutivos.
-- [ ] Redirige al login al intentar acceder a rutas privadas sin token.
+- [ ] Retorna un mensaje genérico de confirmación exista o no el correo ingresado.
+- [ ] El enlace de restablecimiento funciona una sola vez y expira en 60 minutos.
+- [ ] Invalida tokens de sesión previos tras completar el cambio de clave.
 
 ---
 
 ## 🧭 Estado de partida (leer antes de escribir código):
-- Ya existe `backend/src/modules/auth/application/Login.js` con `POST /api/auth/login`: responde
-  `200 { token, user }`, `401` genérico (`Invalid credentials`, no distingue correo de contraseña) y
-  `403 EMAIL_NOT_VERIFIED` mientras la cuenta no confirme el correo. El gate de verificación viene
-  de `odd/tasks/email-auth.md`.
-- El empaquetado de la sesión y la protección de rutas privadas usan
-  `backend/src/shared/middlewares/authMiddleware.js` (`GET /api/auth/me` es el ejemplo ya cubierto).
-- **HU-002 (cerrada)** dejó el rate limiting de reenvío en
-  `odd/tasks/hu-002-confirmar-correo.md`: `application/ResendThrottle.js` es el patrón a reutilizar
-  (ventana deslizante, reloj inyectable, store acotado que falla cerrado) y
-  `shared/errors/TooManyRequestsError.js` el `429` del contrato. `skills/rate-limiting.md` documenta
-  las reglas y deja anotado que `login` todavía no tiene límite.
-- Lo que falta para esta HU es el **bloqueo por 5 intentos fallidos consecutivos durante 15
-  minutos**, con su contador persistido o en el mismo store, y la verificación observable de que el
-  `401` no revela qué campo falló.
+- Ya existe `backend/src/modules/auth/` con el patrón de token de un solo uso resuelto para la
+  verificación de correo: `domain/verificationToken.js` (32 bytes, solo se guarda el SHA-256, TTL
+  configurable) y `PrismaEmailVerificationRepository` (`markUsed`, `invalidateForUser`). Es el molde
+  para el token de restablecimiento, con TTL de **60 minutos** y colección o tipo propio: no se
+  reutiliza el token de verificación de correo, porque un enlace no debe poder hacer las dos cosas.
+- El adaptador de correo (`infrastructure/EmailSender.js`) tiene un solo método,
+  `sendVerificationEmail`. Siguiendo `skills/email-adapter.md`, un correo nuevo es **un método nuevo
+  en el puerto**, con su rama SMTP y su rama `console`, no un parámetro de copy.
+- El límite de peticiones ya está resuelto dos veces y hay que reutilizar el criterio:
+  `application/ResendThrottle.js` (ventana deslizante, reloj inyectable, store acotado que falla
+  cerrado) para el envío, y `domain/loginLockout.js` para el bloqueo por intentos.
+- El JWT no tiene estado ni lista de revocación: los claims son `sub`, `role`, `email` más
+  `iat`/`exp` (7 días). El tercer criterio ("invalida tokens de sesión previos") **no se resuelve
+  solo**: hoy no hay forma de invalidar un token ya emitido. Hay que decidir e implementar algo
+  (versión de sesión en el usuario que viaje como claim y se valide en `authMiddleware`, o lista de
+  revocación). Es la decisión de diseño principal de esta HU y conviene resolverla antes que el
+  endpoint.
+- HU-003 (cerrada) dejó `application/Login.js` con bloqueo por intentos fallidos
+  (`failedLoginAttempts`, `lockedUntil`) y `shared/errors/AccountLockedError.js`. Un cambio de
+  contraseña debería dejar ese estado limpio, igual que un login exitoso.
 
 ---
 
 ## 🔄 Instrucciones de Cierre para la IA al Finalizar:
 1. Pasar todos los criterios de aceptación escribiendo el código en `backend/src/modules/auth/`.
-2. Ir al archivo del backlog (`skills/backlog_del_proyecto.md`) y cambiar `- [ ] **HU-003**` por
-   `- [x] **HU-003**`; actualizar además el puntero de estado.
-3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-004**)
+2. Ir al backlog (`skills/backlog_del_proyecto.md`) y cambiar `- [ ] **HU-004**` por
+   `- [x] **HU-004**`; actualizar además el puntero de estado.
+3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-005**)
    desde el backlog.

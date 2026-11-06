@@ -1,8 +1,8 @@
 # Backlog del Proyecto
 
 ## 📌 Puntero de Estado Actual
-- **Última HU completada:** HU-002
-- **Siguiente HU a ejecutar:** HU-003
+- **Última HU completada:** HU-003
+- **Siguiente HU a ejecutar:** HU-004
 
 ---
 
@@ -31,7 +31,7 @@
     - [ ] Muestra error si el token expiró o ya fue utilizado.
     - [ ] Bloquea solicitudes de reenvío si se superan 3 intentos por hora.
 
-- [ ] **HU-003: Iniciar sesión**
+- [x] **HU-003: Iniciar sesión**
   - **Descripción:** Iniciar sesión con correo y contraseña para acceder al panel web de administración del familiar.
   - **📁 Skills / Reglas a consultar:**
     - `skills/jwt-security.md`
