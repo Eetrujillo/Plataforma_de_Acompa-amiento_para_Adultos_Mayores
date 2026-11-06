@@ -1,6 +1,7 @@
 'use strict';
 
 const { normalizeEmail, toPublicUser } = require('../domain/User');
+const { sessionClaims } = require('../../../shared/session/sessionVersion');
 const {
   UnauthorizedError,
   ValidationError,
@@ -74,11 +75,7 @@ class LoginWithGoogle {
           emailVerifiedAt: new Date()
         };
 
-    const token = this.tokenService.sign({
-      sub: verifiedUser.id,
-      role: verifiedUser.role,
-      email: verifiedUser.email
-    });
+    const token = this.tokenService.sign(sessionClaims(verifiedUser));
 
     return { token, user: toPublicUser(verifiedUser) };
   }

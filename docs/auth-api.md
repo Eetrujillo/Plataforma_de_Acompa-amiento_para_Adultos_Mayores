@@ -74,6 +74,7 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
 - `POST /api/auth/reset-password` — `{ token, password }`; `200` con `{ reset: true }`, `400` si el
   enlace no sirve (ver la sección de restablecimiento).
 - `GET /api/auth/me` — requiere `Authorization: Bearer <jwt>`.
+- El claim `sv` de los tokens de sesión se documenta en la sección de restablecimiento (abajo).
 
 ## Límite del reenvío de verificación (HU-002)
 
@@ -165,8 +166,14 @@ Detalles del enlace:
 - La contraseña nueva se valida **antes** de tocar el token, con la misma regla del registro (mínimo
   8 caracteres y letras + números). Si la rechaza, el enlace **sigue sirviendo** para reintentar.
 - Al completarse, el reset guarda la contraseña, limpia `failedLoginAttempts` y `lockedUntil` (quien
-  demuestra que controla el correo no queda bloqueado por los intentos previos) y sube la versión de
-  sesión del usuario.
+  demuestra que controla el correo no queda bloqueado por los intentos previos) y **sube la versión
+  de sesión** del usuario.
+- **Sesiones anteriores:** el JWT lleva el claim `sv` con la versión que tenía el usuario al emitirse.
+  `authMiddleware` lee el usuario en cada request autenticado y compara `sv` contra `sessionVersion`;
+  si no coinciden responde `401` y el cliente limpia la sesión. Cambiar la contraseña es, entonces,
+  equivalente a cerrar todas las sesiones abiertas. Tokens emitidos antes de este cambio no traen
+  `sv` y se leen como versión `0`: siguen sirviendo hasta el primer reset, así un despliegue no deja
+  a nadie afuera. Un token de un usuario borrado también deja de servir de inmediato.
 - **Cuentas creadas con Google no tienen contraseña que restablecer**: para ellas no se manda nada,
   con la misma respuesta `202`.
 - Límite: 3 pedidos por hora y por correo, contando también correos sin cuenta (instancia propia del

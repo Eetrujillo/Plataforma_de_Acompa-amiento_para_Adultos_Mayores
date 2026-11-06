@@ -2,6 +2,7 @@
 
 const { toPublicUser } = require('../domain/User');
 const { hashToken, isTokenWellFormed, isTokenExpired } = require('../domain/verificationToken');
+const { sessionClaims } = require('../../../shared/session/sessionVersion');
 const { ValidationError } = require('../../../shared/errors');
 
 const INVALID_LINK_MESSAGE = 'El enlace de verificación no es válido o ya venció';
@@ -33,11 +34,7 @@ class VerifyEmail {
 
     const user = await this.userRepository.markEmailVerified(record.userId);
 
-    const sessionToken = this.tokenService.sign({
-      sub: user.id,
-      role: user.role,
-      email: user.email
-    });
+    const sessionToken = this.tokenService.sign(sessionClaims(user));
 
     return { token: sessionToken, user: toPublicUser(user) };
   }

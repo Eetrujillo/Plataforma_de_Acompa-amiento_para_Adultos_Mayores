@@ -2,6 +2,7 @@
 
 const { isValidPairingCode, isPairingCodeExpired } = require('../domain/pairingCode');
 const { User, toPublicUser } = require('../../auth/domain/User');
+const { sessionClaims } = require('../../../shared/session/sessionVersion');
 const { ConflictError, NotFoundError, ValidationError } = require('../../../shared/errors');
 
 /**
@@ -47,7 +48,7 @@ class LinkSeniorApp {
 
     await this.pairingRepository.markUsed({ id: record.id, seniorId: created.id });
 
-    const token = this.tokenService.sign({ sub: created.id, role: created.role, email: created.email });
+    const token = this.tokenService.sign(sessionClaims(created));
 
     return { token, senior: toPublicUser(created) };
   }

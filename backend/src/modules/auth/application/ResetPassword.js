@@ -2,6 +2,7 @@
 
 const { assertPassword } = require('../domain/User');
 const { hashToken, isTokenExpired } = require('../domain/passwordResetToken');
+const { sessionVersionOf } = require('../../../shared/session/sessionVersion');
 const { ValidationError } = require('../../../shared/errors');
 
 // Un único mensaje para token inventado, mal formado, ya usado y vencido: distinguirlos
@@ -51,7 +52,12 @@ class ResetPassword {
 
     const passwordHash = await this.passwordHasher.hash(password);
 
-    await this.userRepository.updatePasswordAfterReset(user.id, { passwordHash });
+    // Subir la versión es lo que cierra las sesiones abiertas: cualquier token emitido
+    // antes de este reset lleva una versión vieja y el middleware lo rechaza.
+    await this.userRepository.updatePasswordAfterReset(user.id, {
+      passwordHash,
+      sessionVersion: sessionVersionOf(user) + 1
+    });
     await this.resetRepository.markUsed({ id: record.id });
 
     return { reset: true };

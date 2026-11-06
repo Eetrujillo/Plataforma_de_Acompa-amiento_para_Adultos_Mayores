@@ -70,10 +70,15 @@ class PrismaUserRepository {
    * Levantar el bloqueo es deliberado: quien acaba de demostrar que controla el correo
    * no puede quedar quince minutos afuera por los fallos previos.
    */
-  async updatePasswordAfterReset(id, { passwordHash }) {
+  async updatePasswordAfterReset(id, { passwordHash, sessionVersion }) {
     return this.prisma.user.update({
       where: { id },
-      data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null }
+      data: {
+        passwordHash,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        ...(sessionVersion === undefined ? {} : { sessionVersion })
+      }
     });
   }
 

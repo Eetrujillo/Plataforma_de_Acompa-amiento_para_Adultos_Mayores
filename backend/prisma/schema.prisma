@@ -23,6 +23,11 @@ model User {
   /// means "no failed attempts" and "not locked".
   failedLoginAttempts Int?
   lockedUntil         DateTime?
+  /// HU-004 session version. Every JWT carries the version it was issued with; a
+  /// password reset bumps it, which invalidates every session opened before. Nullable
+  /// for the same reason as the lockout fields: documents already exist without it and
+  /// a null reads as 0.
+  sessionVersion      Int?
   /// Ley 1581 consent evidence: stamped by the server when the account is created.
   acceptedTermsAt DateTime?
   termsVersion    String?

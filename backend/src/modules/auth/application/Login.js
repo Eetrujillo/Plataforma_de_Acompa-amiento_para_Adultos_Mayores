@@ -1,5 +1,6 @@
 'use strict';
 
+const { sessionClaims } = require('../../../shared/session/sessionVersion');
 const { normalizeEmail, toPublicUser } = require('../domain/User');
 const {
   LOCKOUT_MESSAGE,
@@ -91,7 +92,7 @@ class Login {
       await this.userRepository.updateLoginLock(user.id, CLEARED_LOCK_STATE);
     }
 
-    const token = this.tokenService.sign({ sub: user.id, role: user.role, email: user.email });
+    const token = this.tokenService.sign(sessionClaims(user));
 
     return { token, user: toPublicUser(user) };
   }

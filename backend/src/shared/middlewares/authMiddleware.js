@@ -1,6 +1,7 @@
 'use strict';
 
 const { UnauthorizedError, ForbiddenError } = require('../errors');
+const { sessionVersionOf, tokenVersionOf } = require('../session/sessionVersion');
 
 function extractBearerToken(authorizationHeader) {
   if (typeof authorizationHeader !== 'string') {
@@ -21,9 +22,18 @@ function extractBearerToken(authorizationHeader) {
  *
  * The token verifier is injected by the composition root, so this shared
  * middleware never imports a slice implementation.
+ *
+ * The user is read on every authenticated request. That is the price of being able to
+ * revoke a session: a JWT cannot be taken back on its own, so the token carries the
+ * user's session version and the stored one is what decides. It also means a token for
+ * a deleted user stops working immediately.
  */
-function createAuthMiddleware({ verifyToken }) {
-  return function authMiddleware(req, _res, next) {
+function createAuthMiddleware({ verifyToken, userRepository }) {
+  if (!userRepository) {
+    throw new TypeError('createAuthMiddleware requires a userRepository');
+  }
+
+  return async function authMiddleware(req, _res, next) {
     const token = extractBearerToken(req.headers.authorization);
 
     if (!token) {
@@ -38,7 +48,21 @@ function createAuthMiddleware({ verifyToken }) {
       return next(new UnauthorizedError('Invalid or expired token'));
     }
 
-    req.user = { id: claims.sub, role: claims.role, email: claims.email };
+    let user;
+
+    try {
+      user = await userRepository.findById(claims.sub);
+    } catch (error) {
+      return next(error);
+    }
+
+    // Mismo error para usuario inexistente y sesión revocada: el cliente solo necesita
+    // saber que tiene que volver a entrar, no por qué.
+    if (!user || tokenVersionOf(claims) !== sessionVersionOf(user)) {
+      return next(new UnauthorizedError('Invalid or expired token'));
+    }
+
+    req.user = { id: user.id, role: user.role, email: user.email };
     return next();
   };
 }

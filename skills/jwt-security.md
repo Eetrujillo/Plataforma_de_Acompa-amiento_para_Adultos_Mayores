@@ -3,8 +3,12 @@
 ## El Token
 - Lo emite `backend/src/modules/auth/infrastructure/JwtTokenService.js`; el caso de uso solo llama a
   `tokenService.sign(payload)`. Ningún controlador firma tokens por su cuenta.
-- Claims: exactamente `sub` (id del usuario), `role` y `email`, más `iat`/`exp` que agrega
-  `jsonwebtoken` solo al firmar. **Nada más.** Ni nombre, ni teléfono,
+- Claims: exactamente `sub` (id del usuario), `role`, `email` y `sv` (versión de sesión), más
+  `iat`/`exp` que agrega `jsonwebtoken` solo al firmar. **Nada más.**
+- El payload lo arma `shared/session/sessionVersion.js` (`sessionClaims`). Los cuatro lugares que
+  firman un token —login, verificación de correo, login con Google y vinculación de adulto mayor—
+  tienen que usarlo: un token sin `sv` se lee como versión 0 y queda inválido en cuanto el usuario
+  cambie su contraseña. Ni nombre, ni teléfono,
   ni datos del adulto mayor: el payload de un JWT es legible por cualquiera que lo tenga.
 - Vigencia: `JWT_EXPIRES_IN` (default `7d`). No hay refresh token; al vencer, se vuelve a loguear.
 - Secreto: `JWT_SECRET` desde el entorno. En `NODE_ENV=production` el backend **no arranca** sin él
@@ -36,6 +40,11 @@
    sesión, nunca ocultando el contenido después de pedirlo: el pedido no debe salir.
 7. **Nada de secretos en el cliente.** El frontend guarda el token que recibe y lo manda en
    `Authorization: Bearer <jwt>`; no conoce `JWT_SECRET` ni decide claims.
+8. **Un JWT no se puede retirar solo: la sesión se cierra con la versión.** `authMiddleware` lee el
+   usuario en cada request autenticado y compara el claim `sv` contra `sessionVersion`. Subir la
+   versión (lo hace el reset de contraseña) es "cerrar todas las sesiones". El costo está asumido:
+   un `findById` por id indexado en cada request de los cuatro routers protegidos. La alternativa
+   —confiar solo en el `exp`— deja viva hasta 7 días una sesión abierta con la contraseña vieja.
 
 ## Pruebas
 - Un `200` con token, un `401` idéntico para los dos motivos de falla, el bloqueo a los N intentos, el

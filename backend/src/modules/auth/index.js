@@ -48,7 +48,10 @@ function createAuthModule({ prisma, config, logger = console }) {
     message: PASSWORD_RESET_THROTTLE_MESSAGE
   });
 
-  const authMiddleware = createAuthMiddleware({ verifyToken: (token) => tokenService.verify(token) });
+  const authMiddleware = createAuthMiddleware({
+    verifyToken: (token) => tokenService.verify(token),
+    userRepository
+  });
 
   const controller = createAuthController({
     registerCaregiver: new RegisterCaregiver({
