@@ -7,8 +7,8 @@ import { PageShell } from '../../shared/components/PageShell.jsx';
 import { PrimaryButton } from '../../shared/components/PrimaryButton.jsx';
 
 /**
- * Senior entry point. An unlinked device first pairs with the caregiver code;
- * once linked, the same route shows the emergency button and today's routine.
+ * Senior entry point. An unlinked device first pairs by scanning the QR the caregiver generates in
+ * her panel; once linked, the same route shows the emergency button and today's routine.
  */
 export function SeniorHomePage() {
   const { user } = useAuth();

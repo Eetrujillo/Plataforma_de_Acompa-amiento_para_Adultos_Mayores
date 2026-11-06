@@ -1,87 +1,27 @@
-import { useState } from 'react';
-
-import { linkSenior } from '../application/pairingApi.js';
-import { useAuth } from '../../auth/application/AuthContext.jsx';
-import { PrimaryButton } from '../../../shared/components/PrimaryButton.jsx';
-import { FormField } from '../../../shared/components/FormField.jsx';
 import { PageShell } from '../../../shared/components/PageShell.jsx';
 
 /**
- * First run on the senior device: the caregiver's 6 digit code is the credential.
+ * Pantalla del teléfono que todavía no está vinculado a ningún perfil.
+ *
+ * HU-006 (rework QR-only de L9): ya no se tipea ninguna credencial. El token viaja sólo dentro
+ * del QR que el familiar muestra en su panel, y leerlo es trabajo del escáner de HU-007. Esta
+ * pantalla no pide datos ni llama a la API: sólo explica qué falta.
+ *
+ * El nombre del componente y del archivo se conservan porque `pages/senior/SeniorHomePage.jsx`
+ * los importa; HU-007 lo reemplaza por la vista de escaneo.
  */
 export function PairingLinkForm() {
-  const { startSession } = useAuth();
-  const [form, setForm] = useState({ code: '', fullName: '', phone: '' });
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState(null);
-
-  function handleChange(event) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: name === 'code' ? value.replace(/\D/g, '') : value }));
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setPending(true);
-    setError(null);
-
-    try {
-      const result = await linkSenior(form);
-      startSession({ token: result.token, user: result.senior });
-    } catch (caught) {
-      setError(caught.message);
-    } finally {
-      setPending(false);
-    }
-  }
-
   return (
     <PageShell eyebrow="Primeros pasos" title="Vinculá este teléfono">
       <section className="card">
         <p className="card__hint">
-          Pedile a tu familiar el código de 6 dígitos que aparece en su panel.
+          Pedile a tu familiar que abra su panel y genere el QR de tu perfil. Ese QR es la
+          credencial: se usa una sola vez, vence a las 24 horas y no hay ningún número para
+          escribir.
         </p>
-
-        {error ? (
-          <p className="alert alert--error" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <form className="stack" onSubmit={handleSubmit} noValidate>
-          <FormField
-            id="code"
-            label="Código de 6 dígitos"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            required
-            value={form.code}
-            onChange={handleChange}
-          />
-
-          <FormField
-            id="fullName"
-            label="Tu nombre y apellido"
-            autoComplete="name"
-            required
-            value={form.fullName}
-            onChange={handleChange}
-          />
-
-          <FormField
-            id="phone"
-            label="Teléfono (opcional)"
-            type="tel"
-            autoComplete="tel"
-            value={form.phone}
-            onChange={handleChange}
-          />
-
-          <PrimaryButton type="submit" block disabled={pending}>
-            {pending ? 'Vinculando…' : 'Vincular este teléfono'}
-          </PrimaryButton>
-        </form>
+        <p className="muted">
+          El escaneo del QR todavía no está disponible en esta versión de la app.
+        </p>
       </section>
     </PageShell>
   );

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useAuth } from '../../features/auth/application/AuthContext.jsx';
 import { listLinkedSeniors } from '../../features/pairing/application/pairingApi.js';
-import { PairingCodePanel } from '../../features/pairing/ui/PairingCodePanel.jsx';
+import { PairingQrPanel } from '../../features/pairing/ui/PairingQrPanel.jsx';
 import { SeniorProfilePanel } from '../../features/seniors/ui/caregiver/SeniorProfilePanel.jsx';
 import { ActivityComposer } from '../../features/activities/ui/caregiver/ActivityComposer.jsx';
 import { SosAlertPanel } from '../../features/sos_emergency/ui/caregiver/SosAlertPanel.jsx';
@@ -50,13 +50,13 @@ export function DashboardPage() {
 
       <SeniorProfilePanel />
 
-      <PairingCodePanel />
+      <PairingQrPanel />
 
       <section className="card">
         <h2 className="card__title">Personas a tu cargo</h2>
 
         {seniors.length === 0 ? (
-          <p> Todavía no hay nadie vinculado. Generá un código y usalo en el teléfono del adulto mayor.</p>
+          <p> Todavía no hay nadie vinculado. Generá el QR y escaneálo desde el teléfono del adulto mayor.</p>
         ) : (
           <div className="field">
             <label className="field__label" htmlFor="seniorId">

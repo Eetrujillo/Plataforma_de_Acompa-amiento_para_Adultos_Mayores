@@ -1,44 +1,53 @@
 # Reglas del QR de vinculación — HU-006
 
-El QR es un atajo para el mismo código de 6 dígitos, no un segundo mecanismo de vinculación.
+El QR **es** la credencial: no envuelve un código tipeable ni acompaña a uno. Si no hay QR, no hay
+forma de vincular el perfil.
 
 ## 1. Contenido
 
-- El QR contiene el código y una etiqueta de tipo: `{"type":"senior-pairing","code":"482913"}`. Nada
-  más: no una URL con token, no un JWT, no el `seniorId`, no datos del adulto mayor. El escáner de
-  HU-007 lee ese JSON y canjea el `code`.
-- Motivo: un QR es visual y público —queda en una pantalla, en una captura, en una foto—. Si llevara
-  una URL con credencial, quien lo vea se queda con la credencial sin pasar por el límite de
-  intentos ni por la invalidación.
-- Debe ser canjeable por el mismo `POST /api/pairing/link` que el código tipeado. Un solo camino.
+- El payload es `{"type":"senior-pairing","token":"<43 caracteres base64url>"}`. Nada más: no una
+  URL con credencial, no un JWT, no el `seniorId`, no datos del adulto mayor.
+- El `type` es el discriminante que permite a la app móvil rechazar un QR ajeno antes de usar el
+  valor, y el que deja lugar a futuros tipos sin reinterpretar cadenas.
+- Motivo: un QR es visual y público —queda en una pantalla, en una captura, en una foto—. El token
+  que lleva es de un solo uso, está atado a un perfil y a una vigencia de 24 h; nada más viaja ahí.
+- Cuerpo exacto en `buildPairingQrPayload()` (`backend/src/modules/pairing/infrastructure/QrGenerator.js`),
+  fuera del codificador, para que el contrato sea verificable sin decodificar una imagen.
+- Debe canjearse por el mismo `POST /api/pairing/redeem` que usa cualquier QR. Un solo camino: no
+  hay ruta alterna por código tipeado.
 
 ## 2. Formato de salida
 
-- El backend devuelve `qrCodeDataUrl` (PNG en base64, prefijo `data:image/png;base64,`).
-- El panel lo muestra como imagen con texto alternativo que nombra el código, para que quien use
-  lector de pantalla no dependa del QR.
-- El código impreso en pantalla sigue siendo la fuente de verdad: el QR es opcional. Si la
-  generación del QR falla, el backend responde igual el `201` con `qrCodeDataUrl: null` y el panel
-  muestra el código para tipear. El código ya está emitido y el anterior ya quedó invalidado: tirar
-  el pedido entero dejaría al familiar sin ninguna forma de vincular.
+- El backend devuelve `qrCodeDataUrl` (PNG en base64, prefijo `data:image/png;base64,`), generado a
+  320 px con margen 1 y corrección de errores `M`.
+- El panel lo muestra como imagen con texto alternativo que nombra al **perfil**, no a un código:
+  quien usa lector de pantalla no depende del QR y no hay ningún valor que leer en voz alta.
+- Si el codificador falla, la emisión **falla**: `503 PAIRING_QR_UNAVAILABLE`. Sin imagen no hay
+  credencial, así que no se responde `201` con la imagen vacía ni se invalida el QR anterior. El
+  panel muestra el mensaje y ofrece reintentar.
+- La única salida visual del panel es la imagen del QR. No hay texto con el token, ni un campo para
+  pegarlo o tipearlo, ni un botón "copiar".
 
 ## 3. Legibilidad (adulto mayor)
 
-- Tamaño mínimo 240×240 px en pantalla, contraste alto, sin logo encima ni colores invertidos.
-  Pantalla completa todavía no está implementado: hoy el panel lo muestra a 240 px y el familiar
-  acerca el teléfono.
-- La vigencia se muestra junto al QR, tomada de `expiresAt`. Un QR que ya venció no se sigue
-  mostrando como si sirviera.
+- Tamaño mínimo 240×240 px en pantalla; el panel lo muestra a 320 px (máximo del contenedor) sin
+  logo encima, sin colores invertidos y sin recortes.
+- La vigencia se muestra junto al QR, tomada de `expiresAt` ("vence el dd/mm/aaaa a las hh:mm"). Un
+  QR que ya venció no se sigue mostrando como si sirviera: se regenera.
+- El escaneo desde el teléfono del adulto mayor es HU-007. Hasta entonces la pantalla del teléfono
+  sin vincular sólo explica que hay que escanear el QR del panel.
 
 ## 4. Seguridad
 
-- El QR no se cachea como recurso propio: se renderiza desde la respuesta del endpoint de emisión.
-- No se guarda en disco ni en logs.
-- Al invalidarse el código (nuevo código emitido para el mismo perfil), el QR viejo deja de servir
-  por la misma razón que el código: el canje rechaza lo invalidado.
+- El QR no se cachea como recurso propio ni se guarda en disco o en logs: se renderiza desde la
+  respuesta del endpoint de emisión.
+- Al emitirse un token nuevo para el mismo perfil, el QR viejo deja de servir: el canje rechaza lo
+  invalidado con el mismo mensaje que lo vencido.
+- Quien fotografíe el QR tiene la credencial hasta que se canjee o venza. No hay reenvío, ni
+  "compartir", ni historial de QRs emitidos en la interfaz.
 
 ## 5. Dónde vive
 
 - Generación: `backend/src/modules/pairing/infrastructure/QrGenerator.js` (data URL, sin estado).
-- Presentación: `frontend/src/features/pairing/ui/PairingCodePanel.jsx`.
-- Contrato: `docs/pairing-api.md`. Código y vigencia: `skills/pairing-generator.md`.
+- Presentación: `frontend/src/features/pairing/ui/PairingQrPanel.jsx`.
+- Contrato: `docs/pairing-api.md`. Token y vigencia: `skills/pairing-generator.md`.

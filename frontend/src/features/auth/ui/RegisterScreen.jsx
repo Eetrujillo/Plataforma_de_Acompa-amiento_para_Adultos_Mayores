@@ -100,8 +100,8 @@ export function RegisterScreen() {
     <PageShell eyebrow="Registro" title="Creá tu cuenta de cuidador">
       <section className="card">
         <p className="card__hint">
-          La cuenta es para el familiar o cuidador. El adulto mayor se vincula después con un código
-          de 6 dígitos.
+          La cuenta es para el familiar o cuidador. Después vas a generar un QR desde tu panel, y el
+          adulto mayor lo escanea con su teléfono para vincularlo.
         </p>
 
         {error ? (

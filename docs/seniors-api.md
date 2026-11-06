@@ -2,7 +2,8 @@
 
 Perfil del adulto mayor creado por el familiar que lo administra (HU-005). El senior es un
 `User` con `role: SENIOR` y `caregiverId` del familiar dueño; no tiene correo propio ni
-contraseña: se vincula con un código (HU-006/HU-007).
+contraseña: se vincula escaneando el QR que genera su familiar (HU-006/HU-007). El QR lleva un
+token opaco de un solo uso y 24 h de vigencia; no hay código que tipear.
 
 Todas las rutas exigen `Authorization: Bearer <jwt>` de un usuario con rol `CAREGIVER`.
 Sin token: `401`. Con rol `SENIOR`: `403`.
@@ -100,7 +101,7 @@ así que un valor inventado no puede convertirse en Bogotá sin que nadie se ent
 `linkStatus` tiene dos valores:
 
 - `PENDING` — el familiar cargó el perfil; el teléfono del adulto mayor todavía no lo reclamó.
-- `LINKED` — el teléfono canjeó un código de vinculación, o el perfil es anterior a HU-005
+- `LINKED` — el teléfono canjeó el token del QR de vinculación, o el perfil es anterior a HU-005
   (cuando vincular era el único camino de alta, la ausencia del campo significa vinculado).
 
 Consecuencias, ya vigentes:
@@ -114,8 +115,8 @@ Consecuencias, ya vigentes:
 ## Pendientes que esta HU deja anotados
 
 - Límite de intentos del PIN (HU-007), con bloqueo por perfil.
-- Transición `PENDING → LINKED` en el canje de código (HU-006/HU-007) y un evento para que el
-  panel se actualice sin recargar.
+- Transición `PENDING → LINKED` en el canje del token del QR (HU-006/HU-007) y un evento para que
+  el panel se actualice sin recargar. El canje nunca crea el perfil: lo crea el familiar acá.
 - Cambio de PIN por el familiar: hoy solo se define al crear el perfil.
 - `GET /api/pairing/seniors` y `GET /api/seniors` listan senior con criterios distintos
   (vinculados vs todos). Si se unifican, el selector de actividades tiene que seguir filtrando.

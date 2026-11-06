@@ -99,9 +99,9 @@ del dominio o un servicio transaccional: **[docs/smtp-setup.md](docs/smtp-setup.
 | POST | `/api/seniors` | cuidador (perfil del adulto mayor con PIN y zona horaria) |
 | GET | `/api/seniors` | cuidador (solo los perfiles propios) |
 | GET | `/api/seniors/:id` | cuidador (404 si no es propio) |
-| POST | `/api/pairing/codes` | cuidador |
+| POST | `/api/pairing/qr` | cuidador (QR de un perfil; el QR es la credencial) |
 | GET | `/api/pairing/seniors` | cuidador |
-| POST | `/api/pairing/link` | público (código de 6 dígitos) |
+| POST | `/api/pairing/redeem` | público (canjea el token que lleva el QR) |
 | POST | `/api/activities` | cuidador |
 | GET | `/api/activities/daily?seniorId=&date=` | cuidador / adulto mayor |
 | PATCH | `/api/activities/:id/complete` | adulto mayor |
@@ -123,5 +123,5 @@ cd frontend && npm run build              # vite build
 
 - Tipografía base de 20px y botón SOS de 14rem de alto.
 - Contraste alto, foco visible de 4px y estados anunciados con `aria-live`.
-- Toda la rutina se opera con botones grandes; el código de vinculación es
-  numérico y acepta `inputMode="numeric"`.
+- Toda la rutina se opera con botones grandes; el QR de vinculación se muestra a 320 px, con la
+  vigencia en texto al lado, y no hay ningún código que tipear.
