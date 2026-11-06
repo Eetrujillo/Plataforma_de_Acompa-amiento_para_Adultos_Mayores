@@ -4,18 +4,20 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createApp } = require('../src/app');
-const { GeneratePairingCode } = require('../src/modules/pairing/application/GeneratePairingCode');
-const { LinkSeniorApp } = require('../src/modules/pairing/application/LinkSeniorApp');
+const { GeneratePairingToken } = require('../src/modules/pairing/application/GeneratePairingToken');
+const { RedeemPairingToken } = require('../src/modules/pairing/application/RedeemPairingToken');
 const { ListLinkedSeniors } = require('../src/modules/pairing/application/ListLinkedSeniors');
 const { createPairingController } = require('../src/modules/pairing/infrastructure/PairingController');
 const { createPairingRouter } = require('../src/modules/pairing/infrastructure/pairingRoutes');
 const { QrGenerator } = require('../src/modules/pairing/infrastructure/QrGenerator');
 const { createAuthMiddleware } = require('../src/shared/middlewares/authMiddleware');
 const { JwtTokenService } = require('../src/modules/auth/infrastructure/JwtTokenService');
+const { hashPairingToken } = require('../src/modules/pairing/domain/pairingToken');
 
 /**
- * HU-006 S3/S5 en el borde HTTP: códigos de estado, `error.code` y la forma congelada de las
- * dos respuestas. El caregiver sale siempre de la sesión y el código pertenece a un perfil.
+ * HU-006 T7 en el borde HTTP: `POST /api/pairing/qr` (cuidador) emite el QR y
+ * `POST /api/pairing/redeem` (público) canjea el token que viaja adentro. El token no aparece
+ * en ninguna respuesta; el generador de QR se espía sólo para poder canjear en el test.
  */
 
 const CG = '507f1f77bcf86cd7994390aa';
@@ -24,7 +26,7 @@ const PENDING = '507f1f77bcf86cd7994390bb';
 const LINKED = '507f1f77bcf86cd7994390dd';
 const FOREIGN = '507f1f77bcf86cd799439011';
 
-const CONFIG = { pairing: { codeLength: 6, ttlMinutes: 1440, maxGenerationAttempts: 5 } };
+const CONFIG = { pairing: { ttlMinutes: 1440 } };
 const A_DAY = 24 * 60 * 60 * 1000;
 
 function build() {
@@ -40,34 +42,32 @@ function build() {
     [FOREIGN, { id: FOREIGN, role: 'SENIOR', fullName: 'Otra', caregiverId: OTHER_CG, linkStatus: 'PENDING' }]
   ]);
 
-  const codes = new Map();
+  const records = new Map();
   const createdSeniors = [];
+  const qrTokens = [];
   let counter = 0;
 
   const pairingRepository = {
-    codes,
-    async existsByCode(code) {
-      return codes.has(code);
-    },
-    async create(data) {
-      counter += 1;
-      const record = { id: `pc-${counter}`, usedAt: null, invalidatedAt: null, ...data };
-      codes.set(record.code, record);
-      return record;
-    },
+    records,
     async invalidateOutstanding({ caregiverId, seniorId }) {
-      for (const record of codes.values()) {
+      for (const record of records.values()) {
         if (record.caregiverId === caregiverId && record.seniorId === seniorId && !record.usedAt && !record.invalidatedAt) {
           record.invalidatedAt = new Date();
         }
       }
     },
-    async findByCode(code) {
-      const record = codes.get(code);
+    async create({ tokenHash, caregiverId, seniorId, expiresAt }) {
+      counter += 1;
+      const record = { id: `pt-${counter}`, tokenHash, caregiverId, seniorId, expiresAt, usedAt: null, invalidatedAt: null };
+      records.set(tokenHash, record);
+      return record;
+    },
+    async findByTokenHash(tokenHash) {
+      const record = records.get(tokenHash);
       return record ? { ...record } : null;
     },
     async claim({ id }) {
-      const record = [...codes.values()].find((candidate) => candidate.id === id);
+      const record = [...records.values()].find((candidate) => candidate.id === id);
 
       if (!record || record.usedAt || record.invalidatedAt || record.expiresAt.getTime() <= Date.now()) {
         return { claimed: false };
@@ -75,10 +75,6 @@ function build() {
 
       record.usedAt = new Date();
       return { claimed: true };
-    },
-    async setSenior({ id, seniorId }) {
-      const record = [...codes.values()].find((candidate) => candidate.id === id);
-      record.seniorId = seniorId;
     }
   };
 
@@ -107,21 +103,30 @@ function build() {
     }
   };
 
+  // El QR se genera de verdad; el espía guarda el token para poder canjearlo desde el test.
+  const realQr = new QrGenerator();
+  const qrGenerator = {
+    tokens: qrTokens,
+    async toDataUrl(token) {
+      qrTokens.push(token);
+      return realQr.toDataUrl(token);
+    }
+  };
+
   const tokenService = new JwtTokenService({ secret: 's', expiresIn: '1h' });
   const authMiddleware = createAuthMiddleware({ verifyToken: (token) => tokenService.verify(token), userRepository });
 
   const controller = createPairingController({
-    generatePairingCode: new GeneratePairingCode({ pairingRepository, userRepository, config: CONFIG }),
-    linkSeniorApp: new LinkSeniorApp({ pairingRepository, userRepository, tokenService }),
-    listLinkedSeniors: new ListLinkedSeniors({ userRepository }),
-    qrGenerator: new QrGenerator()
+    generatePairingToken: new GeneratePairingToken({ pairingRepository, userRepository, qrGenerator, config: CONFIG }),
+    redeemPairingToken: new RedeemPairingToken({ pairingRepository, userRepository, tokenService }),
+    listLinkedSeniors: new ListLinkedSeniors({ userRepository })
   });
 
   const router = createPairingRouter({ controller, authMiddleware });
   const app = createApp({ config: { corsOrigin: '*' }, modules: { pairing: router }, logger: { error() {} } });
   const token = (id) => tokenService.sign({ sub: id, role: users.get(id).role, email: users.get(id).email, sv: 0 });
 
-  return { app, token, users, codes, createdSeniors };
+  return { app, token, users, records, createdSeniors, qrTokens };
 }
 
 async function withServer(run) {
@@ -147,86 +152,102 @@ async function withServer(run) {
   }
 }
 
-test('S5: 201 carries exactly code, expiresAt, seniorId and the QR', async () => {
-  await withServer(async ({ call, codes }) => {
+test('S1/S5: el 201 trae expiresAt, seniorId y el QR, nunca el token', async () => {
+  await withServer(async ({ call, records, qrTokens }) => {
     const before = Date.now();
-    const { status, body } = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId: PENDING } });
+    const { status, body, text } = await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: PENDING } });
 
     assert.equal(status, 201);
-    assert.deepEqual(Object.keys(body).sort(), ['code', 'expiresAt', 'qrCodeDataUrl', 'seniorId']);
-    assert.match(body.code, /^\d{6}$/);
+    assert.deepEqual(Object.keys(body).sort(), ['expiresAt', 'qrCodeDataUrl', 'seniorId']);
+    assert.equal(body.token, undefined);
     assert.equal(body.seniorId, PENDING);
     assert.match(body.qrCodeDataUrl, /^data:image\/png;base64,/);
 
+    // El token que viaja dentro del QR: 43 caracteres base64url, y ni una copia en el cuerpo.
+    assert.equal(qrTokens.length, 1);
+    assert.match(qrTokens[0], /^[A-Za-z0-9_-]{43}$/);
+    assert.equal(text.includes(qrTokens[0]), false);
+
     const ttl = Date.parse(body.expiresAt) - before;
     assert.equal(ttl >= A_DAY - 1_000 && ttl < A_DAY + A_DAY, true, `ttl ${ttl}`);
-    assert.equal(codes.get(body.code).seniorId, PENDING);
+
+    // En la base queda sólo el hash de ese token, y el valor crudo no está en ningún registro.
+    const record = records.get(hashPairingToken(qrTokens[0]));
+    assert.equal(Boolean(record), true);
+    assert.equal(record.seniorId, PENDING);
+    assert.equal(record.tokenHash, hashPairingToken(qrTokens[0]));
+    assert.notEqual(record.tokenHash, qrTokens[0]);
+    assert.equal(JSON.stringify([...records.values()]).includes(qrTokens[0]), false);
   });
 });
 
-test('S3/S5: each rejection answers its own status and code, and writes nothing', async () => {
-  await withServer(async ({ call, codes, users }) => {
-    const missing = await call('POST', '/api/pairing/codes', { as: CG, body: {} });
+test('S3: cada rechazo de la emisión responde su estado y no escribe nada', async () => {
+  await withServer(async ({ call, records, qrTokens, users }) => {
+    const missing = await call('POST', '/api/pairing/qr', { as: CG, body: {} });
     assert.equal(missing.status, 400);
     assert.equal(missing.body.error.code, 'SENIOR_ID_REQUIRED');
 
-    const malformed = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId: 'abc' } });
+    const malformed = await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: 'abc' } });
     assert.equal(malformed.status, 400);
     assert.equal(malformed.body.error.code, 'SENIOR_ID_REQUIRED');
 
     for (const seniorId of [FOREIGN, '507f1f77bcf86cd799439999', CG]) {
-      const answer = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId } });
+      const answer = await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId } });
       assert.equal(answer.status, 404, seniorId);
       assert.equal(answer.body.error.code, 'SENIOR_NOT_FOUND', seniorId);
     }
 
-    const linked = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId: LINKED } });
+    const linked = await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: LINKED } });
     assert.equal(linked.status, 409);
     assert.equal(linked.body.error.code, 'SENIOR_ALREADY_LINKED');
 
     // El dueño sale de la sesión: mandar otro caregiverId no abre otra familia.
-    const smuggled = await call('POST', '/api/pairing/codes', {
+    const smuggled = await call('POST', '/api/pairing/qr', {
       as: CG,
       body: { seniorId: FOREIGN, caregiverId: OTHER_CG }
     });
     assert.equal(smuggled.status, 404);
     assert.equal(smuggled.body.error.code, 'SENIOR_NOT_FOUND');
 
-    assert.equal(codes.size, 0);
+    assert.equal(records.size, 0);
+    assert.equal(qrTokens.length, 0);
     assert.equal(users.get(PENDING).linkStatus, 'PENDING');
   });
 });
 
-test('S3: only a caregiver session can ask for a code', async () => {
+test('S3: sólo una sesión de cuidador puede pedir un QR', async () => {
   await withServer(async ({ call }) => {
-    assert.equal((await call('POST', '/api/pairing/codes', { body: { seniorId: PENDING } })).status, 401);
+    assert.equal((await call('POST', '/api/pairing/qr', { body: { seniorId: PENDING } })).status, 401);
 
-    const asSenior = await call('POST', '/api/pairing/codes', { as: PENDING, body: { seniorId: PENDING } });
+    const asSenior = await call('POST', '/api/pairing/qr', { as: PENDING, body: { seniorId: PENDING } });
     assert.equal(asSenior.status, 403);
   });
 });
 
-test('S2/S5: the previous code of the profile stops working once a new one is generated', async () => {
-  await withServer(async ({ call }) => {
-    const first = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId: PENDING } });
-    const second = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId: PENDING } });
+test('S2: el token anterior del perfil deja de canjearse cuando se emite otro', async () => {
+  await withServer(async ({ call, qrTokens }) => {
+    const first = await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: PENDING } });
+    const second = await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: PENDING } });
 
-    const replaced = await call('POST', '/api/pairing/link', { body: { code: first.body.code } });
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+
+    const replaced = await call('POST', '/api/pairing/redeem', { body: { token: qrTokens[0] } });
     assert.equal(replaced.status, 400);
     assert.equal(replaced.body.error.code, 'VALIDATION_ERROR');
 
-    const redeemed = await call('POST', '/api/pairing/link', { body: { code: second.body.code } });
+    const redeemed = await call('POST', '/api/pairing/redeem', { body: { token: qrTokens[1] } });
     assert.equal(redeemed.status, 201);
     assert.equal(redeemed.body.senior.id, PENDING);
   });
 });
 
-test('S5: /link answers 201 conserving the published projection plus linkStatus/timezone', async () => {
-  await withServer(async ({ call, users, createdSeniors }) => {
-    const generated = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId: PENDING } });
+test('S5: /redeem responde 201 con la proyección publicada y no crea seniors', async () => {
+  await withServer(async ({ call, users, createdSeniors, qrTokens }) => {
+    await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: PENDING } });
 
-    const { status, body, text } = await call('POST', '/api/pairing/link', {
-      body: { code: generated.body.code, fullName: 'Intruso', phone: '+573009998877' }
+    const { status, body, text } = await call('POST', '/api/pairing/redeem', {
+      body: { token: qrTokens[0], fullName: 'Intruso', phone: '+573009998877' }
     });
 
     assert.equal(status, 201);
@@ -252,26 +273,61 @@ test('S5: /link answers 201 conserving the published projection plus linkStatus/
     assert.equal(body.senior.timezone, 'America/Bogota');
     assert.equal(typeof body.token, 'string');
     assert.equal(/pinHash|Intruso|573009998877/.test(text), false);
-
+    // L9: el canje no crea el perfil, lo vincula.
+    assert.equal(createdSeniors.length, 0);
     assert.equal(users.get(PENDING).linkStatus, 'LINKED');
     assert.equal(users.get(PENDING).fullName, 'Rosa Pérez');
-    assert.equal(createdSeniors.length, 0);
   });
 });
 
-test('S5: /link keeps its 400/404/409 answers', async () => {
-  await withServer(async ({ call }) => {
-    const malformed = await call('POST', '/api/pairing/link', { body: { code: '48291a' } });
+test('S2/S5: /redeem conserva 400 para mal formado/vencido/invalidado, 404 y 409', async () => {
+  await withServer(async ({ call, qrTokens, records }) => {
+    const malformed = await call('POST', '/api/pairing/redeem', { body: { token: '482913' } });
     assert.equal(malformed.status, 400);
+    assert.equal(malformed.body.error.code, 'VALIDATION_ERROR');
 
-    const missing = await call('POST', '/api/pairing/link', { body: { code: '000000' } });
+    const missing = await call('POST', '/api/pairing/redeem', { body: { token: 'B'.repeat(43) } });
     assert.equal(missing.status, 404);
     assert.equal(missing.body.error.code, 'NOT_FOUND');
 
-    const generated = await call('POST', '/api/pairing/codes', { as: CG, body: { seniorId: PENDING } });
-    assert.equal((await call('POST', '/api/pairing/link', { body: { code: generated.body.code } })).status, 201);
+    await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: PENDING } });
+    const expired = qrTokens[0];
+    records.get(hashPairingToken(expired)).expiresAt = new Date(Date.now() - 1_000);
 
-    const again = await call('POST', '/api/pairing/link', { body: { code: generated.body.code } });
+    const expiredAnswer = await call('POST', '/api/pairing/redeem', { body: { token: expired } });
+    assert.equal(expiredAnswer.status, 400);
+    assert.equal(expiredAnswer.body.error.message, 'pairing token is invalid or expired');
+
+    // Un segundo QR invalida el token del primero: mismo 400 y mismo mensaje que el vencido.
+    await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: PENDING } });
+    const invalidated = qrTokens[1];
+    // El tercero es el que invalida al segundo y queda vivo.
+    await call('POST', '/api/pairing/qr', { as: CG, body: { seniorId: PENDING } });
+    const replacedAnswer = await call('POST', '/api/pairing/redeem', { body: { token: invalidated } });
+    assert.equal(replacedAnswer.status, 400);
+    assert.deepEqual(replacedAnswer.body, expiredAnswer.body);
+
+    const fresh = qrTokens[2];
+    assert.equal((await call('POST', '/api/pairing/redeem', { body: { token: fresh } })).status, 201);
+
+    const again = await call('POST', '/api/pairing/redeem', { body: { token: fresh } });
     assert.equal(again.status, 409);
+    assert.equal(again.body.error.message, 'pairing token already used');
+
+    // El token del QR nunca aparece en una respuesta de error.
+    for (const answer of [expiredAnswer, replacedAnswer, again]) {
+      assert.equal(answer.text.includes(fresh), false);
+      assert.equal(answer.text.includes(expired), false);
+      assert.equal(answer.text.includes(invalidated), false);
+    }
+  });
+});
+
+test('PRESERVE: GET /api/pairing/seniors sigue listando sólo los perfiles vinculados', async () => {
+  await withServer(async ({ call }) => {
+    const { status, body } = await call('GET', '/api/pairing/seniors', { as: CG });
+
+    assert.equal(status, 200);
+    assert.deepEqual(body, { seniors: [{ id: LINKED, fullName: 'Ana', phone: null }] });
   });
 });

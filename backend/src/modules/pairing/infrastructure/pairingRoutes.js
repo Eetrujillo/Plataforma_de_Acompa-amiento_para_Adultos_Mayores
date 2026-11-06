@@ -8,9 +8,10 @@ function createPairingRouter({ controller, authMiddleware }) {
   const router = express.Router();
 
   router.get('/seniors', authMiddleware, requireRole(ROLES.CAREGIVER), controller.seniors);
-  router.post('/codes', authMiddleware, requireRole(ROLES.CAREGIVER), controller.generate);
-  // Public: the senior device has no account yet, the code is the credential.
-  router.post('/link', controller.link);
+  // HU-006 T7: el cuidador pide el QR de un perfil; no hay código que mostrar ni que dictar.
+  router.post('/qr', authMiddleware, requireRole(ROLES.CAREGIVER), controller.generateQr);
+  // Public: the senior device has no account yet, the scanned token is the credential.
+  router.post('/redeem', controller.redeem);
 
   return router;
 }

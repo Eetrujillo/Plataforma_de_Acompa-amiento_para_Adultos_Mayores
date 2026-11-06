@@ -71,17 +71,20 @@ model PasswordResetToken {
   @@index([userId])
 }
 
-/// Short lived 6 digit code that binds a senior device to a caregiver account.
-/// HU-006: el código pertenece a un perfil (`seniorId`) y vive 24 horas por defecto.
+/// Credencial de vinculación de un adulto mayor (HU-006, rework QR-only de L9).
+/// No existe un código legible: el único soporte es el QR, y en esta colección queda
+/// únicamente el SHA-256 del token (`tokenHash`). Quien lea la colección no puede
+/// reconstruir un QR válido.
+/// El token siempre pertenece a un perfil (`seniorId` obligatorio desde L9).
 /// `usedAt` significa "canjeado" y `invalidatedAt` "reemplazado por uno más nuevo": un
-/// código reemplazado no fue usado, así que no se puede marcar con `usedAt` sin mentir.
-/// Los dos son nullable porque los documentos que ya existen no los traen; el reclamo del
-/// canje los filtra con `isSet: false` para no dejar afuera un código ya emitido.
-model PairingCode {
+/// token reemplazado no fue usado, así que no se puede marcar con `usedAt` sin mentir.
+/// Los dos son nullable porque la creación los escribe en null de forma explícita y porque
+/// un documento sin el campo también tiene que poder reclamarse.
+model PairingToken {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  code          String    @unique
+  tokenHash     String    @unique
   caregiverId   String    @db.ObjectId
-  seniorId      String?   @db.ObjectId
+  seniorId      String    @db.ObjectId
   expiresAt     DateTime
   usedAt        DateTime?
   invalidatedAt DateTime?

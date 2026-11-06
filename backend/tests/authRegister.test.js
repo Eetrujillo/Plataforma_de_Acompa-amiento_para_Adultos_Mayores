@@ -11,7 +11,8 @@ const { RegisterCaregiver } = require('../src/modules/auth/application/RegisterC
 const { Login } = require('../src/modules/auth/application/Login');
 const { ResendVerificationEmail } = require('../src/modules/auth/application/ResendVerificationEmail');
 const { ResendThrottle } = require('../src/modules/auth/application/ResendThrottle');
-const { LinkSeniorApp } = require('../src/modules/pairing/application/LinkSeniorApp');
+const { RedeemPairingToken } = require('../src/modules/pairing/application/RedeemPairingToken');
+const { hashPairingToken } = require('../src/modules/pairing/domain/pairingToken');
 const { ConflictError } = require('../src/shared/errors');
 
 const silentLogger = { info() {}, warn() {}, error() {}, log() {} };
@@ -348,54 +349,75 @@ test('sin regresión - login y resend-verification conservan su mensaje de corre
   });
 });
 
-test('sin regresión - vincular un adulto mayor conserva sus mensajes y crea el usuario', async () => {
+test('sin regresión - vincular un adulto mayor ya no crea usuarios ni valida el cuerpo', async () => {
+  // HU-006 T7/L9: el canje dejó de crear perfiles. El perfil existe antes del QR y el cuerpo
+  // del pedido ya no aporta `fullName` ni `phone`, así que los mensajes localizados del factory
+  // compartido (los de registro) no se pueden alcanzar desde acá: eso es lo que se fija.
+  const profile = {
+    id: 'senior-1',
+    email: 'senior+abc123@seniors.local',
+    fullName: 'Rosa Perez',
+    role: 'SENIOR',
+    phone: '+54 11 4444 2222',
+    caregiverId: 'caregiver-1',
+    linkStatus: 'PENDING',
+    timezone: 'America/Bogota',
+    createdAt: new Date('2024-04-01T10:00:00.000Z')
+  };
+  const rawToken = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v';
+  const created = [];
+  const linked = [];
+
   const pairingRepository = {
-    async findByCode() {
+    async findByTokenHash(tokenHash) {
+      if (tokenHash !== hashPairingToken(rawToken)) {
+        return null;
+      }
+
       return {
         id: 'pairing-1',
         caregiverId: 'caregiver-1',
+        seniorId: profile.id,
         expiresAt: new Date(Date.now() + 60_000),
-        usedAt: null
+        usedAt: null,
+        invalidatedAt: null
       };
     },
-    // HU-006 S4/S6: el canje reclama el código con `claim` y, en la rama de compatibilidad,
-    // anota el senior creado con `setSenior`. La aserción de este test es la de siempre:
-    // los mensajes del factory compartido no cambiaron.
     async claim({ id }) {
       return { claimed: id === 'pairing-1' };
-    },
-    async setSenior() {
-      return null;
     }
   };
-  const userRepository = createFakeUserRepository();
-  const linkSenior = new LinkSeniorApp({
+
+  const linkSenior = new RedeemPairingToken({
     pairingRepository,
-    userRepository,
+    userRepository: {
+      async findById(id) {
+        return id === profile.id ? { ...profile } : null;
+      },
+      async markLinked(id) {
+        linked.push(id);
+        return { ...profile, linkStatus: 'LINKED' };
+      },
+      async create(data) {
+        created.push(data);
+        return data;
+      }
+    },
     tokenService: { sign: () => 'jwt' }
   });
 
-  const linked = await linkSenior.execute({
-    code: '123456',
-    fullName: 'Rosa Perez',
-    phone: '+54 11 4444 2222'
-  });
+  // Un `fullName`/`phone` que antes eran un 400 ahora se ignoran: el familiar es el dueño de la
+  // ficha y el teléfono del adulto mayor no edita su perfil.
+  const redeemed = await linkSenior.execute({ token: rawToken, fullName: 'Ro', phone: 'abc' });
 
-  assert.equal(linked.senior.role, 'SENIOR');
-  assert.equal([...userRepository.users.values()][0].caregiverId, 'caregiver-1');
-
-  await assert.rejects(
-    () => linkSenior.execute({ code: '123456', fullName: 'Ro' }),
-    (error) => error.message === 'fullName must be at least 3 characters'
-  );
+  assert.equal(redeemed.senior.role, 'SENIOR');
+  assert.equal(redeemed.senior.caregiverId, 'caregiver-1');
+  assert.equal(redeemed.senior.linkStatus, 'LINKED');
+  assert.deepEqual(created, []);
+  assert.deepEqual(linked, [profile.id]);
 
   await assert.rejects(
-    () => linkSenior.execute({ code: '123456', fullName: 'Rosa Perez', phone: 'abc' }),
-    (error) => error.message === 'phone format is invalid'
-  );
-
-  await assert.rejects(
-    () => linkSenior.execute({ code: '123456', phone: '+54 11 4444 2222' }),
-    (error) => error.message === 'fullName is required'
+    () => linkSenior.execute({ token: '482913' }),
+    (error) => error.message === 'pairing token is invalid or expired'
   );
 });

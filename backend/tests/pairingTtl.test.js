@@ -7,9 +7,10 @@ const os = require('node:os');
 const path = require('node:path');
 
 /**
- * HU-006 S1: la vigencia del código por defecto es 24 horas (1440 minutos), configurable con
- * `PAIRING_TTL_MINUTES`. Se carga el módulo de configuración con un `.env` vacío para que el
- * default del código sea lo único que se lea, sin depender del entorno de quien corre la suite.
+ * HU-006 S1: la vigencia del token de vinculación por defecto es 24 horas (1440 minutos),
+ * configurable con `PAIRING_TTL_MINUTES`. Se carga el módulo de configuración con un `.env`
+ * vacío para que el default del código sea lo único que se lea, sin depender del entorno de
+ * quien corre la suite.
  */
 
 const ENV_MODULE = require.resolve('../src/config/env');
@@ -46,7 +47,7 @@ function ttlMinutesWith(rawValue) {
   }
 }
 
-test('S1: the pairing code lives 24 hours by default', () => {
+test('S1: the pairing token lives 24 hours by default', () => {
   assert.equal(ttlMinutesWith(undefined), 1440);
 });
 
