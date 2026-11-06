@@ -7,11 +7,17 @@ const { GetCurrentUser } = require('./application/GetCurrentUser');
 const { VerifyEmail } = require('./application/VerifyEmail');
 const { ResendVerificationEmail } = require('./application/ResendVerificationEmail');
 const { ResendThrottle } = require('./application/ResendThrottle');
+const {
+  RequestPasswordReset,
+  PASSWORD_RESET_THROTTLE_MESSAGE
+} = require('./application/RequestPasswordReset');
+const { ResetPassword } = require('./application/ResetPassword');
 const { BcryptPasswordHasher } = require('./infrastructure/BcryptPasswordHasher');
 const { JwtTokenService } = require('./infrastructure/JwtTokenService');
 const { GoogleIdTokenVerifier } = require('./infrastructure/GoogleIdTokenVerifier');
 const { PrismaUserRepository } = require('./infrastructure/PrismaUserRepository');
 const { PrismaEmailVerificationRepository } = require('./infrastructure/PrismaEmailVerificationRepository');
+const { PrismaPasswordResetRepository } = require('./infrastructure/PrismaPasswordResetRepository');
 const { createEmailSender } = require('./infrastructure/EmailSender');
 const { createAuthController } = require('./infrastructure/AuthController');
 const { createAuthRouter } = require('./infrastructure/authRoutes');
@@ -25,6 +31,7 @@ const { createAuthMiddleware } = require('../../shared/middlewares/authMiddlewar
 function createAuthModule({ prisma, config, logger = console }) {
   const userRepository = new PrismaUserRepository({ prisma });
   const verificationRepository = new PrismaEmailVerificationRepository({ prisma });
+  const resetRepository = new PrismaPasswordResetRepository({ prisma });
   const passwordHasher = new BcryptPasswordHasher();
   const tokenService = new JwtTokenService(config.jwt);
   const emailSender = createEmailSender({ smtp: config.smtp, logger });
@@ -32,6 +39,13 @@ function createAuthModule({ prisma, config, logger = console }) {
   const resendThrottle = new ResendThrottle({
     maxAttempts: config.resendThrottle.maxAttempts,
     windowMs: config.resendThrottle.windowMinutes * 60 * 1000
+  });
+  // Instancia propia: el cupo de "olvidé mi contraseña" es independiente del de reenvío
+  // de verificación, aunque compartan números.
+  const resetThrottle = new ResendThrottle({
+    maxAttempts: config.resendThrottle.maxAttempts,
+    windowMs: config.resendThrottle.windowMinutes * 60 * 1000,
+    message: PASSWORD_RESET_THROTTLE_MESSAGE
   });
 
   const authMiddleware = createAuthMiddleware({ verifyToken: (token) => tokenService.verify(token) });
@@ -65,6 +79,20 @@ function createAuthModule({ prisma, config, logger = console }) {
       config,
       resendThrottle,
       logger
+    }),
+    requestPasswordReset: new RequestPasswordReset({
+      userRepository,
+      resetRepository,
+      emailSender,
+      throttle: resetThrottle,
+      config,
+      logger
+    }),
+    resetPassword: new ResetPassword({
+      userRepository,
+      resetRepository,
+      passwordHasher,
+      config
     })
   });
 

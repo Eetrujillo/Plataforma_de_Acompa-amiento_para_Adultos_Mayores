@@ -83,6 +83,11 @@ const config = Object.freeze({
   verification: Object.freeze({
     ttlHours: Number.parseInt(process.env.EMAIL_VERIFICATION_TTL_HOURS || '24', 10)
   }),
+  passwordReset: Object.freeze({
+    // HU-004: el enlace de restablecimiento vive 60 minutos, no 24 horas como el de
+    // verificación. Restablecer una contraseña es más sensible que confirmar un correo.
+    ttlMinutes: positiveInteger(process.env.PASSWORD_RESET_TTL_MINUTES, 60)
+  }),
   resendThrottle: Object.freeze({
     // HU-002: at most N resend attempts per email inside a sliding window. A malformed
     // value falls back to the spec number instead of disabling the limit.

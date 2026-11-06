@@ -47,6 +47,19 @@ model EmailVerificationToken {
   @@index([userId])
 }
 
+/// Un solo uso y 60 minutos de vida. Colección propia a propósito: un enlace de
+/// verificación de correo no puede servir para cambiar la contraseña (HU-004).
+model PasswordResetToken {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 /// Short lived 6 digit code that binds a senior device to a caregiver account.
 model PairingCode {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId

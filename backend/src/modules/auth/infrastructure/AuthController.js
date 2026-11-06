@@ -11,6 +11,8 @@ function createAuthController({
   getCurrentUser,
   verifyEmail,
   resendVerificationEmail,
+  requestPasswordReset,
+  resetPassword,
   loginWithGoogle,
   googleConfig = { enabled: false, clientId: null }
 }) {
@@ -50,6 +52,20 @@ function createAuthController({
       const result = await resendVerificationEmail.execute({ email: req.body?.email });
       // Always 202: the endpoint must not reveal whether the account exists.
       res.status(202).json(result);
+    }),
+
+    requestPasswordReset: asyncHandler(async (req, res) => {
+      const result = await requestPasswordReset.execute({ email: req.body?.email });
+      // Igual que el reenvío: la respuesta no distingue si la cuenta existe.
+      res.status(202).json(result);
+    }),
+
+    resetPassword: asyncHandler(async (req, res) => {
+      const result = await resetPassword.execute({
+        token: req.body?.token,
+        password: req.body?.password
+      });
+      res.status(200).json(result);
     })
   };
 }

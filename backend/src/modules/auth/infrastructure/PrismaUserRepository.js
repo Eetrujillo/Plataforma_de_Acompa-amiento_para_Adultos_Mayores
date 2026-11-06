@@ -65,6 +65,19 @@ class PrismaUserRepository {
   }
 
   /**
+   * Guarda la contraseña nueva y deja limpio el bloqueo de intentos fallidos.
+   *
+   * Levantar el bloqueo es deliberado: quien acaba de demostrar que controla el correo
+   * no puede quedar quince minutos afuera por los fallos previos.
+   */
+  async updatePasswordAfterReset(id, { passwordHash }) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null }
+    });
+  }
+
+  /**
    * Persists the consecutive-failed-login counter and its lock.
    *
    * Both fields are nullable in the schema on purpose: the documents that already exist

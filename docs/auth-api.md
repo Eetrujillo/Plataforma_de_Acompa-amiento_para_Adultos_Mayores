@@ -69,6 +69,10 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
   expiró o ya se usó.
 - `POST /api/auth/resend-verification` — `{ email }`; `202` con `{ accepted: true }`, **3 intentos
   por hora y por correo**; el cuarto responde `429` (ver la sección siguiente).
+- `POST /api/auth/forgot-password` — `{ email }`; `202` con `{ accepted: true }` **exista o no la
+  cuenta**, mismo límite de 3 por hora por correo.
+- `POST /api/auth/reset-password` — `{ token, password }`; `200` con `{ reset: true }`, `400` si el
+  enlace no sirve (ver la sección de restablecimiento).
 - `GET /api/auth/me` — requiere `Authorization: Bearer <jwt>`.
 
 ## Límite del reenvío de verificación (HU-002)
@@ -137,3 +141,33 @@ el que bloquea: del 1 al 4 la respuesta es `401` `Invalid credentials`, y el 5.�
 - Estado persistido en el documento `User` (`failedLoginAttempts`, `lockedUntil`, ambos nullable), así
   que un reinicio del backend **no** desbloquea la cuenta. Código: `domain/loginLockout.js` (reglas
   puras con reloj inyectado) y `application/Login.js`.
+
+## Restablecer la contraseña (HU-004)
+
+Dos endpoints, en ese orden:
+
+1. `POST /api/auth/forgot-password` con `{ email }` → **siempre** `202 { accepted: true }`. Si la
+   cuenta existe y tiene contraseña, se manda un correo con un enlace; si no existe, no se manda
+   nada y la respuesta es idéntica. Un correo con formato inválido sigue siendo `400`
+   (`VALIDATION_ERROR`) y no consume cupo del límite.
+2. `POST /api/auth/reset-password` con `{ token, password }` → `200 { reset: true }`.
+
+Detalles del enlace:
+
+- Viaja como `${APP_URL}/reset-password?token=<token>`; en la base solo se guarda el SHA-256.
+- **Un solo uso y 60 minutos** de vigencia (`PASSWORD_RESET_TTL_MINUTES`, default `60`). Es una
+  colección propia (`PasswordResetToken`): un enlace de verificación de correo no puede cambiar la
+  contraseña.
+- Pedir un enlace nuevo **quema el anterior**: solo sirve el último que se envió.
+- Token inventado, ya usado, vencido o mal formado devuelven **el mismo** `400`:
+  `El enlace para restablecer la contraseña no es válido o ya venció`. Distinguirlos solo le sirve a
+  quien está probando enlaces.
+- La contraseña nueva se valida **antes** de tocar el token, con la misma regla del registro (mínimo
+  8 caracteres y letras + números). Si la rechaza, el enlace **sigue sirviendo** para reintentar.
+- Al completarse, el reset guarda la contraseña, limpia `failedLoginAttempts` y `lockedUntil` (quien
+  demuestra que controla el correo no queda bloqueado por los intentos previos) y sube la versión de
+  sesión del usuario.
+- **Cuentas creadas con Google no tienen contraseña que restablecer**: para ellas no se manda nada,
+  con la misma respuesta `202`.
+- Límite: 3 pedidos por hora y por correo, contando también correos sin cuenta (instancia propia del
+  limitador, separada de la del reenvío de verificación).

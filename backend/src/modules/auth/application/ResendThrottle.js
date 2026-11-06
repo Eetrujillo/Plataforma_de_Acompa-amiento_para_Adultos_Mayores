@@ -25,7 +25,8 @@ class ResendThrottle {
     maxAttempts = DEFAULT_MAX_ATTEMPTS,
     windowMs = DEFAULT_WINDOW_MS,
     now = () => Date.now(),
-    maxKeys = DEFAULT_MAX_KEYS
+    maxKeys = DEFAULT_MAX_KEYS,
+    message = RESEND_THROTTLE_MESSAGE
   } = {}) {
     if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
       throw new RangeError('maxAttempts must be a positive integer');
@@ -39,6 +40,7 @@ class ResendThrottle {
     this.windowMs = windowMs;
     this.now = now;
     this.maxKeys = maxKeys;
+    this.message = message;
     this.attempts = new Map();
   }
 
@@ -58,7 +60,7 @@ class ResendThrottle {
     const recent = this.recentFor(key, at);
 
     if (recent.length >= this.maxAttempts) {
-      throw new TooManyRequestsError(RESEND_THROTTLE_MESSAGE, {
+      throw new TooManyRequestsError(this.message, {
         retryAfterSeconds: Math.max(
           1,
           Math.ceil((recent[0] + this.windowMs - at) / 1000)
@@ -77,7 +79,7 @@ class ResendThrottle {
         // keeps the limit honest; the cost of reaching this state is itself the
         // flood that an IP-level limiter is meant to absorb (see
         // skills/rate-limiting.md).
-        throw new TooManyRequestsError(RESEND_THROTTLE_MESSAGE, {
+        throw new TooManyRequestsError(this.message, {
           retryAfterSeconds: Math.ceil(this.windowMs / 1000)
         });
       }
