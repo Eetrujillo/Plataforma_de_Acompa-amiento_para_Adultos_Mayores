@@ -107,11 +107,14 @@ function buildScenario(options = {}) {
   const verificationRepository = createFakeVerificationRepository();
   const emailSender = createFakeEmailSender();
 
+  const tokenService = { sign: (payload) => `jwt:${payload.sub}`, verify: () => ({}) };
+
   const registerCaregiver = new RegisterCaregiver({
     userRepository,
     passwordHasher,
     verificationRepository,
     emailSender,
+    tokenService,
     config: CONFIG,
     logger: silentLogger
   });
@@ -119,8 +122,6 @@ function buildScenario(options = {}) {
   const unreachable = (name) => async () => {
     throw new Error(`${name} is not part of HU-001`);
   };
-
-  const tokenService = { sign: (payload) => `jwt:${payload.sub}`, verify: () => ({}) };
 
   const controller = createAuthController({
     registerCaregiver,
@@ -194,6 +195,9 @@ test('S1 - un registro válido responde 201 con la cuenta creada y sin token de 
     assert.equal(body.verificationSent, true);
     assert.equal('passwordHash' in body.user, false);
     assert.equal('verificationToken' in body, false);
+    // La cuenta se crea con sesión, pero sin permiso para saltarse la
+    // verificación: el guard del familiar sigue exigiendo el correo confirmado.
+    assert.equal(body.token, `jwt:${body.user.id}`);
   });
 
   assert.equal(scenario.userRepository.users.size, 1);

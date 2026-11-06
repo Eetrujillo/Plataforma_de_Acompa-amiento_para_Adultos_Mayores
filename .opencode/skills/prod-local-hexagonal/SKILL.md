@@ -70,7 +70,28 @@ habla HTTP y el controlador nunca habla Prisma.
    recuperación → `/restablecer-contrasena?token=...`. Si cambian las rutas del
    frontend, cambiar `buildVerificationLink` y `PasswordRecovery`.
 6. **Registro.** Acepta `name`/`fullName` y `acceptPrivacyPolicy`/`acceptedTerms`.
-   `fullName` es obligatorio (mínimo 3) y el registro no emite JWT.
+   `fullName` es obligatorio (mínimo 3). **Sí emite JWT** (`token`), porque la
+   pantalla de verificación necesita consultar `/auth/me`; `verifiedEmailGuard`
+   sigue bloqueando hasta confirmar el correo. `verificationUrl` solo viaja fuera
+   de producción y sin SMTP.
+7. **Confirmar correo sin SMTP.** `POST /api/auth/dev/verify-email` (`{ email }`)
+   existe solo con `NODE_ENV !== 'production'` (`devRoutes` en `authRoutes.js`).
+   Devuelve `{ token, user, message }`. No montarlo nunca en producción.
+8. **Mongo sin Docker.** Atlas (`mongodb+srv://`) ya es replica set, así que
+   `prisma db push` + `npm run dev` funcionan sin `rs0` local.
+
+## Conexión app ↔ web (una sola cuenta)
+
+Ambos clientes deben apuntar al **mismo** backend. La app resuelve la URL en
+`App Mobile/src/config.ts` (`DEFAULT_API_BASE`) y `App Mobile/src/services/apiBase.ts`:
+
+1. `EXPO_PUBLIC_API_BASE`
+2. host de Expo (`Constants.expoConfig.hostUri`) + `:3500`
+3. `10.0.2.2:3500` (Android) / `localhost:3500` (web, iOS)
+
+Override en caliente: pantalla `/conexion` → `gap_api_base` en AsyncStorage.
+El backend escucha en todas las interfaces (`httpServer.listen(config.port)`), y
+`CORS_ORIGIN` por defecto es `*`.
 
 ## Validación
 

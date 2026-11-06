@@ -113,28 +113,73 @@ Sin Mongo, el backend arranca y responde `/api/health`, `/api/app/consent` y los
 DATABASE_UNAVAILABLE`. Para escribir hace falta el replica set (`rs0`): Prisma
 necesita transacciones y Mongo solo las da en replica set.
 
+### Sin Docker y sin Mongo instalado (MongoDB Atlas)
+
+Atlas entrega un replica set, así que Prisma funciona sin montar `rs0` a mano:
+
+1. Crear un cluster M0 gratuito en <https://cloud.mongodb.com>.
+2. Copiar la cadena `mongodb+srv://...` en `DATABASE_URL`.
+3. Permitir la IP del equipo en *Network Access*.
+4. `cd backend && npx prisma db push && npm run dev`.
+
+```powershell
+$env:DATABASE_URL="mongodb+srv://usuario:clave@cluster.mongodb.net/mearn_db"
+npx prisma db push
+npm run dev
+```
+
 ## Conectar la app móvil (Expo Go)
 
-En `App Mobile/.env`:
+**La app y la web deben apuntar al mismo backend.** Si cada una usa un servidor
+distinto, la cuenta creada en la web no existe en la app y los datos no se
+comparten.
+
+La app resuelve la URL así (`App Mobile/src/config.ts`):
+
+1. `EXPO_PUBLIC_API_BASE`, si está definida.
+2. La IP del PC que sirve Expo (`Constants.expoConfig.hostUri`) + puerto `3500`.
+   En un teléfono con Expo Go esto basta: `localhost` sería el propio teléfono.
+3. `10.0.2.2:3500` en el emulador de Android; `localhost:3500` en web/iOS.
+
+Si hace falta otra URL (backend desplegado, otra máquina), se cambia en la app
+desde **«Configurar servidor»** (`/conexion`) y queda guardada en el dispositivo
+bajo `gap_api_base`. También se puede fijar antes de arrancar:
 
 ```
-EXPO_PUBLIC_API_BASE=http://IP-DE-TU-EQUIPO:3500/api
+# App Mobile/.env
+EXPO_PUBLIC_API_BASE=http://192.168.1.20:3500/api
 ```
 
-`localhost` no sirve desde el teléfono: Expo Go corre en el dispositivo y debe
-llegar a la IP de tu PC en la red local. El backend escucha en `0.0.0.0`.
+Requisitos para que el teléfono llegue al backend:
+
+- Backend escuchando en `0.0.0.0` (por defecto `httpServer.listen(port)`).
+- Teléfono y PC en la misma red Wi-Fi.
+- Firewall de Windows permitiendo el puerto `3500` (y `8081` para Expo).
+- `CORS_ORIGIN=*` o el origen exacto de la web de Expo.
+
+### Cuenta compartida entre web y app
+
+- El registro (`POST /api/auth/register`) ya devuelve `token`, así que la cuenta
+  abre sesión de inmediato; `verifiedEmailGuard` sigue exigiendo el correo
+  confirmado antes de operar.
+- Sin SMTP, el enlace de confirmación se imprime en la consola del backend. Para
+  no depender de la consola, en desarrollo existe
+  `POST /api/auth/dev/verify-email` (`{ email }`): la ruta **no se monta** con
+  `NODE_ENV=production` y los botones «Confirmar correo ahora (desarrollo)» solo
+  aparecen en modo dev (web: `import.meta.env.DEV`, app: `__DEV__`).
 
 ## Validación ejecutada
 
 | Comprobación | Resultado |
 |---|---|
 | `npx prisma validate` | Esquema válido |
-| `npm test` (backend) | 96 pruebas de `prod` + 10 nuevas de HU-012/013/017/019/020 |
-| `node --check` (92 archivos) | Sin errores de sintaxis |
+| `npm test` (backend) | 106 pruebas (96 de `prod` + HU-012/013/017/019/020 + registro con token) |
+| `node --check` (93 archivos) | Sin errores de sintaxis |
 | Arranque sin Mongo | `/api/health` 200, `/api/app/consent` 200, rutas protegidas 401 |
 | `npm run typecheck` (frontend) | Sin errores |
 | `npm run build` (frontend) | 261 KB JS + 23 KB CSS |
 | `npx tsc --noEmit` (App Mobile) | Sin errores |
+| `npx expo export --platform web` | Exporta sin errores |
 
 ## Pendiente
 

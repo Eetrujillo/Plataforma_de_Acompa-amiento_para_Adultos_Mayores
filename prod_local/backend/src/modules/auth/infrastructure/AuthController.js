@@ -16,6 +16,7 @@ function createAuthController({
   resendVerificationEmail,
   loginWithGoogle,
   passwordRecovery,
+  devVerifyEmail = null,
   googleConfig = { enabled: false, clientId: null }
 }) {
   return {
@@ -32,8 +33,13 @@ function createAuthController({
 
       res.status(201).json({
         user: result.user,
+        // Sesión inmediata: la cuenta aún no está verificada, pero el cliente
+        // necesita el token para consultar su estado y refrescarlo.
+        token: result.token ?? null,
         verificationSent: result.verificationSent,
-        emailVerificationSent: result.verificationSent
+        emailVerificationSent: result.verificationSent,
+        // Solo llega en desarrollo sin SMTP; en producción es `undefined`.
+        verificationUrl: result.verificationUrl
       });
     }),
 
@@ -86,6 +92,15 @@ function createAuthController({
         token: req.body?.token,
         password: req.body?.password
       });
+      res.status(200).json(result);
+    }),
+
+    /**
+     * Solo desarrollo: la ruta no existe con NODE_ENV=production.
+     * Ver `DevVerifyEmail`.
+     */
+    devVerifyEmail: asyncHandler(async (req, res) => {
+      const result = await devVerifyEmail.execute({ email: req.body?.email });
       res.status(200).json(result);
     })
   };

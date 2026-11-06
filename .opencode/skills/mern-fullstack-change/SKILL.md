@@ -34,9 +34,21 @@ Implement one HU end-to-end without breaking earlier HUs.
    ```
    Add or run an isolated Node test when the logic can be tested without MongoDB.
 
+## Reusable patterns already in the repo
+
+- **Live family view (HU-020).** `GET /api/activities/today` is read-only, scoped by
+  `familiar: req.user._id`, declared **before** `/:id`, and returns
+  `{ date, timeZone, olderAdult, activities }`. Each item carries `status`
+  (`pending`/`completed`/`expired`) and `expiresAt`. The business threshold
+  (`EXPIRATION_GRACE_MINUTES`) lives only in `activity.service.js`; the client compares against
+  `expiresAt` and never repeats the rule. `TodayPage.tsx` polls every 8 s, on `focus` and on
+  `visibilitychange`, guards concurrent requests, and keeps the last data when a refresh fails.
+- **Pure helper for a time rule.** Export the rule as a small function (`dayStatus`) so it can be
+  asserted with a throwaway Node script; no MongoDB needed.
+
 ## Project rules
 
-- Preserve HU-001 to HU-015 behavior.
+- Preserve HU-001 to HU-020 behavior.
 - Family routes use `Bearer` JWT; the older-adult app uses `X-Older-Adult-Token`.
 - Never return `pinHash`, code/session hashes, or raw tokens.
 - Senior screens (`/app`, `/app/vincular`, `/app/ajustes`) use `.senior-app`: base text 20 px,
@@ -44,7 +56,8 @@ Implement one HU end-to-end without breaking earlier HUs.
 - Use `ConfirmDialog.tsx` for confirmations; `Modal.tsx` is empty.
 - Default time zone is `America/Bogota`.
 - Keep Docker compatibility: no host-only paths, use env vars, bind to `0.0.0.0`.
-- Do not commit, push, or deploy without explicit approval.
+- Git, credentials, and infrastructure: follow `AGENTS.md`. The push is manual and controlled by
+  the user; never publish through an unauthorized channel.
 
 ## Done checklist
 
@@ -55,3 +68,5 @@ Implement one HU end-to-end without breaking earlier HUs.
 - [ ] Error `code`s are handled in the UI.
 - [ ] README and env docs updated.
 - [ ] `node --check`, typecheck, build, and relevant tests pass.
+- [ ] New model/route/service/type pattern captured in a skill under `.opencode/skills/`
+      (see `AGENTS.md`, "Skills: eficiencia de tokens").

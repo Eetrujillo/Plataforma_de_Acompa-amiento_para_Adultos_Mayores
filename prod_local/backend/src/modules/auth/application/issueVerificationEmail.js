@@ -42,7 +42,9 @@ async function issueVerificationEmail({
       expiresInHours: ttlHours
     });
 
-    return { sent: true };
+    // `link` se devuelve solo cuando el correo no salió por SMTP (desarrollo):
+    // sin eso, el enlace queda únicamente en la consola del backend.
+    return { sent: true, link: emailSender.channel === 'console' ? link : undefined };
   } catch (error) {
     logger.warn(`[auth] verification email delivery failed for ${user.email}: ${error.message}`);
     return { sent: false };

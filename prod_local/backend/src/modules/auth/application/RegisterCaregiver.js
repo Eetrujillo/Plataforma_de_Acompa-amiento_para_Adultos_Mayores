@@ -12,11 +12,20 @@ const DEFAULT_TERMS_VERSION = '1.0';
  * Ports: userRepository, passwordHasher, verificationRepository, emailSender
  */
 class RegisterCaregiver {
-  constructor({ userRepository, passwordHasher, verificationRepository, emailSender, config, logger = console }) {
+  constructor({
+    userRepository,
+    passwordHasher,
+    verificationRepository,
+    emailSender,
+    tokenService = null,
+    config,
+    logger = console
+  }) {
     this.userRepository = userRepository;
     this.passwordHasher = passwordHasher;
     this.verificationRepository = verificationRepository;
     this.emailSender = emailSender;
+    this.tokenService = tokenService;
     this.config = config;
     this.logger = logger;
   }
@@ -69,7 +78,27 @@ class RegisterCaregiver {
       logger: this.logger
     });
 
-    return { user: toPublicUser(created), verificationSent: delivery.sent };
+    // El registro abre sesión igual que el login. Sin este token la pantalla de
+    // «confirma tu correo» no puede consultar `/auth/me` para refrescar el
+    // estado, y la cuenta queda inservible hasta cerrar y volver a entrar.
+    // El token no salta la verificación: `verifiedEmailGuard` la exige aparte.
+    const token = this.tokenService
+      ? this.tokenService.sign({
+          sub: created.id,
+          role: created.role,
+          email: created.email,
+          sessionVersion: created.sessionVersion ?? 0
+        })
+      : null;
+
+    return {
+      user: toPublicUser(created),
+      token,
+      verificationSent: delivery.sent,
+      // Solo en desarrollo y sin SMTP: permite confirmar sin copiar el enlace
+      // de la consola. En producción el campo no se envía.
+      verificationUrl: this.config?.nodeEnv === 'production' ? undefined : delivery.link
+    };
   }
 
   async persist(data) {

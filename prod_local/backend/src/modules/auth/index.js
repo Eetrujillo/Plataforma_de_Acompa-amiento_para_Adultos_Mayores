@@ -8,6 +8,7 @@ const { VerifyEmail } = require('./application/VerifyEmail');
 const { ResendVerificationEmail } = require('./application/ResendVerificationEmail');
 const { ResendThrottle } = require('./application/ResendThrottle');
 const { PasswordRecovery } = require('./application/PasswordRecovery');
+const { DevVerifyEmail } = require('./application/DevVerifyEmail');
 const { BcryptPasswordHasher } = require('./infrastructure/BcryptPasswordHasher');
 const { JwtTokenService } = require('./infrastructure/JwtTokenService');
 const { GoogleIdTokenVerifier } = require('./infrastructure/GoogleIdTokenVerifier');
@@ -45,6 +46,7 @@ function createAuthModule({ prisma, config, logger = console }) {
       passwordHasher,
       verificationRepository,
       emailSender,
+      tokenService,
       config,
       logger
     }),
@@ -77,11 +79,17 @@ function createAuthModule({ prisma, config, logger = console }) {
       passwordHasher,
       config,
       logger
-    })
+    }),
+    // Solo se usa fuera de producción; la ruta tampoco se monta.
+    devVerifyEmail: new DevVerifyEmail({ userRepository, tokenService })
   });
 
   return {
-    router: createAuthRouter({ controller, authMiddleware }),
+    router: createAuthRouter({
+      controller,
+      authMiddleware,
+      devRoutes: config.nodeEnv !== 'production'
+    }),
     authMiddleware,
     tokenService,
     userRepository,

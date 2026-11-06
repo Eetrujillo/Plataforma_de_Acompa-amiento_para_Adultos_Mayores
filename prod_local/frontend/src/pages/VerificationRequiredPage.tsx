@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Notification } from '../components/ui/Notification';
 import { useAuth } from '../hooks/useAuth';
 import { useResendVerification } from '../hooks/useResendVerification';
+import { setToken } from '../services/apiClient';
+import { authService } from '../services/authService';
 import { formatWait } from '../utils/time';
 
 export function VerificationRequiredPage() {
@@ -10,6 +12,8 @@ export function VerificationRequiredPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { resend, resending, message, error, retryAfterSeconds } = useResendVerification();
+  const [devBusy, setDevBusy] = useState(false);
+  const [devError, setDevError] = useState('');
 
   const requestedPath = (location.state as { from?: string } | null)?.from;
   const from = requestedPath && requestedPath !== '/verificar-correo' ? requestedPath : '/';
@@ -39,6 +43,27 @@ export function VerificationRequiredPage() {
   async function handleResend() {
     if (!user || resending || retryAfterSeconds > 0) return;
     await resend(user.email);
+  }
+
+  /**
+   * Atajo de desarrollo: sin SMTP el enlace solo aparece en la consola del
+   * backend. La ruta no existe cuando el backend corre en producción.
+   */
+  async function handleDevConfirm() {
+    if (!user || devBusy) return;
+
+    setDevBusy(true);
+    setDevError('');
+
+    try {
+      const response = await authService.devVerifyEmail(user.email);
+      setToken(response.token);
+      await refreshUser();
+    } catch {
+      setDevError('No se pudo confirmar en modo desarrollo. Revisa el servidor.');
+    } finally {
+      setDevBusy(false);
+    }
   }
 
   return (
@@ -80,6 +105,20 @@ export function VerificationRequiredPage() {
               Actualizar estado
             </button>
           </p>
+
+          {import.meta.env.DEV ? (
+            <>
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => void handleDevConfirm()}
+                disabled={devBusy}
+              >
+                {devBusy ? 'Confirmando…' : 'Confirmar correo ahora (desarrollo)'}
+              </button>
+              {devError ? <Notification type="error">{devError}</Notification> : null}
+            </>
+          ) : null}
 
           <button className="btn-secondary" type="button" onClick={handleLogout}>
             Cerrar sesión

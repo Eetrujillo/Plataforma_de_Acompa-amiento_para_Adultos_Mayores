@@ -37,6 +37,13 @@ export const authService = {
   resetPassword: (token: string, password: string): Promise<ResetPasswordResponse> =>
     apiClient.post<ResetPasswordResponse>('/auth/reset-password', { token, password }),
 
+  /**
+   * Solo desarrollo: confirma el correo sin abrir el enlace del mensaje.
+   * La ruta no existe cuando el backend corre con NODE_ENV=production.
+   */
+  devVerifyEmail: (email: string): Promise<AuthResponse> =>
+    apiClient.post<AuthResponse>('/auth/dev/verify-email', { email }),
+
   logout: (): void => setToken(null),
 
   hasToken: (): boolean => Boolean(getToken()),
