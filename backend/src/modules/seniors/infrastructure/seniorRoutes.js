@@ -1,0 +1,18 @@
+'use strict';
+
+const express = require('express');
+const { ROLES } = require('../../auth/domain/User');
+const { requireRole } = require('../../../shared/middlewares/authMiddleware');
+
+function createSeniorRouter({ controller, authMiddleware }) {
+  const router = express.Router();
+
+  // Every profile endpoint requires a caregiver: a senior device never manages profiles.
+  router.use(authMiddleware, requireRole(ROLES.CAREGIVER));
+
+  router.post('/', controller.create);
+
+  return router;
+}
+
+module.exports = { createSeniorRouter };

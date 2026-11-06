@@ -9,6 +9,7 @@ const { createApp } = require('./app');
 
 const { createAuthModule } = require('./modules/auth');
 const { createPairingModule } = require('./modules/pairing');
+const { createSeniorsModule } = require('./modules/seniors');
 const { createActivitiesModule } = require('./modules/activities');
 const { createSosModule } = require('./modules/sos_emergency');
 
@@ -31,6 +32,11 @@ function buildApplication() {
     authMiddleware: auth.authMiddleware
   });
 
+  const seniors = createSeniorsModule({
+    userRepository: auth.userRepository,
+    authMiddleware: auth.authMiddleware
+  });
+
   const activities = createActivitiesModule({
     prisma,
     userRepository: auth.userRepository,
@@ -49,6 +55,7 @@ function buildApplication() {
     modules: {
       auth: auth.router,
       pairing: pairing.router,
+      seniors: seniors.router,
       activities: activities.router,
       sos: sos.router
     }

@@ -34,6 +34,10 @@ function createApp({ config, modules = {}, logger = console } = {}) {
     app.use(`${API_PREFIX}/pairing`, modules.pairing);
   }
 
+  if (modules.seniors) {
+    app.use(`${API_PREFIX}/seniors`, modules.seniors);
+  }
+
   if (modules.activities) {
     app.use(`${API_PREFIX}/activities`, modules.activities);
   }
