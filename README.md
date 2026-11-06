@@ -96,6 +96,9 @@ del dominio o un servicio transaccional: **[docs/smtp-setup.md](docs/smtp-setup.
 | POST | `/api/auth/forgot-password` | público (202; 429 si se excede el límite) |
 | POST | `/api/auth/reset-password` | público (token del correo) |
 | GET | `/api/auth/me` | autenticado |
+| POST | `/api/seniors` | cuidador (perfil del adulto mayor con PIN y zona horaria) |
+| GET | `/api/seniors` | cuidador (solo los perfiles propios) |
+| GET | `/api/seniors/:id` | cuidador (404 si no es propio) |
 | POST | `/api/pairing/codes` | cuidador |
 | GET | `/api/pairing/seniors` | cuidador |
 | POST | `/api/pairing/link` | público (código de 6 dígitos) |
