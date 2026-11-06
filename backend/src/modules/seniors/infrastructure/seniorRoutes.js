@@ -11,6 +11,8 @@ function createSeniorRouter({ controller, authMiddleware }) {
   router.use(authMiddleware, requireRole(ROLES.CAREGIVER));
 
   router.post('/', controller.create);
+  router.get('/', controller.list);
+  router.get('/:id', controller.get);
 
   return router;
 }

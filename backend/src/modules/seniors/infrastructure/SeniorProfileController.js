@@ -7,7 +7,7 @@ const { asyncHandler } = require('../../../shared/middlewares/asyncHandler');
  *
  * The owner is always `req.user.id`: the body never carries it.
  */
-function createSeniorProfileController({ createSeniorProfile }) {
+function createSeniorProfileController({ createSeniorProfile, listSeniorProfiles, getSeniorProfile }) {
   return {
     create: asyncHandler(async (req, res) => {
       const senior = await createSeniorProfile.execute({
@@ -18,6 +18,20 @@ function createSeniorProfileController({ createSeniorProfile }) {
       });
 
       res.status(201).json(senior);
+    }),
+
+    list: asyncHandler(async (req, res) => {
+      const result = await listSeniorProfiles.execute({ caregiverId: req.user.id });
+      res.status(200).json(result);
+    }),
+
+    get: asyncHandler(async (req, res) => {
+      const senior = await getSeniorProfile.execute({
+        caregiverId: req.user.id,
+        seniorId: req.params.id
+      });
+
+      res.status(200).json(senior);
     })
   };
 }

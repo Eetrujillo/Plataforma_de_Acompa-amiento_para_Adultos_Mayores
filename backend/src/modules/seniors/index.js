@@ -2,6 +2,8 @@
 
 const { BcryptPasswordHasher } = require('../auth/infrastructure/BcryptPasswordHasher');
 const { CreateSeniorProfile } = require('./application/CreateSeniorProfile');
+const { GetSeniorProfile } = require('./application/GetSeniorProfile');
+const { ListSeniorProfiles } = require('./application/ListSeniorProfiles');
 const { PIN_HASH_ROUNDS } = require('./domain/seniorProfile');
 const { createSeniorProfileController } = require('./infrastructure/SeniorProfileController');
 const { createSeniorRouter } = require('./infrastructure/seniorRoutes');
@@ -18,7 +20,9 @@ function createSeniorsModule({ userRepository, authMiddleware }) {
   const pinHasher = new BcryptPasswordHasher({ saltRounds: PIN_HASH_ROUNDS });
 
   const controller = createSeniorProfileController({
-    createSeniorProfile: new CreateSeniorProfile({ userRepository, pinHasher })
+    createSeniorProfile: new CreateSeniorProfile({ userRepository, pinHasher }),
+    listSeniorProfiles: new ListSeniorProfiles({ userRepository }),
+    getSeniorProfile: new GetSeniorProfile({ userRepository })
   });
 
   return {

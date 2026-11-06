@@ -81,6 +81,16 @@ function resolveTimeZone(timezone) {
 }
 
 /**
+ * Mongo object ids are 24 hex characters. Checking the shape here keeps a malformed id from
+ * reaching Prisma, where it would surface as a 500 instead of the 404 the contract promises.
+ */
+const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
+
+function isValidSeniorId(seniorId) {
+  return typeof seniorId === 'string' && OBJECT_ID_PATTERN.test(seniorId);
+}
+
+/**
  * Public projection of a senior profile. `pinHash` is deliberately absent: this shape is
  * the only one the HTTP layer returns, so a field added here is a field exposed.
  */
@@ -104,6 +114,7 @@ module.exports = {
   PIN_HASH_ROUNDS,
   PIN_PATTERN,
   assertPin,
+  isValidSeniorId,
   isValidTimeZone,
   resolveFullName,
   resolveTimeZone,
