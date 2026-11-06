@@ -28,6 +28,12 @@ model User {
   /// for the same reason as the lockout fields: documents already exist without it and
   /// a null reads as 0.
   sessionVersion      Int?
+  /// HU-005 senior profile. A caregiver has no PIN and no link state, so both fields are
+  /// nullable; the documents created before this field existed read as "not set" too.
+  /// `pinHash` never leaves the persistence layer: the public projection excludes it.
+  pinHash    String?
+  timezone   String?  @default("America/Bogota")
+  linkStatus String?  @default("PENDING")
   /// Ley 1581 consent evidence: stamped by the server when the account is created.
   acceptedTermsAt DateTime?
   termsVersion    String?

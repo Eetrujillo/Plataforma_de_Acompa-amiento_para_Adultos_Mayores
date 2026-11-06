@@ -129,6 +129,9 @@ class User {
     role,
     phone = null,
     caregiverId = null,
+    pinHash = null,
+    timezone = null,
+    linkStatus = null,
     emailVerifiedAt = null,
     acceptedTermsAt = null,
     termsVersion = null,
@@ -142,6 +145,9 @@ class User {
     this.role = role;
     this.phone = phone;
     this.caregiverId = caregiverId;
+    this.pinHash = pinHash;
+    this.timezone = timezone;
+    this.linkStatus = linkStatus;
     this.emailVerifiedAt = emailVerifiedAt;
     this.acceptedTermsAt = acceptedTermsAt;
     this.termsVersion = termsVersion;
@@ -178,7 +184,7 @@ class User {
     });
   }
 
-  static createSenior({ fullName, phone, caregiverId }) {
+  static createSenior({ fullName, phone, caregiverId, pinHash = null, timezone = null, linkStatus = null }) {
     if (typeof caregiverId !== 'string' || caregiverId.length === 0) {
       throw new ValidationError('caregiverId is required');
     }
@@ -191,6 +197,11 @@ class User {
       phone: normalizePhone(phone),
       role: ROLES.SENIOR,
       caregiverId,
+      // A senior created without an explicit state is not linked yet; the pairing flow
+      // passes LINKED because redeeming the code is the proof (HU-005 S7).
+      pinHash,
+      timezone: timezone ?? 'America/Bogota',
+      linkStatus: linkStatus ?? 'PENDING',
       // Seniors have no mailbox: pairing is their credential, so they are verified on creation.
       emailVerifiedAt: new Date()
     });

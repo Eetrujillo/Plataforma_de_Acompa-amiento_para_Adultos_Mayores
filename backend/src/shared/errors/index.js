@@ -12,6 +12,10 @@ const { EmailNotRegisteredError } = require('./EmailNotRegisteredError');
 const { GoogleNotConfiguredError } = require('./GoogleNotConfiguredError');
 const { TooManyRequestsError } = require('./TooManyRequestsError');
 const { AccountLockedError } = require('./AccountLockedError');
+const { InvalidPinError } = require('./InvalidPinError');
+const { InvalidFullNameError } = require('./InvalidFullNameError');
+const { InvalidTimeZoneError } = require('./InvalidTimeZoneError');
+const { SeniorNotFoundError } = require('./SeniorNotFoundError');
 
 module.exports = {
   AppError,
@@ -25,5 +29,9 @@ module.exports = {
   EmailNotRegisteredError,
   GoogleNotConfiguredError,
   TooManyRequestsError,
-  AccountLockedError
+  AccountLockedError,
+  InvalidPinError,
+  InvalidFullNameError,
+  InvalidTimeZoneError,
+  SeniorNotFoundError
 };

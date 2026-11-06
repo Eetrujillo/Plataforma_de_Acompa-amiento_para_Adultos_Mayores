@@ -36,14 +36,23 @@ class LinkSeniorApp {
       throw new ValidationError('pairing code expired');
     }
 
-    const senior = User.createSenior({ fullName, phone, caregiverId: record.caregiverId });
+    // Redeeming the code is the proof that this device is the senior's, so the profile is
+    // born linked; a profile created from the caregiver panel is PENDING until then.
+    const senior = User.createSenior({
+      fullName,
+      phone,
+      caregiverId: record.caregiverId,
+      linkStatus: 'LINKED'
+    });
 
     const created = await this.userRepository.create({
       email: senior.email,
       fullName: senior.fullName,
       phone: senior.phone,
       role: senior.role,
-      caregiverId: senior.caregiverId
+      caregiverId: senior.caregiverId,
+      timezone: senior.timezone,
+      linkStatus: senior.linkStatus
     });
 
     await this.pairingRepository.markUsed({ id: record.id, seniorId: created.id });

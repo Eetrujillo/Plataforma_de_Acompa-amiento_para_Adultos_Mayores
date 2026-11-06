@@ -27,6 +27,9 @@ class PrismaUserRepository {
     role,
     passwordHash = null,
     caregiverId = null,
+    pinHash = null,
+    timezone = null,
+    linkStatus = null,
     emailVerifiedAt = null,
     acceptedTermsAt = null,
     termsVersion = null,
@@ -41,6 +44,11 @@ class PrismaUserRepository {
           role,
           passwordHash,
           caregiverId,
+          // Only written when the caller sends them: a caregiver account must keep relying on
+          // the schema defaults instead of storing explicit nulls over them.
+          ...(pinHash === null ? {} : { pinHash }),
+          ...(timezone === null ? {} : { timezone }),
+          ...(linkStatus === null ? {} : { linkStatus }),
           emailVerifiedAt,
           acceptedTermsAt,
           termsVersion,
