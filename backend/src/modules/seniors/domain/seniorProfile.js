@@ -57,6 +57,9 @@ function isValidTimeZone(timezone) {
 /**
  * Absent, null or blank means "use the project default". An explicit but invalid zone is
  * an error: silently storing Bogota for a caregiver in Lima would shift every routine.
+ *
+ * The value is stored in its canonical IANA spelling: `Intl` accepts `america/lima` and
+ * would otherwise let two profiles name the same zone differently.
  */
 function resolveTimeZone(timezone) {
   if (timezone === undefined || timezone === null) {
@@ -77,7 +80,7 @@ function resolveTimeZone(timezone) {
     throw new InvalidTimeZoneError();
   }
 
-  return candidate;
+  return new Intl.DateTimeFormat('en-US', { timeZone: candidate }).resolvedOptions().timeZone;
 }
 
 /**

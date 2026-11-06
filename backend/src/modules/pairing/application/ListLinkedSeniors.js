@@ -5,6 +5,17 @@
  *
  * Ports: userRepository
  */
+
+/**
+ * Only an explicit pending state is filtered out, and the comparison ignores case: a
+ * hand-edited or imported document must not sneak into the activity picker, but a document
+ * written before HU-005 carries no `linkStatus` at all and was created by the pairing flow,
+ * so a missing value means linked.
+ */
+function isPending(linkStatus) {
+  return typeof linkStatus === 'string' && linkStatus.toUpperCase() === 'PENDING';
+}
+
 class ListLinkedSeniors {
   constructor({ userRepository }) {
     this.userRepository = userRepository;
@@ -14,11 +25,8 @@ class ListLinkedSeniors {
     const seniors = await this.userRepository.listSeniorsByCaregiver(caregiverId);
 
     return {
-      // Only the profiles whose device already proved ownership can be picked in the panel.
-      // A document written before HU-005 carries no `linkStatus` and was created by the
-      // pairing flow, so the missing field means linked, not pending.
       seniors: seniors
-        .filter((senior) => senior.linkStatus !== 'PENDING')
+        .filter((senior) => !isPending(senior.linkStatus))
         .map((senior) => ({
           id: senior.id,
           fullName: senior.fullName,

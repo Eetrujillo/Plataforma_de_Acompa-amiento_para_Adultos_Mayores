@@ -42,3 +42,13 @@ test('a pending profile is the only thing filtered out', async () => {
 
   assert.deepEqual(result.seniors, [{ id: 's-foreign', fullName: 'Otra Familia', phone: null }]);
 });
+
+test('a pending state written in another case is still pending', async () => {
+  const lowercase = [
+    { id: 's-lower', fullName: 'Perfil Importado', phone: null, caregiverId: 'cg-3', linkStatus: 'pending' }
+  ];
+
+  const result = await build(lowercase).execute({ caregiverId: 'cg-3' });
+
+  assert.deepEqual(result.seniors, []);
+});

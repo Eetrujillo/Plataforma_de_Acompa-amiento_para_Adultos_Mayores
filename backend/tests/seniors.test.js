@@ -128,10 +128,19 @@ test('time zone: absent, null or blank falls back to America/Bogota', async () =
   }
 });
 
-test('time zone: an explicit valid zone is kept, trimmed', async () => {
+test('time zone: an explicit valid zone is kept, trimmed and canonicalized', async () => {
   const { useCase, repository } = build();
 
   const result = await useCase.execute({ ...VALID, timezone: ' America/Lima ' });
+
+  assert.equal(result.timezone, 'America/Lima');
+  assert.equal(repository.writes[0].timezone, 'America/Lima');
+});
+
+test('time zone: a differently cased zone is stored in its canonical spelling', async () => {
+  const { useCase, repository } = build();
+
+  const result = await useCase.execute({ ...VALID, timezone: 'america/lima' });
 
   assert.equal(result.timezone, 'America/Lima');
   assert.equal(repository.writes[0].timezone, 'America/Lima');
