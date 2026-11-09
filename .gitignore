@@ -1,5 +1,7 @@
 .env
 node_modules
-dist
-npm-debug.log
-.DS_Store
+dist/
+*.log
+
+# Local override that points this machine at the deployed database: never commit it.
+docker-compose.override.yml

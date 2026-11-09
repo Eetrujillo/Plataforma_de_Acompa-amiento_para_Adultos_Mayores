@@ -1,0 +1,54 @@
+# ⚡ Tarea Activa Actual
+
+- **ID:** HU-007
+- **Título:** Vincular mi app con el código
+- **Descripción:** Ingresar o escanear el código de vinculación en la app móvil para conectar con la cuenta del familiar.
+
+---
+
+## 📁 Skills / Reglas Obligatorias a Leer Ahora:
+1. `skills/pairing-link.md` *(no existe todavía: hay que crearla antes de empezar)*
+2. `skills/senior-ui-wcag.md` *(no existe todavía: hay que crearla antes de empezar)*
+3. `skills/pairing-generator.md` *(HU-006: qué es un código, cómo vence y cómo se invalida)*
+4. `skills/qr-adapter.md` *(HU-006: el QR lleva `{"type":"senior-pairing","code":"…"}`)*
+5. `skills/bcrypt-pin.md` *(el PIN recién acá se verifica: el límite de intentos es obligatorio)*
+6. `skills/profiles-hexagonal.md` *(el perfil ya existe: el canje lo pasa a `LINKED`)*
+
+---
+
+## ✅ Criterios de Aceptación a Validar:
+- [ ] Con código válido y consentimiento previo, conecta la app y guarda el token de dispositivo.
+- [ ] Muestra el mensaje claro "Pídele a tu familiar un código nuevo" si el código venció.
+- [ ] Bloquea nuevos intentos por 15 minutos tras 5 fallos consecutivos de código.
+
+---
+
+## 🧭 Estado de partida (leer antes de escribir código):
+- El canje ya está hecho en backend (`LinkSeniorApp`, HU-006): código atado a un perfil, reclamo
+  atómico, perfil `PENDING → LINKED`, payload con `toPublicUser` + `linkStatus`/`timezone`, y una rama
+  legacy sin `seniorId` marcada como **transitoria hasta esta HU**. HU-007 la retira.
+- **Falta la parte de la app**: la pantalla para tipear/escanear el código, el guardado del token de
+  dispositivo y la sesión persistente del adulto mayor (regla "Cero Credenciales" de `skills/RUlLES.md`:
+  el adulto mayor nunca escribe correo ni contraseña).
+- **El PIN todavía no se verifica en ningún lado.** Criterio 3 (bloqueo por 5 fallos) tiene dos sujetos
+  posibles —el código y el PIN— y hay que decidir cuál(es) bloquean; `skills/bcrypt-pin.md` ya fija que el
+  PIN necesita contador por perfil. El patrón existe en `domain/loginLockout.js` y en el límite del
+  reenvío (`ResendThrottle`), pero el del PIN no está escrito.
+- El mensaje del criterio 2 es texto exacto: hoy el backend responde un `400` genérico
+  (`pairing code is invalid or expired`); la copy de la app es la que tiene que decir la frase del criterio.
+- Consentimiento: el criterio habla de "consentimiento previo". Se resuelve en HU-008; acá hay que
+  decidir si la app lo exige antes de canjear o si se permite vincular y el consentimiento bloquea el uso.
+  No inventar el registro de consentimiento en esta HU.
+- `POST /api/pairing/link` es público a propósito: el código es la credencial. Cualquier límite de intentos
+  tiene que ser por IP + por perfil, no por sesión.
+- La app móvil está empaquetada con Capacitor (`webDir: dist`, sin `server.url`): los cambios de frontend
+  no llegan al teléfono sin APK nuevo. Verificar en navegador y en build, y decir explícitamente qué queda
+  sin probar en dispositivo.
+
+---
+
+## 🔄 Instrucciones de Cierre para la IA al Finalizar:
+1. Pasar todos los criterios de aceptación.
+2. En el backlog (`skills/backlog_del_proyecto.md`) cambiar `- [ ] **HU-007**` por
+   `- [x] **HU-007**` y actualizar el puntero de estado.
+3. Sobrescribir este archivo (`ACTIVE_TASK`) cargando los datos de la siguiente tarea (**HU-008**) desde el backlog.

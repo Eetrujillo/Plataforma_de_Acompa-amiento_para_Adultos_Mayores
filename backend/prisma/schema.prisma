@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+/// Caregiver or senior account.
+/// MongoDB has no native enums, so `role` is a validated String (CAREGIVER | SENIOR).
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String?
+  fullName     String
+  role         String
+  phone        String?
+  caregiverId  String?  @db.ObjectId
+  emailVerifiedAt DateTime?
+  /// HU-003 lockout state. Nullable on purpose: documents created before this field
+  /// existed do not carry it, and Mongo needs no data migration for that. A null value
+  /// means "no failed attempts" and "not locked".
+  failedLoginAttempts Int?
+  lockedUntil         DateTime?
+  /// HU-004 session version. Every JWT carries the version it was issued with; a
+  /// password reset bumps it, which invalidates every session opened before. Nullable
+  /// for the same reason as the lockout fields: documents already exist without it and
+  /// a null reads as 0.
+  sessionVersion      Int?
+  /// HU-005 senior profile. A caregiver has no PIN and no link state, so both fields are
+  /// nullable; the documents created before this field existed read as "not set" too.
+  /// `pinHash` never leaves the persistence layer: the public projection excludes it.
+  pinHash    String?
+  timezone   String?  @default("America/Bogota")
+  linkStatus String?  @default("PENDING")
+  /// Ley 1581 consent evidence: stamped by the server when the account is created.
+  acceptedTermsAt DateTime?
+  termsVersion    String?
+  ipAddress       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([role])
+  @@index([caregiverId])
+}
+
+/// Single use token that proves the account owner controls the email address.
+/// Only the SHA-256 hash of the raw token is stored.
+model EmailVerificationToken {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Un solo uso y 60 minutos de vida. Colección propia a propósito: un enlace de
+/// verificación de correo no puede servir para cambiar la contraseña (HU-004).
+model PasswordResetToken {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Credencial de vinculación de un adulto mayor (HU-006, rework QR-only de L9).
+/// No existe un código legible: el único soporte es el QR, y en esta colección queda
+/// únicamente el SHA-256 del token (`tokenHash`). Quien lea la colección no puede
+/// reconstruir un QR válido.
+/// El token siempre pertenece a un perfil (`seniorId` obligatorio desde L9).
+/// `usedAt` significa "canjeado" y `invalidatedAt` "reemplazado por uno más nuevo": un
+/// token reemplazado no fue usado, así que no se puede marcar con `usedAt` sin mentir.
+/// Los dos son nullable porque la creación los escribe en null de forma explícita y porque
+/// un documento sin el campo también tiene que poder reclamarse.
+model PairingToken {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  tokenHash     String    @unique
+  caregiverId   String    @db.ObjectId
+  seniorId      String    @db.ObjectId
+  expiresAt     DateTime
+  usedAt        DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([caregiverId])
+  @@index([caregiverId, seniorId])
+}
+
+/// Daily routine item assigned by a caregiver to a senior.
+model Activity {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId      String    @db.ObjectId
+  createdBy     String    @db.ObjectId
+  title         String
+  description   String?
+  scheduledTime String
+  scheduledDate String
+  status        String    @default("PENDING")
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([seniorId, scheduledDate])
+  @@index([status])
+}
+
+/// Emergency alert raised from a senior device with its GPS position.
+model SosAlert {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId   String    @db.ObjectId
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  message    String?
+  status     String    @default("ACTIVE")
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  resolvedBy String?   @db.ObjectId
+
+  @@index([seniorId, status])
+  @@index([status])
+}
