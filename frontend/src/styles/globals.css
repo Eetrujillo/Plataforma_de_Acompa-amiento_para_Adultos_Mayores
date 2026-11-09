@@ -17,6 +17,11 @@
   --focus: #d97706;
   --radius: 16px;
   --shadow: 0 20px 50px rgba(20, 42, 74, 0.14);
+  /* Tokens cálidos del login (HU de rediseño UI): crema y dorado de marca */
+  --warm-bg: #fdf8ef;
+  --warm-border: #f3e8d2;
+  --accent: #f2b134;
+  --accent-soft: #fdf3dd;
 }
 
 * {
@@ -78,6 +83,145 @@ a:hover {
   display: grid;
   place-items: center;
   padding: 2rem 1rem;
+  background:
+    radial-gradient(circle at top left, #fbeed7 0, transparent 42%),
+    radial-gradient(circle at bottom right, #e2edfb 0, transparent 45%),
+    radial-gradient(circle at 80% 15%, #f6e3ea 0, transparent 30%),
+    var(--bg);
+}
+
+/* --- Login cálido: marca, ilustración y accesos secundarios (rediseño UI) --- */
+
+.auth-card--warm {
+  border-radius: 20px;
+  overflow: hidden;
+  padding: 0;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding-top: 2rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--primary);
+}
+
+.auth-brand-logo {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.auth-hero {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  margin: 0.9rem 2.5rem 0;
+}
+
+.auth-hero img {
+  display: block;
+  width: min(260px, 60vw);
+  height: auto;
+  padding: 0.6rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--warm-border);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(20, 42, 74, 0.1);
+}
+
+.auth-hero-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.auth-hero-caption strong {
+  color: var(--primary);
+}
+
+.auth-card--warm .auth-form {
+  padding: 1.1rem 2.5rem 2rem;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 0.3rem 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--warm-border);
+}
+
+.auth-secondary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.auth-secondary-card {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid #f0e5cf;
+  border-radius: 14px;
+  background: var(--warm-bg);
+  text-decoration: none;
+  color: var(--primary);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.auth-secondary-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--primary);
+}
+
+.auth-secondary-card strong {
+  font-size: 0.95rem;
+}
+
+.auth-secondary-card span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.auth-options {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+
+.auth-options a {
+  font-size: 0.92rem;
+}
+
+@media (max-width: 640px) {
+  .auth-hero {
+    margin-inline: 1.6rem;
+  }
+
+  .auth-card--warm .auth-form {
+    padding: 1rem 1.6rem 1.6rem;
+  }
+
+  .auth-secondary-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .auth-card {

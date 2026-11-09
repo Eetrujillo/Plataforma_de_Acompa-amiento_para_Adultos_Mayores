@@ -98,6 +98,10 @@ export function LoginForm() {
         required
       />
 
+      <p className="auth-options">
+        <Link to="/recuperar-contrasena">¿Olvidaste tu contraseña?</Link>
+      </p>
+
       <button className="btn-primary" type="submit" disabled={submitting || isLockedForEmail}>
         {submitting
           ? 'Ingresando…'
@@ -106,13 +110,18 @@ export function LoginForm() {
             : 'Iniciar sesión'}
       </button>
 
-      <p className="auth-switch">
-        <Link to="/recuperar-contrasena">¿Olvidaste tu contraseña?</Link>
-      </p>
+      <p className="auth-divider" aria-hidden="true">o</p>
 
-      <p className="auth-switch">
-        ¿Aún no tienes cuenta? <Link to="/register">Regístrate</Link>
-      </p>
+      <div className="auth-secondary-actions">
+        <Link className="auth-secondary-card" to="/register">
+          <strong>Crear una cuenta</strong>
+          <span>Para familiares y cuidadores</span>
+        </Link>
+        <Link className="auth-secondary-card" to="/register">
+          <strong>Soy adulto mayor</strong>
+          <span>Ingresar con código de vinculación</span>
+        </Link>
+      </div>
     </form>
   );
 }
