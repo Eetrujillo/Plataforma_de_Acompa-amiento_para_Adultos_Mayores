@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Dirección 3: Ingreso guiado, letra grande</title>
+<style>
+  :root {
+    --bg: #eef3fa; --surface: #ffffff; --text: #101820; --muted: #33414f;
+    --primary: #0d3f7a; --primary-hover: #082b55; --border: #5b6b7d;
+    --success-bg: #e9f7ef; --success-text: #1e6b3a;
+    --focus: #b45309; --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 2rem 1rem;
+    font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 20px; line-height: 1.6; color: var(--text);
+    background:
+      radial-gradient(circle at top left, #e2edfb 0, transparent 45%),
+      radial-gradient(circle at bottom right, #e8f3ea 0, transparent 40%),
+      var(--bg);
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  .shell { width: min(680px, 100%); display: grid; gap: 1.25rem; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .logo { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.1rem; color: var(--primary); }
+  .logo-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--primary); color: #fff; font-size: 1.4rem; }
+  .a11y-tools { display: flex; gap: 0.5rem; }
+  .a11y-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    min-height: 56px; min-width: 56px; padding: 0.4rem 0.8rem;
+    border: 3px solid var(--border); border-radius: 12px; background: var(--surface);
+    color: var(--primary); font: inherit; font-size: 0.95rem; font-weight: 800; cursor: pointer;
+  }
+  .a11y-btn:hover { background: #e6effc; }
+  .a11y-btn[aria-pressed="true"] { border-color: var(--primary); background: #e6effc; }
+
+  .steps { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.25rem; }
+  .step { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 0.95rem; color: var(--muted); }
+  .step .num {
+    display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px;
+    border: 3px solid var(--border); background: var(--surface); color: var(--muted); font-size: 1rem;
+  }
+  .step.current { color: var(--primary); }
+  .step.current .num { border-color: var(--primary); background: var(--primary); color: #fff; }
+  .step.done .num { border-color: var(--success-text); background: var(--success-bg); color: var(--success-text); }
+  .step-line { flex: 1; height: 3px; border-radius: 3px; background: #cdd9ea; }
+
+  .card {
+    display: grid; gap: 1.25rem; padding: 2rem;
+    border: 3px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); box-shadow: 0 12px 32px rgba(16, 24, 32, 0.12);
+  }
+  .card h1 { margin: 0; font-size: 2rem; line-height: 1.2; color: var(--primary); }
+  .card .lead { margin: 0; color: var(--muted); font-size: 1rem; }
+
+  .field { display: flex; flex-direction: column; gap: 0.5rem; }
+  .field label { font-weight: 800; font-size: 1.05rem; }
+  .field input {
+    min-height: 72px; padding: 0.8rem 1rem; border: 3px solid var(--border); border-radius: 14px;
+    font: inherit; font-size: 1.25rem; font-weight: 600; color: var(--text); background: #ffffff;
+  }
+  .field input:focus { outline: 4px solid var(--focus); outline-offset: 2px; border-color: var(--primary); }
+  .field .help { color: var(--muted); font-size: 0.95rem; }
+
+  .why { display: flex; gap: 0.9rem; align-items: flex-start; padding: 1rem 1.1rem; border: 2px solid #cdd9ea; border-radius: 14px; background: #f7faff; }
+  .why .emoji { font-size: 1.8rem; line-height: 1; }
+  .why p { margin: 0; font-size: 0.95rem; color: var(--muted); }
+
+  .actions { display: grid; gap: 0.75rem; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem;
+    min-height: 72px; padding: 0.8rem 1.2rem; border-radius: 14px; border: 3px solid transparent;
+    font: inherit; font-size: 1.1rem; font-weight: 800; text-decoration: none; cursor: pointer;
+  }
+  .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+  .btn-secondary { background: #ffffff; border-color: var(--primary); color: var(--primary); }
+  .btn-secondary:hover { background: #e6effc; }
+  a:focus-visible, .btn:focus-visible, input:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+
+  .footnote { margin: 0; text-align: center; color: var(--muted); font-size: 0.95rem; }
+  .footnote a { color: var(--primary); font-weight: 800; text-decoration-thickness: 3px; text-underline-offset: 3px; }
+
+  @media (max-width: 640px) {
+    .card { padding: 1.3rem; }
+    .topbar { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <div class="logo"><span class="logo-mark" aria-hidden="true">🤝</span> Acompaños</div>
+      <div class="a11y-tools">
+        <button class="a11y-btn" aria-pressed="true" title="Aumentar tamaño de letra">Aa<span aria-hidden="true">＋</span></button>
+        <button class="a11y-btn" aria-pressed="false" title="Alto contraste">◐</button>
+      </div>
+    </div>
+
+    <nav class="steps" aria-label="Progreso del ingreso">
+      <span class="step current"><span class="num" aria-hidden="true">1</span> Correo</span>
+      <span class="step-line" aria-hidden="true"></span>
+      <span class="step"><span class="num" aria-hidden="true">2</span> Contraseña</span>
+      <span class="step-line" aria-hidden="true"></span>
+      <span class="step"><span class="num" aria-hidden="true">3</span> Listo</span>
+    </nav>
+
+    <section class="card" aria-labelledby="login-title">
+      <h1 id="login-title">Iniciar sesión</h1>
+      <p class="lead">Paso 1 de 2 · Escribí el correo de tu cuenta.</p>
+
+      <form novalidate>
+        <div class="field">
+          <label for="email">Correo electrónico</label>
+          <input id="email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="maria.lopez@correo.com">
+          <span class="help">Revisá que esté bien escrito, sin espacios.</span>
+        </div>
+
+        <div class="why" style="margin-top:1.25rem">
+          <span class="emoji" aria-hidden="true">💡</span>
+          <p>Usamos el correo para enviarte avisos de las actividades de tus adultos mayores.</p>
+        </div>
+
+        <div class="actions" style="margin-top:1.25rem">
+          <button class="btn btn-primary" type="submit">Continuar →</button>
+          <a class="btn btn-secondary" href="#">Ya tengo una cuenta, volver</a>
+        </div>
+      </form>
+    </section>
+
+    <p class="footnote">¿Problemas para ingresar? <a href="#">Recuperá tu contraseña</a></p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design System — Plataforma Adultos Mayores</title>
+<style>
+  :root {
+    --bg: #eef3fa;
+    --surface: #ffffff;
+    --text: #1b2430;
+    --muted: #566274;
+    --primary: #1f4e8c;
+    --primary-hover: #163a69;
+    --border: #b9c6d8;
+    --error-bg: #fdecec;
+    --error-text: #8a1c1c;
+    --success-bg: #e9f7ef;
+    --success-text: #1e6b3a;
+    --info-bg: #eaf2fd;
+    --info-text: #1f4e8c;
+    --warning-bg: #fff8e8;
+    --warning-text: #5c4308;
+    --focus: #d97706;
+    --radius: 16px;
+    --shadow: 0 20px 50px rgba(20, 42, 74, 0.14);
+    --senior-primary: #0d3f7a;
+    --senior-border: #5b6b7d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--text);
+    background:
+      radial-gradient(circle at top left, #e2edfb 0, transparent 45%),
+      radial-gradient(circle at bottom right, #e8f3ea 0, transparent 40%),
+      var(--bg);
+  }
+  .wrap { width: min(1100px, 100%); margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+  h1 { font-size: 1.9rem; color: var(--primary); margin: 0 0 0.25rem; }
+  .sub { color: var(--muted); margin: 0 0 2.5rem; }
+  h2 { font-size: 1.25rem; color: var(--primary); margin: 2.5rem 0 1rem; border-bottom: 1px solid #e3e9f2; padding-bottom: 0.5rem; }
+  code { background: #eaf2fd; color: #1f4e8c; padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.85em; }
+
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+  .swatch { background: var(--surface); border: 1px solid rgba(185,198,216,.45); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(20,42,74,.08); }
+  .swatch .chip { height: 64px; }
+  .swatch .meta { padding: 0.6rem 0.8rem; font-size: 0.8rem; }
+  .swatch .meta strong { display: block; font-size: 0.85rem; }
+
+  .type-scale { display: grid; gap: 0.75rem; }
+  .type-row { background: var(--surface); border: 1px solid rgba(185,198,216,.45); border-radius: 12px; padding: 0.9rem 1.2rem; display: flex; align-items: baseline; gap: 1.2rem; }
+
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+  .card { background: var(--surface); border: 1px solid rgba(185,198,216,.45); border-radius: var(--radius); box-shadow: var(--shadow); padding: 2rem; }
+  .card h3 { margin: 0 0 0.75rem; color: var(--primary); font-size: 1.15rem; }
+
+  .btn-primary, .btn-secondary, .btn-danger {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 52px; border-radius: 10px; padding: 0.75rem 1.25rem;
+    font: inherit; font-size: 1.02rem; font-weight: 700; cursor: pointer;
+    border: 2px solid var(--primary); transition: background .15s ease;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+  .btn-secondary { background: transparent; color: var(--primary); }
+  .btn-secondary:hover { background: rgba(31,78,140,.08); }
+  .btn-danger { border-color: #a12222; background: #a12222; color: #fff; }
+  .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+
+  .form-field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+  .form-field label { font-weight: 700; font-size: 0.95rem; }
+  .form-field input {
+    min-height: 52px; padding: 0.75rem 0.9rem; border: 2px solid var(--border);
+    border-radius: 10px; font: inherit; color: var(--text); background: #fbfdff;
+  }
+  .form-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(31,78,140,.16); outline: none; }
+  .form-field input[aria-invalid="true"] { border-color: var(--error-text); background: #fffafa; }
+  .form-hint { color: var(--muted); font-size: 0.85rem; }
+  .form-error { color: var(--error-text); font-size: 0.88rem; font-weight: 600; }
+
+  .notification { border-radius: 10px; padding: 0.85rem 1rem; font-size: 0.95rem; font-weight: 600; border: 1px solid transparent; margin-bottom: 0.6rem; }
+  .n-error { background: var(--error-bg); color: var(--error-text); border-color: #efb4b4; }
+  .n-success { background: var(--success-bg); color: var(--success-text); border-color: #a9d9bc; }
+  .n-info { background: var(--info-bg); color: var(--info-text); border-color: #b9d3f0; }
+  .n-warning { background: var(--warning-bg); color: var(--warning-text); border-color: #e8c37a; }
+
+  .status-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+  .status { display: inline-flex; align-items: center; padding: 0.15rem 0.75rem; border: 2px solid; border-radius: 999px; font-size: 0.95rem; font-weight: 700; }
+  .st-pending { border-color: #8a6d1f; background: #fff6dc; color: #4a3600; }
+  .st-completed { border-color: #1f6f43; background: #e6f6ec; color: #14532d; }
+  .st-expired { border-color: #9b2c2c; background: #fdeaea; color: #7f1d1d; }
+
+  .senior-strip { background: var(--senior-primary); color: #fff; border-radius: 12px; padding: 1rem 1.2rem; font-weight: 700; font-size: 20px; }
+  .senior-note { color: var(--muted); font-size: 0.9rem; }
+  :focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Design System</h1>
+  <p class="sub">Plataforma de Acompañamiento para Adultos Mayores — tokens extraídos de <code>frontend/src/styles/globals.css</code></p>
+
+  <h2>Colores</h2>
+  <div class="swatches">
+    <div class="swatch"><div class="chip" style="background:#1f4e8c"></div><div class="meta"><strong>primary</strong>#1f4e8c</div></div>
+    <div class="swatch"><div class="chip" style="background:#163a69"></div><div class="meta"><strong>primary-hover</strong>#163a69</div></div>
+    <div class="swatch"><div class="chip" style="background:#eef3fa"></div><div class="meta"><strong>bg</strong>#eef3fa</div></div>
+    <div class="swatch"><div class="chip" style="background:#ffffff;border-bottom:1px solid #e3e9f2"></div><div class="meta"><strong>surface</strong>#ffffff</div></div>
+    <div class="swatch"><div class="chip" style="background:#1b2430"></div><div class="meta"><strong>text</strong>#1b2430</div></div>
+    <div class="swatch"><div class="chip" style="background:#566274"></div><div class="meta"><strong>muted</strong>#566274</div></div>
+    <div class="swatch"><div class="chip" style="background:#b9c6d8"></div><div class="meta"><strong>border</strong>#b9c6d8</div></div>
+    <div class="swatch"><div class="chip" style="background:#d97706"></div><div class="meta"><strong>focus</strong>#d97706</div></div>
+    <div class="swatch"><div class="chip" style="background:#fdecec"></div><div class="meta"><strong>error-bg</strong>#fdecec</div></div>
+    <div class="swatch"><div class="chip" style="background:#8a1c1c"></div><div class="meta"><strong>error-text</strong>#8a1c1c</div></div>
+    <div class="swatch"><div class="chip" style="background:#e9f7ef"></div><div class="meta"><strong>success-bg</strong>#e9f7ef</div></div>
+    <div class="swatch"><div class="chip" style="background:#1e6b3a"></div><div class="meta"><strong>success-text</strong>#1e6b3a</div></div>
+    <div class="swatch"><div class="chip" style="background:#eaf2fd"></div><div class="meta"><strong>info-bg</strong>#eaf2fd</div></div>
+    <div class="swatch"><div class="chip" style="background:#fff8e8"></div><div class="meta"><strong>warning-bg</strong>#fff8e8</div></div>
+    <div class="swatch"><div class="chip" style="background:#5c4308"></div><div class="meta"><strong>warning-text</strong>#5c4308</div></div>
+    <div class="swatch"><div class="chip" style="background:#0d3f7a"></div><div class="meta"><strong>senior-primary</strong>#0d3f7a</div></div>
+  </div>
+
+  <h2>Tipografía — Segoe UI, base 18px</h2>
+  <div class="type-scale">
+    <div class="type-row"><span style="font-size:1.9rem;font-weight:700;color:var(--primary)">H1 · 1.9rem</span><span style="color:var(--muted)">títulos de página, color primario</span></div>
+    <div class="type-row"><span style="font-size:1.25rem;font-weight:700;color:var(--primary)">H2 · 1.25rem</span><span style="color:var(--muted)">secciones de tarjeta</span></div>
+    <div class="type-row"><span style="font-size:1rem">Cuerpo · 1rem</span><span style="color:var(--muted)">line-height 1.55</span></div>
+    <div class="type-row"><span style="font-size:0.8rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">EYEBROW · 0.8rem</span><span style="color:var(--muted)">etiquetas de formulario auth</span></div>
+  </div>
+
+  <h2>Botones — 52px de alto, radio 10px, borde 2px</h2>
+  <div class="card">
+    <div class="btn-row">
+      <button class="btn-primary">Guardar cambios</button>
+      <button class="btn-secondary">Ver detalle</button>
+      <button class="btn-danger">Eliminar</button>
+      <span style="color:var(--muted)">Los botones del panel senior miden 64px</span>
+    </div>
+  </div>
+
+  <h2>Formularios</h2>
+  <div class="card">
+    <div class="form-field">
+      <label for="demo-mail">Correo electrónico</label>
+      <input id="demo-mail" type="email" placeholder="tu@correo.com">
+      <span class="form-hint">Usamos tu correo solo para la verificación de cuenta.</span>
+    </div>
+    <div class="form-field">
+      <label for="demo-name">Nombre completo</label>
+      <input id="demo-name" aria-invalid="true" value="">
+      <span class="form-error">El nombre es obligatorio.</span>
+    </div>
+  </div>
+
+  <h2>Notificaciones</h2>
+  <div class="card">
+    <div class="notification n-error">No pudimos conectar con el servidor. Reintentá en unos segundos.</div>
+    <div class="notification n-success">Actividad creada correctamente.</div>
+    <div class="notification n-info">Se envió el código de vinculación a tu familiar.</div>
+    <div class="notification n-warning">El código vence en 10 minutos.</div>
+  </div>
+
+  <h2>Estados de actividad (chips)</h2>
+  <div class="card">
+    <div class="status-row">
+      <span class="status st-pending">Pendiente</span>
+      <span class="status st-completed">Completada</span>
+      <span class="status st-expired">Expirada</span>
+    </div>
+  </div>
+
+  <h2>Tarjeta y tema senior</h2>
+  <div class="demo-grid">
+    <div class="card">
+      <h3>Actividad de hoy</h3>
+      <p style="margin:0 0 0.75rem;color:var(--muted)">Tarjeta estándar: superficie blanca, borde suave, radio 16px y sombra grande.</p>
+      <span class="status st-pending">Pendiente</span>
+    </div>
+    <div class="card">
+      <h3>Vista del adulto mayor</h3>
+      <p class="senior-note" style="margin:0 0 1rem">Rutas <code>/app</code>: base 20px, alto contraste, bordes de 3px y botones de 64px.</p>
+      <div class="senior-strip">Tomar medicación · 9:00</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

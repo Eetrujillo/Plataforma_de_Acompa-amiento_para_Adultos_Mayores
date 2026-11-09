@@ -5,6 +5,7 @@ import { listLinkedSeniors } from '../../features/pairing/application/pairingApi
 import { PairingQrPanel } from '../../features/pairing/ui/PairingQrPanel.jsx';
 import { SeniorProfilePanel } from '../../features/seniors/ui/caregiver/SeniorProfilePanel.jsx';
 import { ActivityComposer } from '../../features/activities/ui/caregiver/ActivityComposer.jsx';
+import { SeniorOverviewCards } from '../../features/activities/ui/caregiver/SeniorOverviewCards.jsx';
 import { SosAlertPanel } from '../../features/sos_emergency/ui/caregiver/SosAlertPanel.jsx';
 import { PageShell } from '../../shared/components/PageShell.jsx';
 import { PrimaryButton } from '../../shared/components/PrimaryButton.jsx';
@@ -57,26 +58,7 @@ export function DashboardPage() {
 
         {seniors.length === 0 ? (
           <p> Todavía no hay nadie vinculado. Generá el QR y escaneálo desde el teléfono del adulto mayor.</p>
-        ) : (
-          <div className="field">
-            <label className="field__label" htmlFor="seniorId">
-              Adulto mayor
-            </label>
-            <select
-              className="field__input"
-              id="seniorId"
-              name="seniorId"
-              value={selectedSeniorId}
-              onChange={(event) => setSelectedSeniorId(event.target.value)}
-            >
-              {seniors.map((senior) => (
-                <option key={senior.id} value={senior.id}>
-                  {senior.fullName}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        ) : null}
 
         <p>
           <PrimaryButton variant="secondary" onClick={loadSeniors}>
@@ -85,7 +67,19 @@ export function DashboardPage() {
         </p>
       </section>
 
-      {selectedSeniorId ? <ActivityComposer seniorId={selectedSeniorId} /> : null}
+      <SeniorOverviewCards seniors={seniors} />
+
+      <section className="card">
+        <h2 className="card__title">Nueva actividad</h2>
+
+        {seniors.length > 0 && !selectedSeniorId ? (
+          <p className="card__hint">Elegí para quién es la actividad usando la lista de arriba.</p>
+        ) : null}
+
+        {selectedSeniorId ? (
+          <ActivityComposer seniorId={selectedSeniorId} />
+        ) : null}
+      </section>
     </PageShell>
   );
 }

@@ -1,0 +1,9 @@
+{
+  "title": "Login V2",
+  "brief": "Segunda ronda de direcciones para la ruta /login de prod (LoginScreen.jsx). Todas integran la imagen de abuelitos y los tokens cálidos (crema #fbeed7, dorado #f2b134) con la paleta petróleo de prod (#0f3d5c, acento #1f7a8c) y su login con Google real.",
+  "artboards": [
+    { "file": "01-escena-dividida.html", "title": "Pantalla dividida con escena", "tradeoff": "Propuesta de valor completa con branding fuerte a pantalla completa; en móvil la escena se comprime y los puntos desaparecen", "width": 1440, "height": 900 },
+    { "file": "02-tarjeta-escena.html", "title": "Tarjeta cálida con escena superior", "tradeoff": "Evolución directa del login implementado (misma estructura BEM, agrega Google visible); menos diferenciación frente a otros productos", "width": 1440, "height": 900 },
+    { "file": "03-paso-a-paso.html", "title": "Ingreso paso a paso (paso 2)", "tradeoff": "Segunda pantalla del flujo guiado: menos campos por vista y confirmación de identidad; agrega un paso al flujo y necesita estado entre pantallas", "width": 1440, "height": 900 }
+  ]
+}
