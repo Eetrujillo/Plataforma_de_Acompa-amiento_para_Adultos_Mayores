@@ -11,14 +11,14 @@
   --color-success: #1e6b3a;
   --color-border: #c8d6e0;
   --color-accent-strong: #17616f;
-  --color-login-sky: #dff0fb;
-  --color-login-sky-soft: #eef7fd;
+  --color-login-sky: #fbeed7;
+  --color-login-sky-soft: #fdf6e9;
   --color-login-heading: #123a5a;
   --color-login-muted: #5f7486;
-  --color-login-field-bg: #f8fbfd;
-  --color-login-field-border: #dfe8ef;
+  --color-login-field-bg: #fdfcf9;
+  --color-login-field-border: #ece2cf;
   --color-login-leaf: #bfe0ea;
-  --color-login-heart: #e0576b;
+  --color-login-heart: #f2b134;
   --color-login-skin: #f3c9a8;
   --color-login-hair: #d7dbe0;
   --color-login-glasses: #4a3b2f;
@@ -384,10 +384,13 @@ select {
   overflow: hidden;
 }
 
-.login__illustration-svg {
+.login__illustration-image {
   display: block;
   width: 100%;
+  max-width: 22rem;
   height: auto;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
 }
 
 .login__title {
