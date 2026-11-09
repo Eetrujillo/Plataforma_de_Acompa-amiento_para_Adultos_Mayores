@@ -8,7 +8,6 @@ import {
   resendVerificationRequest
 } from '../application/authApi.js';
 import { GoogleSignInButton } from './GoogleSignInButton.jsx';
-import { LoginIllustration } from './LoginIllustration.jsx';
 import { PrimaryButton } from '../../../shared/components/PrimaryButton.jsx';
 
 function PersonIcon() {
@@ -179,16 +178,48 @@ export function LoginScreen() {
   const needsVerification = error?.code === 'EMAIL_NOT_VERIFIED';
 
   return (
-    <main className="login">
-      <section className="login__card">
-        <div className="login__illustration">
-          <LoginIllustration />
+    <main className="login login--split">
+      <aside className="login__scene">
+        <p className="login__scene-brand">
+          <svg width="40" height="40" viewBox="0 0 512 512" role="img" aria-label="GAP">
+            <rect width="512" height="512" rx="96" fill="#ffffff" />
+            <circle cx="256" cy="168" r="62" fill="#0f3d5c" />
+            <path d="M256 250c-74 0-134 60-134 134v28h268v-28c0-74-60-134-134-134z" fill="#0f3d5c" />
+            <path d="M366 118c-22 0-40 18-40 40 0 30 40 62 40 62s40-32 40-62c0-22-18-40-40-40z" fill="#f2b134" />
+          </svg>
+          GAP · Acompañamiento
+        </p>
+
+        <div className="login__scene-body">
+          <h2 className="login__scene-title">Acompañá a quien más querés, todos los días.</h2>
+          <p className="login__scene-text">
+            Medicamentos, rutinas y emergencias de tus adultos mayores, en un solo lugar y en tiempo real.
+          </p>
+          <ul className="login__scene-points">
+            <li><span className="login__scene-point-icon" aria-hidden="true">🧩</span> Creá rutinas con horarios y repetición</li>
+            <li><span className="login__scene-point-icon" aria-hidden="true">📱</span> Vinculá por QR el teléfono del adulto mayor</li>
+            <li><span className="login__scene-point-icon" aria-hidden="true">🚨</span> Recibí alertas SOS al instante</li>
+          </ul>
         </div>
 
-        <h1 className="login__title">Cuidamos tu bienestar</h1>
-        <p className="login__subtitle">
-          Seguimiento, medicamentos y acompañamiento, en un solo lugar.
-        </p>
+        <img
+          className="login__scene-photo"
+          src="/abuelitos-abrazados.jpeg"
+          alt=""
+          width="340"
+          height="240"
+          loading="eager"
+        />
+
+        <p className="login__scene-foot">Plataforma de acompañamiento para adultos mayores</p>
+      </aside>
+
+      <section className="login__pane">
+        <section className="login__card">
+          <h1 className="login__title">Cuidamos tu bienestar</h1>
+          <p className="login__subtitle">
+            Seguimiento, medicamentos y acompañamiento, en un solo lugar.
+          </p>
 
         {error ? (
           <p className="alert alert--error" role="alert">
@@ -316,6 +347,7 @@ export function LoginScreen() {
         <p className="login__footer">
           ¿No tienes una cuenta? <Link to="/register">Registrate</Link>
         </p>
+        </section>
       </section>
     </main>
   );

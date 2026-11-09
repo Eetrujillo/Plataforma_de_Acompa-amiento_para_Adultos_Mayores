@@ -511,6 +511,142 @@ select {
   );
 }
 
+/* --- Login V2: pantalla dividida con escena de marca --- */
+
+.login--split {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  padding: 0;
+  background: var(--color-bg);
+}
+
+.login__scene {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 2.5rem 3rem 2.5rem;
+  overflow: hidden;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 80% 12%, rgba(242, 177, 52, 0.35) 0, transparent 35%),
+    radial-gradient(circle at 15% 85%, rgba(31, 122, 140, 0.4) 0, transparent 45%),
+    linear-gradient(160deg, var(--color-primary) 0%, var(--color-primary-strong) 100%);
+}
+
+.login__scene-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.login__scene-brand img {
+  display: block;
+  border-radius: 10px;
+}
+
+.login__scene-title {
+  margin: 0 0 0.6rem;
+  font-size: 2.1rem;
+  line-height: 1.15;
+  max-width: 18ch;
+  color: #ffffff;
+}
+
+.login__scene-text {
+  margin: 0 0 1.5rem;
+  max-width: 40ch;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.login__scene-points {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.login__scene-points li {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-weight: 600;
+}
+
+.login__scene-point-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  font-size: 1.3rem;
+  flex: 0 0 auto;
+}
+
+.login__scene-photo {
+  align-self: flex-end;
+  width: min(340px, 55%);
+  height: auto;
+  border-radius: var(--radius-xl) 0 0 0;
+  box-shadow: -20px -10px 40px rgba(0, 0, 0, 0.25);
+}
+
+.login__scene-foot {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.login__pane {
+  display: grid;
+  place-items: center;
+  padding: 2.5rem 1.5rem;
+}
+
+.login__pane .login__card {
+  width: min(440px, 100%);
+  padding: 2.2rem 2rem;
+}
+
+@media (max-width: 55rem) {
+  .login--split {
+    grid-template-columns: 1fr;
+  }
+
+  .login__scene {
+    padding: 2rem 1.5rem;
+    gap: 1rem;
+  }
+
+  .login__scene-title {
+    font-size: 1.6rem;
+  }
+
+  .login__scene-points {
+    display: none;
+  }
+
+  .login__scene-photo {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login__scene,
+  .login__pane,
+  .login__card {
+    transition: none;
+    animation: none;
+  }
+}
+
 .login__card {
   width: 100%;
   max-width: 27rem;
