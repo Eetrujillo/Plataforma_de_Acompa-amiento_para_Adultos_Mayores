@@ -1,0 +1,9 @@
+{
+  "title": "Login",
+  "brief": "Rediseño de la ruta /login de la plataforma de acompañamiento para adultos mayores. Contenido real: eyebrow \"Bienvenido de nuevo\", título \"Iniciar sesión\", campos Correo electrónico y Contraseña, botón \"Iniciar sesión\", enlaces \"¿Olvidaste tu contraseña?\" y \"Regístrate\", con aviso de bloqueo temporal por reintentos. Audiencia: familiares/cuidadores.",
+  "artboards": [
+    { "file": "01-split-marca.html", "title": "Split de marca", "tradeoff": "Contexto emocional y propuestas de valor fuertes a la izquierda; en pantallas angostas el panel de marca se reduce y el foco queda solo en el formulario", "width": 1440, "height": 900 },
+    { "file": "02-centrada-refinada.html", "title": "Tarjeta centrada refinada (cálida)", "tradeoff": "Evolución cálida del diseño actual: ilustración 3D de abuelitos abrazados (imagen provista por el usuario, incrustada en base64), tonos crema y dorado de marca; mantiene simplicidad y accesibilidad, con menor diferenciación estructural", "width": 1440, "height": 900 },
+    { "file": "03-guiado-letra-grande.html", "title": "Ingreso guiado, letra grande", "tradeoff": "Más amigable para usuarios con baja alfabetización digital (pasos numerados, base 20px, botones de 72px, controles de accesibilidad); agrega un paso a un flujo que hoy es de una sola pantalla", "width": 1440, "height": 900 }
+  ]
+}

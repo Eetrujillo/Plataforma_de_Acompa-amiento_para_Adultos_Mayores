@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login V2 — Dirección 3: Ingreso paso a paso</title>
+<style>
+  :root {
+    --bg: #f4f7fa; --surface: #ffffff; --ink: #10202b; --ink-soft: #3d5262;
+    --primary: #0f3d5c; --primary-strong: #0a2b42; --accent: #1f7a8c;
+    --warm: #fbeed7; --warm-soft: #fdf6e9; --gold: #f2b134;
+    --danger: #b3261e; --success: #1e6b3a; --border: #c8d6e0;
+    --radius-md: 12px; --radius-lg: 20px; --radius-xl: 28px;
+    --shadow: 0 6px 18px rgba(16, 32, 43, 0.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 2rem 1rem;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 20px; line-height: 1.55; color: var(--ink);
+    background:
+      radial-gradient(circle at 85% 15%, var(--warm) 0, transparent 35%),
+      var(--bg);
+  }
+  .shell { width: min(640px, 100%); display: grid; gap: 1.1rem; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .brand { display: inline-flex; align-items: center; gap: 0.55rem; font-weight: 800; color: var(--primary); }
+  .brand svg { display: block; border-radius: 10px; }
+  .steps { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.9rem; color: var(--ink-soft); }
+  .steps .num { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; border: 2.5px solid var(--border); background: #fff; }
+  .steps .current { color: var(--primary); }
+  .steps .current .num { border-color: var(--primary); background: var(--primary); color: #fff; }
+  .steps .done .num { border-color: var(--success); background: #e9f7ef; color: var(--success); }
+  .steps .line { width: 40px; height: 3px; border-radius: 3px; background: #d5e0ea; }
+
+  .card { background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow); padding: 2rem; border: 1px solid rgba(200,214,224,0.6); display: grid; gap: 1.1rem; }
+  .card h1 { margin: 0; font-size: 1.9rem; color: var(--primary); }
+  .card .lead { margin: 0; color: var(--ink-soft); font-size: 0.98rem; }
+
+  .identity { display: flex; align-items: center; gap: 0.9rem; padding: 0.9rem 1.1rem; border-radius: var(--radius-lg); background: var(--warm-soft); border: 2px solid var(--warm); }
+  .identity .emoji { font-size: 1.7rem; }
+  .identity strong { color: var(--primary); display: block; }
+  .identity span { font-size: 0.88rem; color: var(--ink-soft); }
+  .identity button { margin-left: auto; border: 0; background: transparent; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+  .tips { display: grid; gap: 0.5rem; padding: 1rem 1.1rem; border-radius: var(--radius-lg); background: var(--bg); }
+  .tips p { margin: 0; font-size: 0.9rem; color: var(--ink-soft); display: flex; gap: 0.5rem; align-items: flex-start; }
+
+  .field { display: grid; gap: 0.4rem; }
+  .field label { font-weight: 700; font-size: 0.95rem; }
+  .field .wrap { position: relative; }
+  .field input {
+    width: 100%; min-height: 60px; padding: 0.7rem 3.2rem 0.7rem 1rem;
+    border: 1.5px solid #ece2cf; border-radius: var(--radius-md);
+    background: #fdfcf9; font: inherit; color: var(--ink); font-size: 1.05rem;
+  }
+  .field input:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px rgba(31, 122, 140, 0.15); }
+  .eye { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; padding: 0.4rem; border-radius: 8px; }
+  .eye:hover { background: var(--warm-soft); }
+
+  .btn {
+    min-height: 58px; border-radius: var(--radius-md); border: 2px solid var(--primary);
+    background: var(--primary); color: #fff; font: inherit; font-weight: 800; cursor: pointer;
+  }
+  .btn:hover { background: var(--primary-strong); border-color: var(--primary-strong); }
+  .btn--ghost { background: transparent; color: var(--primary); }
+  .btn--ghost:hover { background: var(--warm-soft); }
+  .actions { display: grid; gap: 0.6rem; }
+  a:focus-visible, .btn:focus-visible, input:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
+  .foot { text-align: center; color: var(--ink-soft); font-size: 0.92rem; margin: 0; }
+  .foot a { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <div class="brand">
+        <svg width="38" height="38" viewBox="0 0 512 512" role="img" aria-label="GAP">
+          <rect width="512" height="512" rx="96" fill="#0f3d5c"/>
+          <circle cx="256" cy="168" r="62" fill="#ffffff"/>
+          <path d="M256 250c-74 0-134 60-134 134v28h268v-28c0-74-60-134-134-134z" fill="#ffffff"/>
+          <path d="M366 118c-22 0-40 18-40 40 0 30 40 62 40 62s40-32 40-62c0-22-18-40-40-40z" fill="#f2b134"/>
+        </svg>
+        GAP
+      </div>
+      <nav class="steps" aria-label="Progreso">
+        <span class="done" aria-label="Paso 1 completado"><span class="num">✓</span></span>
+        <span class="line" aria-hidden="true"></span>
+        <span class="current" aria-label="Paso 2 de 2"><span class="num">2</span></span>
+      </nav>
+    </div>
+
+    <section class="card" aria-labelledby="t">
+      <h1 id="t">Escribí tu contraseña</h1>
+      <p class="lead">Paso 2 de 2 · Verificamos que sos vos.</p>
+
+      <div class="identity">
+        <span class="emoji" aria-hidden="true">👤</span>
+        <div>
+          <strong>maria.lopez@correo.com</strong>
+          <span>Cuenta verificada del cuidador</span>
+        </div>
+        <button type="button">No soy yo</button>
+      </div>
+
+      <form style="display:grid; gap:1.1rem" novalidate>
+        <div class="field">
+          <label for="pass">Contraseña</label>
+          <div class="wrap">
+            <input id="pass" type="password" autocomplete="current-password" placeholder="Tu contraseña" required>
+            <button type="button" class="eye" aria-label="Mostrar contraseña">👁️</button>
+          </div>
+        </div>
+
+        <div class="tips">
+          <p><span aria-hidden="true">💡</span> Podés marcar "Recordarme" en la próxima pantalla si usás un dispositivo propio.</p>
+          <p><span aria-hidden="true">🔒</span> Nunca compartimos tu contraseña con nadie.</p>
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="submit">Iniciar sesión</button>
+          <button class="btn btn--ghost" type="button">Usar otro correo</button>
+        </div>
+      </form>
+    </section>
+
+    <p class="foot">¿Problemas para ingresar? <a href="#">Recuperá tu contraseña</a></p>
+  </main>
+</body>
+</html>
