@@ -10,7 +10,7 @@ export function AppTopbar({ brand = 'Acompaña', links = [], userInitial, onExit
       <div className="topbar__inner">
         <span className="topbar__brand">
           <span className="topbar__brand-mark" aria-hidden="true">❤</span>
-          {brand}
+          <span className="topbar__brand-name">{brand}</span>
         </span>
 
         {links.length > 0 ? (
@@ -21,9 +21,10 @@ export function AppTopbar({ brand = 'Acompaña', links = [], userInitial, onExit
                 className="topbar__link"
                 href={link.href}
                 aria-current={index === 0 ? 'page' : undefined}
+                aria-label={link.label}
               >
                 {link.icon ? <span aria-hidden="true">{link.icon}</span> : null}
-                {link.label}
+                <span className="topbar__link-label">{link.label}</span>
                 {link.badgeCount ? (
                   <span className="topbar__badge">{link.badgeCount}</span>
                 ) : null}
