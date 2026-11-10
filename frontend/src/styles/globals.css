@@ -131,9 +131,10 @@ select {
 
 /* --- Panel del cuidador: tarjetas por persona (rediseño aceptado) --- */
 
+/* Tarjetas por persona: nunca desbordan en pantallas angostas */
 .senior-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 1.5rem;
 }
 
@@ -905,7 +906,7 @@ html {
   max-width: 75rem;
 }
 
-/* Navbar sticky con pestañas */
+/* Navbar sticky con pestañas: compacto y responsivo */
 .topbar {
   position: sticky;
   top: 0;
@@ -918,27 +919,29 @@ html {
 .topbar__inner {
   max-width: 75rem;
   margin: 0 auto;
-  padding: 0.7rem 1rem;
+  padding: 0.45rem 0.9rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .topbar__brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   color: var(--color-primary);
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .topbar__brand-mark {
   display: grid;
   place-items: center;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.9rem;
   border-radius: var(--radius-md);
   background: var(--color-login-sky);
 }
@@ -946,20 +949,22 @@ html {
 .topbar__nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem;
+  gap: 0.1rem;
   margin: 0 auto;
 }
 
 .topbar__link {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.6rem 0.9rem;
+  gap: 0.35rem;
+  min-height: 44px;
+  padding: 0.35rem 0.65rem;
   border-radius: var(--radius-md);
   color: var(--color-ink-soft);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .topbar__link:hover {
@@ -975,39 +980,41 @@ html {
 .topbar__badge {
   background: var(--color-danger);
   color: #ffffff;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   border-radius: 999px;
-  padding: 0.05rem 0.45rem;
+  padding: 0.05rem 0.4rem;
 }
 
 .topbar__user {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   margin-left: auto;
 }
 
 .topbar__avatar {
   display: grid;
   place-items: center;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 999px;
   background: var(--color-login-heart);
   color: #ffffff;
+  font-size: 0.9rem;
   font-weight: 700;
 }
 
 .topbar__exit {
+  min-height: 44px;
   border: 2px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-ink-soft);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   border-radius: var(--radius-md);
-  padding: 0.5rem 0.9rem;
+  padding: 0.3rem 0.75rem;
   cursor: pointer;
 }
 
@@ -1021,9 +1028,9 @@ html {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1.2rem;
+  gap: 1rem;
   margin-bottom: 1.5rem;
-  padding: 1.6rem 1.8rem;
+  padding: 1.3rem 1.5rem;
   border: 1px solid #f0e4c8;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
@@ -1053,13 +1060,14 @@ html {
 .lobby-hero__stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8rem;
+  gap: 0.7rem;
   margin-left: auto;
 }
 
 .stat {
-  min-width: 9rem;
-  padding: 0.9rem 1.2rem;
+  flex: 1 1 7.5rem;
+  min-width: 0;
+  padding: 0.75rem 1rem;
   border: 1px solid #f0e4c8;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
@@ -1069,7 +1077,7 @@ html {
 .stat__value {
   margin: 0;
   color: var(--color-login-heading);
-  font-size: 1.7rem;
+  font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.1;
 }
@@ -1198,15 +1206,71 @@ html {
   .lobby-panels {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 48rem) {
+  .lobby-hero {
+    padding: 1.1rem 1.2rem;
+  }
+
+  .lobby-hero__title {
+    font-size: 1.5rem;
+  }
 
   .lobby-hero__stats {
+    width: 100%;
     margin-left: 0;
   }
 
+  /* Pestañas en una sola fila desplazable, sin scrollbar visible */
   .topbar__nav {
     order: 3;
     width: 100%;
-    overflow-x: auto;
     flex-wrap: nowrap;
+    margin: 0;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scrollbar-width: none;
+  }
+
+  .topbar__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar__link {
+    flex: 0 0 auto;
+  }
+
+  .timeline__item {
+    flex-wrap: wrap;
+    row-gap: 0.2rem;
+  }
+
+  .timeline__label {
+    flex: 1 1 100%;
+  }
+
+  .timeline__item .badge {
+    margin-left: 3.6rem;
+  }
+}
+
+@media (max-width: 30rem) {
+  /* Solo iconos en las pestañas: el nombre completo queda en aria-label */
+  .topbar__link-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .topbar__link {
+    padding: 0.35rem 0.85rem;
+  }
+
+  .topbar__brand-name {
+    display: none;
   }
 }
