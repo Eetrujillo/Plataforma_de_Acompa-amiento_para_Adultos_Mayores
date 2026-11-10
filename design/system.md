@@ -2,6 +2,8 @@
 
 Fuente única: `frontend/src/styles/globals.css` del árbol de prod/dev-kevin alineado (post merge `5ea0426`). Valores tomados tal cual del código; nada inventado. Reemplaza la versión anterior (que documentaba el frontend TSX legacy, hoy eliminado).
 
+Reverificado el 2026-11-11 contra `frontend/src/styles/globals.css` (896 líneas): los 30 tokens de `:root` coinciden 1:1 con esta tabla; sin valores nuevos.
+
 ## Colores
 
 | Token | Valor | Uso | Fuente |

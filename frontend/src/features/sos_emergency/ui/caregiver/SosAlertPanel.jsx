@@ -5,7 +5,7 @@ import { PrimaryButton } from '../../../../shared/components/PrimaryButton.jsx';
 
 const POLL_INTERVAL_MS = 30_000;
 
-export function SosAlertPanel() {
+export function SosAlertPanel({ onActiveCountChange }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,14 +13,17 @@ export function SosAlertPanel() {
 
   const load = useCallback(async () => {
     try {
-      setAlerts(await listActiveAlerts());
+      const active = await listActiveAlerts();
+      setAlerts(active);
+      // Avisa al lobby cuántas alertas quedan activas (badge del navbar y hero).
+      onActiveCountChange?.(active.length);
       setError(null);
     } catch (caught) {
       setError(caught.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onActiveCountChange]);
 
   useEffect(() => {
     load();

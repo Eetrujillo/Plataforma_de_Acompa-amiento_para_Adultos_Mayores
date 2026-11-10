@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lobby 02 — Pestañas superiores</title>
+<style>
+  :root {
+    --color-bg: #f4f7fa;
+    --color-surface: #ffffff;
+    --color-ink: #10202b;
+    --color-ink-soft: #3d5262;
+    --color-primary: #0f3d5c;
+    --color-primary-strong: #0a2b42;
+    --color-accent: #1f7a8c;
+    --color-danger: #b3261e;
+    --color-success: #1e6b3a;
+    --color-border: #c8d6e0;
+    --color-login-sky: #fbeed7;
+    --color-login-sky-soft: #fdf6e9;
+    --color-login-heading: #123a5a;
+    --color-login-muted: #5f7486;
+    --color-login-heart: #f2b134;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+    --shadow-md: 0 6px 18px rgba(16, 32, 43, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-size: 20px;
+    line-height: 1.5;
+  }
+
+  :focus-visible { outline: 4px solid var(--color-accent); outline-offset: 2px; border-radius: 6px; }
+
+  /* ---------- Navbar superior ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: 0 2px 10px rgba(16, 32, 43, 0.06);
+  }
+
+  .topbar__inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .topbar__brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--color-primary); font-size: 1.1rem; }
+  .topbar__brand-mark {
+    width: 42px; height: 42px;
+    border-radius: var(--radius-md);
+    background: var(--color-login-sky);
+    display: grid; place-items: center;
+    font-size: 1.3rem;
+  }
+
+  .topbar__nav { display: flex; gap: 4px; margin: 0 auto; }
+
+  .topbar__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: var(--color-ink-soft);
+    font-size: 0.98rem;
+    font-weight: 600;
+    transition: background 160ms ease, color 160ms ease;
+  }
+
+  .topbar__link:hover { background: var(--color-login-sky-soft); color: var(--color-login-heading); }
+  .topbar__link[aria-current="page"] { background: var(--color-primary); color: #ffffff; }
+
+  .topbar__badge {
+    background: var(--color-danger);
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+
+  .topbar__user { display: flex; align-items: center; gap: 12px; }
+  .topbar__avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--color-login-heart);
+    color: #ffffff;
+    display: grid; place-items: center;
+    font-weight: 700;
+  }
+  .topbar__exit {
+    text-decoration: none;
+    color: var(--color-ink-soft);
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--color-border);
+  }
+  .topbar__exit:hover { border-color: var(--color-login-heart); background: var(--color-login-sky-soft); }
+
+  /* ---------- Hero de bienvenida ---------- */
+  .hero {
+    background: linear-gradient(160deg, var(--color-login-sky) 0%, var(--color-login-sky-soft) 70%);
+    border-bottom: 1px solid #f0e4c8;
+    padding: 40px 32px 44px;
+  }
+
+  .hero__inner { max-width: 1200px; margin: 0 auto; display: flex; gap: 32px; align-items: center; flex-wrap: wrap; }
+
+  .hero__eyebrow { color: var(--color-login-muted); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.78rem; margin-bottom: 6px; }
+  .hero__title { color: var(--color-login-heading); font-size: 2.1rem; line-height: 1.15; margin-bottom: 8px; }
+  .hero__sub { color: var(--color-ink-soft); max-width: 46ch; }
+
+  .hero__summary { display: flex; gap: 16px; margin-left: auto; flex-wrap: wrap; }
+
+  .stat {
+    background: var(--color-surface);
+    border: 1px solid #f0e4c8;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 18px 24px;
+    min-width: 150px;
+  }
+
+  .stat__value { font-size: 1.9rem; font-weight: 700; color: var(--color-login-heading); line-height: 1.1; }
+  .stat__value--alert { color: var(--color-danger); }
+  .stat__label { color: var(--color-login-muted); font-size: 0.85rem; margin-top: 4px; }
+
+  /* ---------- Contenido ---------- */
+  .content { max-width: 1200px; margin: 0 auto; padding: 40px 32px 90px; }
+
+  .section-title { color: var(--color-login-heading); font-size: 1.3rem; margin-bottom: 18px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 24px; margin-bottom: 44px; }
+
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 24px;
+  }
+
+  .card__head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .card__avatar { width: 58px; height: 58px; border-radius: 50%; background: var(--color-login-sky); display: grid; place-items: center; font-size: 1.6rem; flex-shrink: 0; }
+  .card__name { color: var(--color-login-heading); font-size: 1.15rem; }
+  .card__meta { color: var(--color-login-muted); font-size: 0.88rem; }
+
+  .bar-row { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 12px; font-size: 0.92rem; }
+  .bar-label { color: var(--color-ink-soft); }
+  .bar { height: 14px; background: var(--color-login-sky); border-radius: 999px; overflow: hidden; }
+  .bar__fill { height: 100%; background: var(--color-accent); border-radius: 999px; transition: width 900ms ease; }
+  .bar__fill--ok { background: var(--color-success); }
+  .bar-count { color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
+
+  .next { display: flex; gap: 14px; align-items: center; background: var(--color-login-sky-soft); border: 1px solid #f0e4c8; border-radius: var(--radius-md); padding: 14px 16px; margin-top: 18px; }
+  .next__emoji { font-size: 1.5rem; }
+  .next__title { font-weight: 600; }
+  .next__meta { color: var(--color-login-muted); font-size: 0.85rem; }
+  .card__link { display: inline-block; margin-top: 16px; color: var(--color-accent-strong); font-weight: 600; text-decoration: none; }
+  .card__link:hover { text-decoration: underline; }
+
+  /* ---------- Timeline del día ---------- */
+  .timeline { list-style: none; }
+  .timeline li { display: flex; gap: 16px; padding: 14px 0; border-bottom: 1px dashed var(--color-border); align-items: center; }
+  .timeline li:last-child { border-bottom: none; }
+  .timeline__time { font-variant-numeric: tabular-nums; color: var(--color-ink-soft); min-width: 64px; font-weight: 600; }
+  .timeline__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--color-login-heart); flex-shrink: 0; }
+  .timeline__dot--done { background: var(--color-success); }
+  .timeline__dot--pending { background: var(--color-login-heart); }
+  .timeline__dot--alert { background: var(--color-danger); }
+  .timeline__label { flex: 1; }
+  .timeline__who { color: var(--color-login-muted); font-size: 0.85rem; }
+
+  .status-pill {
+    font-size: 0.78rem; font-weight: 700;
+    border-radius: 999px; padding: 4px 12px;
+  }
+  .status-pill--done { background: #e2f1e7; color: var(--color-success); }
+  .status-pill--pending { background: var(--color-login-sky); color: var(--color-login-heading); }
+  .status-pill--alert { background: #fdeeec; color: var(--color-danger); }
+
+  /* ---------- Animación de revelado ---------- */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity 620ms ease, transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+  .reveal.is-visible { opacity: 1; transform: none; }
+  .reveal[data-delay="1"] { transition-delay: 90ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .bar__fill { transition: none; }
+  }
+
+  @media (max-width: 960px) {
+    .topbar__inner { flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
+    .topbar__nav { order: 3; width: 100%; overflow-x: auto; }
+    .hero__summary { margin-left: 0; }
+    .content { padding: 28px 16px 70px; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="topbar__brand" href="#inicio" style="text-decoration:none">
+        <span class="topbar__brand-mark" aria-hidden="true">❤</span>
+        Acompaña
+      </a>
+
+      <nav class="topbar__nav" aria-label="Navegación principal">
+        <a class="topbar__link" href="#inicio" aria-current="page">🏠 Inicio</a>
+        <a class="topbar__link" href="#rutina">🗓️ Rutina diaria</a>
+        <a class="topbar__link" href="#sos">🚨 Alertas SOS <span class="topbar__badge">1</span></a>
+        <a class="topbar__link" href="#vinculo">🔗 Vínculo QR</a>
+        <a class="topbar__link" href="#perfil">👤 Mi perfil</a>
+      </nav>
+
+      <div class="topbar__user">
+        <span class="topbar__avatar" aria-label="Sesión de Kevin" title="Kevin">K</span>
+        <a class="topbar__exit" href="#salir">Salir</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero" id="inicio">
+    <div class="hero__inner">
+      <div>
+        <p class="hero__eyebrow">Panel del cuidador</p>
+        <h1 class="hero__title">Hola, Kevin 👋</h1>
+        <p class="hero__sub">Martes 11 de noviembre. Todo tranquilo salvo una alerta pendiente de confirmar.</p>
+      </div>
+      <div class="hero__summary">
+        <div class="stat">
+          <p class="stat__value stat__value--alert">1</p>
+          <p class="stat__label">Alerta SOS sin atender</p>
+        </div>
+        <div class="stat">
+          <p class="stat__value">6</p>
+          <p class="stat__label">Actividades de hoy</p>
+        </div>
+        <div class="stat">
+          <p class="stat__value">2</p>
+          <p class="stat__label">Personas a tu cargo</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="content">
+
+    <section aria-label="Personas a tu cargo">
+      <h2 class="section-title">Cómo va hoy cada persona</h2>
+      <div class="cards">
+
+        <article class="card reveal" aria-labelledby="card-rosa">
+          <div class="card__head">
+            <span class="card__avatar" aria-hidden="true">👵</span>
+            <div>
+              <h3 class="card__name" id="card-rosa">Rosa Giménez · 78</h3>
+              <p class="card__meta">Vinculada desde el 3 de octubre</p>
+            </div>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Hoy</span>
+            <span class="bar" role="progressbar" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso de rutina de Rosa">
+              <span class="bar__fill" style="width: 66%"></span>
+            </span>
+            <span class="bar-count">2/3</span>
+          </div>
+          <div class="next">
+            <span class="next__emoji" aria-hidden="true">💊</span>
+            <div>
+              <p class="next__title">Medicación de la tarde</p>
+              <p class="next__meta">Pendiente · 16:00</p>
+            </div>
+          </div>
+          <a class="card__link" href="#rutina">Ver rutina completa →</a>
+        </article>
+
+        <article class="card reveal" data-delay="1" aria-labelledby="card-carlos">
+          <div class="card__head">
+            <span class="card__avatar" aria-hidden="true">👴</span>
+            <div>
+              <h3 class="card__name" id="card-carlos">Carlos Pérez · 82</h3>
+              <p class="card__meta">Vinculado desde el 21 de octubre</p>
+            </div>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Hoy</span>
+            <span class="bar" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso de rutina de Carlos">
+              <span class="bar__fill bar__fill--ok" style="width: 100%"></span>
+            </span>
+            <span class="bar-count">4/4</span>
+          </div>
+          <div class="next">
+            <span class="next__emoji" aria-hidden="true">🎉</span>
+            <div>
+              <p class="next__title">Rutina completa</p>
+              <p class="next__meta">Terminó la última actividad a las 15:20</p>
+            </div>
+          </div>
+          <a class="card__link" href="#rutina">Ver rutina completa →</a>
+        </article>
+
+      </div>
+    </section>
+
+    <div class="panels" style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+
+      <section class="card reveal" id="rutina" aria-labelledby="titulo-timeline">
+        <h2 class="section-title" id="titulo-timeline" style="margin-bottom: 8px;">Línea del día</h2>
+        <p style="color: var(--color-login-muted); font-size: 0.88rem; margin-bottom: 12px;">Lo que pasó hoy en tu red familiar</p>
+        <ul class="timeline">
+          <li>
+            <span class="timeline__time">08:00</span>
+            <span class="timeline__dot timeline__dot--done" aria-hidden="true"></span>
+            <span class="timeline__label">Desayuno <span class="timeline__who">· Carlos</span></span>
+            <span class="status-pill status-pill--done">Completada</span>
+          </li>
+          <li>
+            <span class="timeline__time">09:30</span>
+            <span class="timeline__dot timeline__dot--done" aria-hidden="true"></span>
+            <span class="timeline__label">Medicación matutina <span class="timeline__who">· Rosa</span></span>
+            <span class="status-pill status-pill--done">Completada</span>
+          </li>
+          <li>
+            <span class="timeline__time">10:42</span>
+            <span class="timeline__dot timeline__dot--alert" aria-hidden="true"></span>
+            <span class="timeline__label">Botón SOS presionado <span class="timeline__who">· Rosa</span></span>
+            <span class="status-pill status-pill--alert">Sin confirmar</span>
+          </li>
+          <li>
+            <span class="timeline__time">16:00</span>
+            <span class="timeline__dot timeline__dot--pending" aria-hidden="true"></span>
+            <span class="timeline__label">Medicación de la tarde <span class="timeline__who">· Rosa</span></span>
+            <span class="status-pill status-pill--pending">Pendiente</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="card reveal" data-delay="1" id="vinculo" aria-labelledby="titulo-qr">
+        <h2 class="section-title" id="titulo-qr" style="margin-bottom: 8px;">Vincular a alguien</h2>
+        <p style="color: var(--color-login-muted); font-size: 0.88rem; margin-bottom: 16px;">Generá un QR y escanealo desde el teléfono del adulto mayor</p>
+        <p><button class="btn btn--primary" type="button" style="font:inherit; font-weight:600; border:none; background:var(--color-primary); color:#fff; border-radius:var(--radius-md); padding:12px 22px; cursor:pointer;">Generar nuevo código QR</button></p>
+        <p style="margin-top: 14px; color: var(--color-ink-soft); font-size: 0.9rem;">El código vence a los 10 minutos por seguridad.</p>
+      </section>
+
+    </div>
+  </main>
+
+<script>
+  const revealables = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    revealables.forEach((el) => observer.observe(el));
+  } else {
+    revealables.forEach((el) => el.classList.add('is-visible'));
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "title": "Lobby post-login del cuidador",
+  "brief": "Rediseño del lobby que aparece tras un login exitoso (ruta /caregiver, DashboardPage + PageShell): navbar con las opciones organizadas, contenido relevante primero (alerta SOS y estado diario de las personas a cargo) y secciones que se revelan con animación al desplazarse. Nombres mapeados a archivos existentes del frontend: PageShell.jsx, DashboardPage.jsx, globals.css.",
+  "artboards": [
+    {
+      "file": "01-sidebar-hub.html",
+      "title": "Hub con sidebar",
+      "tradeoff": "Navegación siempre visible y muy organizada; ocupa ancho horizontal y es menos familiar en pantallas chicas",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "02-tabs-superiores.html",
+      "title": "Pestañas superiores",
+      "tradeoff": "Patrón familiar y responsivo con resumen del día en el hero; menos opciones visibles de un vistazo que la sidebar",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-pildora-flotante.html",
+      "title": "Píldora flotante y bento",
+      "tradeoff": "Moderno, cálido y visual (bento con entrada escalonada); la jerarquía depende del tamaño de tarjeta más que de una barra de navegación tradicional",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}

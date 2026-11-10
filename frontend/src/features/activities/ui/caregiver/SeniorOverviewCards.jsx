@@ -1,21 +1,7 @@
 import { useDailyRoutine } from '../../application/useDailyRoutine.js';
-import { describeProgress, isCompleted } from '../../domain/activity.js';
+import { describeProgress, isCompleted, isExpired } from '../../domain/activity.js';
 
-function isExpired(activity) {
-  if (!activity || isCompleted(activity)) {
-    return false;
-  }
-
-  const [hours, minutes] = String(activity.scheduledTime ?? '').split(':').map(Number);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-    return false;
-  }
-
-  const scheduled = new Date();
-  scheduled.setHours(hours, minutes, 0, 0);
-
-  return scheduled.getTime() < Date.now();
-}
+import { useEffect } from 'react';
 
 function RoutineProgress({ routine, loading }) {
   if (loading) {
@@ -66,8 +52,14 @@ function NextActivity({ activities }) {
   );
 }
 
-function SeniorCard({ senior }) {
+function SeniorCard({ senior, onRoutineReport }) {
   const { routine, loading } = useDailyRoutine({ seniorId: senior.id });
+
+  // Reporta la rutina cargada hacia arriba para el resumen del hero y la línea
+  // del día, sin volver a pedir nada al backend.
+  useEffect(() => {
+    onRoutineReport?.(senior, routine);
+  }, [routine, senior, onRoutineReport]);
 
   return (
     <section className="senior-card" aria-labelledby={`senior-card-${senior.id}`}>
@@ -91,7 +83,7 @@ function SeniorCard({ senior }) {
   );
 }
 
-export function SeniorOverviewCards({ seniors }) {
+export function SeniorOverviewCards({ seniors, onRoutineReport }) {
   if (!seniors.length) {
     return null;
   }
@@ -99,7 +91,7 @@ export function SeniorOverviewCards({ seniors }) {
   return (
     <section className="senior-cards" aria-label="Personas a tu cargo">
       {seniors.map((senior) => (
-        <SeniorCard key={senior.id} senior={senior} />
+        <SeniorCard key={senior.id} senior={senior} onRoutineReport={onRoutineReport} />
       ))}
     </section>
   );
