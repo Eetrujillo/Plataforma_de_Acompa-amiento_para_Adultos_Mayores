@@ -921,7 +921,7 @@ html {
   margin: 0 auto;
   padding: 0.45rem 0.9rem;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.5rem;
 }
@@ -930,6 +930,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  flex: 0 0 auto;
   color: var(--color-primary);
   font-size: 0.95rem;
   font-weight: 700;
@@ -946,11 +947,19 @@ html {
   background: var(--color-login-sky);
 }
 
+/* La nav nunca empuja al usuario a otra fila: se contrae y desplaza lateral */
 .topbar__nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.1rem;
-  margin: 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar__nav::-webkit-scrollbar {
+  display: none;
 }
 
 .topbar__link {
@@ -990,6 +999,7 @@ html {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 0 0 auto;
   margin-left: auto;
 }
 
@@ -1220,21 +1230,6 @@ html {
   .lobby-hero__stats {
     width: 100%;
     margin-left: 0;
-  }
-
-  /* Pestañas en una sola fila desplazable, sin scrollbar visible */
-  .topbar__nav {
-    order: 3;
-    width: 100%;
-    flex-wrap: nowrap;
-    margin: 0;
-    overflow-x: auto;
-    padding-bottom: 0.15rem;
-    scrollbar-width: none;
-  }
-
-  .topbar__nav::-webkit-scrollbar {
-    display: none;
   }
 
   .topbar__link {
