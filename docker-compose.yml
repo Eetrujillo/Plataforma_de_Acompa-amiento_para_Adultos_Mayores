@@ -11,7 +11,7 @@ services:
     environment:
       MONGO_INITDB_DATABASE: mearn_db
     ports:
-      - "4301:27017"
+      - "127.0.0.1:4301:27017"
     volumes:
       - mongo_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d:ro
@@ -88,7 +88,7 @@ services:
       mongo-rs-init:
         condition: service_completed_successfully
     ports:
-      - "${BACKEND_PORT:-3500}:3500"
+      - "127.0.0.1:${BACKEND_PORT:-3500}:3500"
     # The container runs the built image: no bind mount and no anonymous volume
     # in front of node_modules, so what was built is exactly what runs.
     networks:
@@ -105,7 +105,7 @@ services:
     # The SPA is compiled at image build time and served by nginx, which also
     # proxies /api and /socket.io to the backend service.
     ports:
-      - "${FRONTEND_PORT:-3201}:3201"
+      - "127.0.0.1:${FRONTEND_PORT:-3201}:3201"
     networks:
       - mearn-net
 
