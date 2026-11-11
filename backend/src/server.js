@@ -19,7 +19,16 @@ const { createSosModule } = require('./modules/sos_emergency');
  */
 function buildApplication() {
   const httpServer = http.createServer();
-  const io = createSocketServer(httpServer, config);
+
+  // engine.io se engancha al servidor y solo delega los caminos que no son suyos,
+  // asi que Express tiene que estar registrado ANTES. Si se suma despues, los dos
+  // handlers atienden el mismo request y cualquier GET a /socket.io/ termina en
+  // una unhandledRejection que apaga el proceso. El io igual hace falta para
+  // componer la slice de sos, por eso se expone con un facade diferido.
+  let io = null;
+  const lateIo = {
+    to: (room) => io.to(room)
+  };
   const prisma = getPrismaClient();
 
   const auth = createAuthModule({ prisma, config });
@@ -47,7 +56,7 @@ function buildApplication() {
     prisma,
     userRepository: auth.userRepository,
     authMiddleware: auth.authMiddleware,
-    io
+    io: lateIo
   });
 
   const app = createApp({
@@ -62,6 +71,9 @@ function buildApplication() {
   });
 
   httpServer.on('request', app);
+
+  // Recien ahora: engine.io captura el listener de Express y delega lo que no es suyo.
+  io = createSocketServer(httpServer, config);
 
   return { httpServer, io, prisma };
 }

@@ -86,6 +86,11 @@ function notFoundHandler(req, _res, next) {
  */
 function createErrorHandler({ logger = console } = {}) {
   return function errorHandler(error, req, res, _next) {
+    // Si la respuesta ya salio, responder otra vez lanza ERR_HTTP_HEADERS_SENT,
+    // que en produccion escala a unhandledRejection y apaga el proceso.
+    if (res.headersSent) {
+      return _next(error);
+    }
     const isOperational = error instanceof AppError;
     const parserHint = isOperational ? null : mapBodyParserError(error);
     const hint = isOperational || parserHint ? null : mapPrismaError(error);
