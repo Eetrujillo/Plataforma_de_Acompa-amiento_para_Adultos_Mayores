@@ -18,6 +18,23 @@
 
 ## ✅ Criterios de Aceptación a Validar:
 - [ ] Con código válido y consentimiento previo, conecta la app y guarda el token de dispositivo.
+
+---
+
+## 🔎 Estado al 2026-11-11 (única fuente de verdad: los tests)
+
+**Backend: hecho y en verde.** `tests/pairingRedeem.test.js`, `tests/pairingLinkedList.test.js` y
+`tests/pairingHttp.test.js` pasan, y `docs/pairing-api.md` documenta el canje del código.
+La verificación de PIN (`skills/bcrypt-pin.md`) y el paso del perfil a `LINKED` también están cubiertos.
+
+**Falta lo que justifica esta HU de cara al usuario:**
+1. La app móvil que escanea el QR (no hay proyecto móvil en el repo todavía).
+2. La pantalla de consentimiento con tipografía >= 20sp (HU-008 se apoya en esto).
+3. Las dos skills obligatorias que esta misma tarea pide crear antes de empezar:
+   `skills/pairing-link.md` y `skills/senior-ui-wcag.md`.
+
+Sin esos tres puntos la HU no se puede cerrar, aunque el backend ya responda.
+
 - [ ] Muestra el mensaje claro "Pídele a tu familiar un código nuevo" si el código venció.
 - [ ] Bloquea nuevos intentos por 15 minutos tras 5 fallos consecutivos de código.
 

@@ -4,6 +4,21 @@
 - **Última HU completada:** HU-006
 - **Siguiente HU a ejecutar:** HU-007
 
+### Verificación del 2026-11-11 (evidencia, no opinión)
+- **HU-001 a HU-006: verificadas por test.** 27 archivos de test en verde, 190 aserciones en total,
+  corridos dentro de la imagen del backend (`node --test tests/*.test.js`).
+  - HU-001 → `authRegister` · HU-002 → `authEmailVerification`, `authResendThrottle`
+  - HU-003 → `authLogin`, `authGoogle`, `authSessionVersion` · HU-004 → `authPasswordReset`
+  - HU-005 → `seniors`, `seniorsHttp`, `seniorsRead`, `seniorProfileProbes`
+  - HU-006 → `pairingGenerateQr`, `pairingQr`, `pairingTtl`, `pairingHu006Fixes`, `pairingToken`, `pairingRepository`
+- **HU-007 en curso, con la mitad de atrás hecha.** La slice de backend ya tiene tests en verde
+  (`pairingRedeem`, `pairingLinkedList`, `pairingHttp`) y está documentada en `docs/pairing-api.md`.
+  Falta la otra mitad: la app móvil, la pantalla de consentimiento con tipografía >= 20sp (WCAG)
+  y las skills `pairing-link.md` y `senior-ui-wcag.md`, que todavía no existen.
+- **HU-008, HU-009 y HU-010:** sin empezar.
+- **Trabajo fuera de HU:** el cierre de puertos, el proxy inverso y el arreglo del doble handler de
+  `/socket.io` son infraestructura, no avance de sprint. Ver `docs/` para el detalle técnico.
+
 ---
 
 ## 🚀 SPRINT 1: Autenticación, Perfiles, Vinculación y Consentimiento
