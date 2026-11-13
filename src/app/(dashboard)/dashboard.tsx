@@ -75,6 +75,13 @@ export default function DashboardHome() {
             </Pressable>
           </Link>
         )}
+        {Platform.OS !== 'web' && user && !user.guest && user.role !== 'admin' && (
+          <Link href="/escanear" asChild>
+            <Pressable style={styles.qrButton} hitSlop={8}>
+              <Text style={styles.qrButtonText}>📷 Escanear QR de vinculación</Text>
+            </Pressable>
+          </Link>
+        )}
         {user?.vinculo && (
           <Text style={styles.vinculoHint}>
             Vinculado al círculo {user.vinculo.slice(0, 8)}…
