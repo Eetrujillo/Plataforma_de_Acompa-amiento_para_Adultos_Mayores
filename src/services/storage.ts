@@ -14,6 +14,7 @@ export const StorageKeys = {
   alertas: 'aam.alertas',
   tareas: 'aam.tareas',
   citas: 'aam.citas',
+  vinculos: 'aam.vinculos',
 } as const;
 
 export async function loadObject<T>(key: string): Promise<T | null> {

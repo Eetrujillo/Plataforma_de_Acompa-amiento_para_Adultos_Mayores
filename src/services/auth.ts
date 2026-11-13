@@ -39,6 +39,10 @@ export interface PublicUser {
   name: string;
   email: string;
   role: Role;
+  /** Link code this session/account is bound to, when any. */
+  vinculo?: string;
+  /** True for the QR-scanned local patient without an account (S2). */
+  guest?: boolean;
 }
 
 export type AuthResult =
@@ -102,7 +106,13 @@ export async function register(
 }
 
 /** Validate credentials against local users and start a session. */
-export async function login(email: string, password: string): Promise<AuthResult> {
+export async function login(
+  email: string,
+  password: string,
+  options?: { /** Mobile login enters as `familiar` (S4); admin stays admin (S1). */
+    roleOverride?: Role;
+  },
+): Promise<AuthResult> {
   if (!email.trim() || !password) {
     return { ok: false, reason: 'input-error', message: 'Completá correo y contraseña' };
   }
@@ -112,8 +122,12 @@ export async function login(email: string, password: string): Promise<AuthResult
   if (!user || (await hashPassword(password, user.salt)) !== user.passwordHash) {
     return { ok: false, reason: 'invalid-credentials', message: 'Correo o contraseña incorrectos' };
   }
-  await saveObject(StorageKeys.session, publicUser(user));
-  return { ok: true, user: publicUser(user) };
+  const sessionUser = publicUser(user);
+  if (options?.roleOverride && user.role !== 'admin') {
+    sessionUser.role = options.roleOverride;
+  }
+  await saveObject(StorageKeys.session, sessionUser);
+  return { ok: true, user: sessionUser };
 }
 
 /** Drop the current session (data stays in local storage). */
@@ -165,4 +179,47 @@ export async function ensureDemoUsers(): Promise<void> {
     });
   }
   await saveObject(StorageKeys.users, users);
+}
+
+/**
+ * Start a local guest session as `adulto_mayor` bound to a link code (S2):
+ * the patient scanned the familiar's QR without logging in.
+ */
+export async function loginGuestAdulto(code: string): Promise<PublicUser> {
+  const guest: PublicUser = {
+    id: `guest:${code}`,
+    name: 'Paciente',
+    email: `${code}@vinculo.local`,
+    role: 'adulto_mayor',
+    vinculo: code,
+    guest: true,
+  };
+  await saveObject(StorageKeys.session, guest);
+  return guest;
+}
+
+/**
+ * Bind a logged-in user to a scanned link and assign the `cuidador` role
+ * (S3), except for `admin`, which stays untouched (S1). Updates both the
+ * stored account and the current session.
+ */
+export async function applyVinculoToLoggedInUser(code: string): Promise<PublicUser | null> {
+  const session = await getSession();
+  if (!session || session.guest) return null;
+
+  const users = await listUsers();
+  const index = users.findIndex((user) => user.email === session.email);
+  if (index === -1) return null;
+
+  if (users[index].role !== 'admin') {
+    users[index].role = 'cuidador';
+  }
+  await saveObject(StorageKeys.users, users);
+
+  const updated: PublicUser = {
+    ...publicUser(users[index]),
+    vinculo: code,
+  };
+  await saveObject(StorageKeys.session, updated);
+  return updated;
 }
