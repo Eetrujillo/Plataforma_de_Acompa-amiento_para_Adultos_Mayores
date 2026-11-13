@@ -5,7 +5,7 @@
  */
 
 import { Link, Stack, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { brand } from '@/content';
+import * as authService from '@/services/auth';
 import { Palette, Radius, Spacing } from '@/constants/theme';
 
 type Mode = 'login' | 'register';
@@ -49,6 +50,8 @@ function nameError(value: string, mode: Mode): string | null {
 export default function AuthScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('login');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState<FieldState>({ value: '', touched: false });
   const [email, setEmail] = useState<FieldState>({ value: '', touched: false });
   const [password, setPassword] = useState<FieldState>({ value: '', touched: false });
@@ -57,8 +60,16 @@ export default function AuthScreen() {
   const passwordErr = password.touched ? passwordError(password.value, mode) : null;
   const nameErr = name.touched ? nameError(name.value, mode) : null;
 
-  const onSubmit = () => {
-    // Design-only: reveal every validation message, no network call yet (S7).
+  // An open session goes straight to the dashboard.
+  useEffect(() => {
+    authService.getSession().then((session) => {
+      if (session) router.replace('/dashboard');
+    });
+  }, [router]);
+
+  const onSubmit = async () => {
+    if (submitting) return;
+    // Reveal every validation message before calling the service.
     setName({ value: name.value, touched: true });
     setEmail({ value: email.value, touched: true });
     setPassword({ value: password.value, touched: true });
@@ -67,10 +78,20 @@ export default function AuthScreen() {
       emailError(email.value) == null &&
       passwordError(password.value, mode) == null &&
       nameError(name.value, mode) == null;
-    if (valid) {
-      // TODO(m2): call the auth API, store the session, then route in.
-      // Until then we simply go back to the landing (design-only flow).
-      router.navigate('/');
+    if (!valid) return;
+
+    setSubmitting(true);
+    setFormError(null);
+    const result =
+      mode === 'login'
+        ? await authService.login(email.value, password.value)
+        : await authService.register(name.value, email.value, password.value);
+    setSubmitting(false);
+
+    if (result.ok) {
+      router.replace('/dashboard');
+    } else {
+      setFormError(result.message);
     }
   };
 
@@ -148,15 +169,25 @@ export default function AuthScreen() {
             secureTextEntry
           />
 
-          <Pressable onPress={onSubmit} style={styles.submitButton}>
+          {formError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{formError}</Text>
+            </View>
+          )}
+
+          <Pressable onPress={onSubmit} style={[styles.submitButton, submitting && styles.submitDisabled]}>
             <Text style={styles.submitButtonText}>
-              {mode === 'login' ? 'Ingresar' : 'Crear mi cuenta'}
+              {submitting
+                ? 'Guardando…'
+                : mode === 'login'
+                  ? 'Ingresar'
+                  : 'Crear mi cuenta'}
             </Text>
           </Pressable>
 
           <Text style={styles.hint}>
-            Entrega actual: solo diseño. En la próxima etapa esta pantalla se conecta al
-            servidor.
+            Autenticación local: tus datos se guardan únicamente en este
+            dispositivo/navegador. Más adelante se conecta al servidor.
           </Text>
         </View>
 
@@ -275,6 +306,14 @@ const styles = StyleSheet.create({
   },
   submitButtonText: { color: Palette.textOnBlock, fontWeight: '700' as const, fontSize: 18 },
   hint: { fontSize: 13, color: Palette.inkSoft, textAlign: 'center' },
+  errorBanner: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  errorBannerText: { color: Palette.danger, fontWeight: '600' as const, fontSize: 14 },
+  submitDisabled: { opacity: 0.6 },
   backLink: {
     marginTop: Spacing.md,
     color: Palette.violet,
