@@ -68,6 +68,18 @@ export default function DashboardHome() {
             </Text>
           </View>
         )}
+        {user?.role === 'familiar' && !user.guest && (
+          <Link href="/mi-qr" asChild>
+            <Pressable style={styles.qrButton} hitSlop={8}>
+              <Text style={styles.qrButtonText}>📷 Mi QR de vinculación</Text>
+            </Pressable>
+          </Link>
+        )}
+        {user?.vinculo && (
+          <Text style={styles.vinculoHint}>
+            Vinculado al círculo {user.vinculo.slice(0, 8)}…
+          </Text>
+        )}
 
         <View style={styles.cardRow}>
           {dashboardModules.map((module) => (
@@ -161,4 +173,14 @@ const styles = StyleSheet.create({
   },
   roleBadgeAdmin: { backgroundColor: '#FEF3C7' },
   roleBadgeText: { color: '#1E1B4B', fontWeight: '700', fontSize: 14 },
+  qrButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EC4899',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  qrButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  vinculoHint: { fontSize: 12, color: '#4B4767', marginBottom: 8 },
 } as const);

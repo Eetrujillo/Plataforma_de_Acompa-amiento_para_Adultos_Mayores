@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { brand } from '@/content';
 import * as authService from '@/services/auth';
 import type { Role } from '@/services/auth';
+import { ensureVinculo } from '@/services/vinculos';
 import { Palette, Radius, Spacing } from '@/constants/theme';
 
 type Mode = 'login' | 'register';
@@ -84,10 +85,25 @@ export default function AuthScreen() {
 
     setSubmitting(true);
     setFormError(null);
+    const isWeb = Platform.OS === 'web';
+    // Mobile login enters as `familiar` (S4); web keeps the chosen role (S6).
     const result =
       mode === 'login'
-        ? await authService.login(email.value, password.value)
-        : await authService.register(name.value, email.value, password.value, role);
+        ? await authService.login(
+            email.value,
+            password.value,
+            isWeb ? undefined : { roleOverride: 'familiar' },
+          )
+        : await authService.register(
+            name.value,
+            email.value,
+            password.value,
+            isWeb ? role : 'familiar',
+          );
+    if (result.ok) {
+      // Every account owns its unique link code (S5); ensure it exists.
+      await ensureVinculo(result.user.email);
+    }
     setSubmitting(false);
 
     if (result.ok) {
@@ -138,7 +154,7 @@ export default function AuthScreen() {
         </View>
 
         <View style={styles.formCard}>
-          {mode === 'register' && (
+          {mode === 'register' && Platform.OS === 'web' && (
             <>
               <View style={styles.roleWrap}>
                 <Text style={styles.fieldLabel}>Rol</Text>
@@ -213,6 +229,14 @@ export default function AuthScreen() {
             dispositivo/navegador. Más adelante se conecta al servidor.
           </Text>
         </View>
+
+        {Platform.OS !== 'web' && (
+          <Link href="/escanear" asChild>
+            <Pressable hitSlop={12}>
+              <Text style={styles.scanLink}>📷 Vincularme escaneando un QR</Text>
+            </Pressable>
+          </Link>
+        )}
 
         <Link href="/" asChild>
           <Pressable hitSlop={12}>
@@ -350,6 +374,12 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { color: Palette.danger, fontWeight: '600' as const, fontSize: 14 },
   submitDisabled: { opacity: 0.6 },
+  scanLink: {
+    marginTop: Spacing.sm,
+    color: Palette.orangeDark,
+    fontWeight: '700' as const,
+    fontSize: 16,
+  },
   backLink: {
     marginTop: Spacing.md,
     color: Palette.violet,
