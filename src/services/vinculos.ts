@@ -80,3 +80,15 @@ export async function getVinculo(code: string): Promise<Vinculo | null> {
   const vinculos = await listVinculos();
   return vinculos.find((vinculo) => vinculo.code === code) ?? null;
 }
+
+/**
+ * Accept a scanned QR payload without any network: the code is derived
+ * deterministically from the email, so a device that never saw this link
+ * can verify `code === deriveCode(email)` and create its local record.
+ * Returns null for fabricated payloads (code does not match the email).
+ */
+export async function acceptQrPayload(payload: QrPayload): Promise<Vinculo | null> {
+  const expected = await deriveCode(payload.email);
+  if (expected !== payload.code) return null;
+  return ensureVinculo(payload.email);
+}

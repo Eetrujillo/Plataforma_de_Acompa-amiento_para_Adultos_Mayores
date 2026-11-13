@@ -18,7 +18,7 @@ import {
   getSession,
   loginGuestAdulto,
 } from '@/services/auth';
-import { getVinculo, parseQrPayload } from '@/services/vinculos';
+import { acceptQrPayload, parseQrPayload } from '@/services/vinculos';
 
 type Outcome =
   | { kind: 'idle' }
@@ -65,7 +65,8 @@ export default function EscanearScreen() {
       setOutcome({ kind: 'invalid' });
       return;
     }
-    const vinculo = await getVinculo(payload.code);
+    // The QR is self-verifiable: the device rebuilds the link locally.
+    const vinculo = await acceptQrPayload(payload);
     if (!vinculo) {
       setOutcome({ kind: 'unknown-vinculo' });
       return;
