@@ -73,7 +73,10 @@ function buildApplication() {
   httpServer.on('request', app);
 
   // Recien ahora: engine.io captura el listener de Express y delega lo que no es suyo.
-  io = createSocketServer(httpServer, config);
+  io = createSocketServer(httpServer, config, {
+    verifyToken: (token) => auth.tokenService.verify(token),
+    userRepository: auth.userRepository
+  });
 
   return { httpServer, io, prisma };
 }
