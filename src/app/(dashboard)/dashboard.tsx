@@ -12,6 +12,7 @@ import { brand } from '@/content';
 import { dashboardModules } from '@/modules/registry';
 import * as authService from '@/services/auth';
 import type { PublicUser } from '@/services/auth';
+import { ROLE_LABELS } from '@/services/auth';
 
 export default function DashboardHome() {
   const router = useRouter();
@@ -60,6 +61,13 @@ export default function DashboardHome() {
             ? 'Elegí un módulo para continuar gestionando el tratamiento:'
             : '¿Qué querés hacer ahora?'}
         </Text>
+        {user && (
+          <View style={[styles.roleBadge, user.role === 'admin' && styles.roleBadgeAdmin]}>
+            <Text style={styles.roleBadgeText}>
+              {user.role === 'admin' ? '⭐ ' : ''}{ROLE_LABELS[user.role]}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.cardRow}>
           {dashboardModules.map((module) => (
@@ -142,4 +150,15 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 20, fontWeight: '700', color: '#1E1B4B' },
   cardDescription: { fontSize: 14, lineHeight: 20, color: '#4B4767', marginBottom: 10 },
   cardLink: { color: '#6D28D9', fontWeight: '700', fontSize: 15 },
+
+  roleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EDEBFA',
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  roleBadgeAdmin: { backgroundColor: '#FEF3C7' },
+  roleBadgeText: { color: '#1E1B4B', fontWeight: '700', fontSize: 14 },
 } as const);

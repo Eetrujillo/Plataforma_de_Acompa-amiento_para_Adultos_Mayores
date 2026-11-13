@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { brand } from '@/content';
 import * as authService from '@/services/auth';
+import type { Role } from '@/services/auth';
 import { Palette, Radius, Spacing } from '@/constants/theme';
 
 type Mode = 'login' | 'register';
@@ -52,6 +53,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<Mode>('login');
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [role, setRole] = useState<Role>('adulto_mayor');
   const [name, setName] = useState<FieldState>({ value: '', touched: false });
   const [email, setEmail] = useState<FieldState>({ value: '', touched: false });
   const [password, setPassword] = useState<FieldState>({ value: '', touched: false });
@@ -85,7 +87,7 @@ export default function AuthScreen() {
     const result =
       mode === 'login'
         ? await authService.login(email.value, password.value)
-        : await authService.register(name.value, email.value, password.value);
+        : await authService.register(name.value, email.value, password.value, role);
     setSubmitting(false);
 
     if (result.ok) {
@@ -137,8 +139,28 @@ export default function AuthScreen() {
 
         <View style={styles.formCard}>
           {mode === 'register' && (
-            <Field
-              label="Nombre y apellido"
+            <>
+              <View style={styles.roleWrap}>
+                <Text style={styles.fieldLabel}>Rol</Text>
+                <View style={styles.roleRow}>
+                  {authService.ROLES.map((option) => (
+                    <Pressable
+                      key={option}
+                      onPress={() => setRole(option)}
+                      style={[styles.roleChip, role === option && styles.roleChipActive]}>
+                      <Text
+                        style={[
+                          styles.roleChipText,
+                          role === option && styles.roleChipTextActive,
+                        ]}>
+                        {authService.ROLE_LABELS[option]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <Field
+                label="Nombre y apellido"
               placeholder="Nombre y apellido"
               value={name.value}
               error={nameErr}
@@ -146,6 +168,7 @@ export default function AuthScreen() {
               onBlur={() => name.value !== '' && setName({ value: name.value, touched: true })}
               autoCapitalize="words"
             />
+            </>
           )}
           <Field
             label="Correo electrónico"
@@ -306,6 +329,19 @@ const styles = StyleSheet.create({
   },
   submitButtonText: { color: Palette.textOnBlock, fontWeight: '700' as const, fontSize: 18 },
   hint: { fontSize: 13, color: Palette.inkSoft, textAlign: 'center' },
+  roleWrap: { gap: 4 },
+  roleRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  roleChip: {
+    borderRadius: Radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: Palette.surface,
+    borderWidth: 2,
+    borderColor: Palette.inkSoft,
+  },
+  roleChipActive: { backgroundColor: Palette.violet, borderColor: Palette.violet },
+  roleChipText: { color: Palette.ink, fontWeight: '600' as const, fontSize: 13 },
+  roleChipTextActive: { color: Palette.textOnBlock },
   errorBanner: {
     backgroundColor: '#FEE2E2',
     borderRadius: Radius.md,

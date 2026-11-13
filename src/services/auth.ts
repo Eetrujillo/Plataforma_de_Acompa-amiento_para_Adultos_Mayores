@@ -12,10 +12,23 @@ import { CryptoDigestAlgorithm, digestStringAsync, randomUUID } from 'expo-crypt
 
 import { StorageKeys, loadObject, removeItem, saveObject } from '@/services/storage';
 
+export type Role = 'admin' | 'adulto_mayor' | 'cuidador' | 'familiar';
+
+export const ROLES: readonly Role[] = ['admin', 'adulto_mayor', 'cuidador', 'familiar'];
+
+/** Spanish display labels for each role. */
+export const ROLE_LABELS: Record<Role, string> = {
+  admin: 'Administración',
+  adulto_mayor: 'Adulto mayor',
+  cuidador: 'Cuidador',
+  familiar: 'Familiar',
+};
+
 export interface StoredUser {
   id: string;
   name: string;
   email: string;
+  role: Role;
   salt: string;
   passwordHash: string;
   createdAt: string;
@@ -25,6 +38,7 @@ export interface PublicUser {
   id: string;
   name: string;
   email: string;
+  role: Role;
 }
 
 export type AuthResult =
@@ -38,7 +52,7 @@ async function hashPassword(password: string, salt: string): Promise<string> {
 }
 
 function publicUser(user: StoredUser): PublicUser {
-  return { id: user.id, name: user.name, email: user.email };
+  return { id: user.id, name: user.name, email: user.email, role: user.role };
 }
 
 function validateRegisterInput(name: string, email: string, password: string): string | null {
@@ -57,9 +71,13 @@ export async function register(
   name: string,
   email: string,
   password: string,
+  role: Role,
 ): Promise<AuthResult> {
   const inputError = validateRegisterInput(name, email, password);
   if (inputError) return { ok: false, reason: 'input-error', message: inputError };
+  if (!ROLES.includes(role)) {
+    return { ok: false, reason: 'input-error', message: 'Elegí un rol válido' };
+  }
 
   const normalizedEmail = email.trim().toLowerCase();
   const users = await listUsers();
@@ -72,6 +90,7 @@ export async function register(
     id: randomUUID(),
     name: name.trim(),
     email: normalizedEmail,
+    role,
     salt,
     passwordHash: await hashPassword(password, salt),
     createdAt: new Date().toISOString(),
@@ -105,4 +124,45 @@ export async function logout(): Promise<void> {
 /** The logged-in user for this browser/device, or null. */
 export async function getSession(): Promise<PublicUser | null> {
   return loadObject<PublicUser>(StorageKeys.session);
+}
+
+/* ------------------------------------------------------------------ */
+/* Demo seed users                                                     */
+/* ------------------------------------------------------------------ */
+
+interface DemoUser {
+  name: string;
+  email: string;
+  role: Role;
+  password: string;
+}
+
+/**
+ * Seed accounts, one per role (S4). Idempotent: it upserts each demo user
+ * by email, so it runs on every cold start and coexists with real
+ * registrations. Demo credentials are public on purpose (local demo data).
+ */
+export const DEMO_USERS: readonly DemoUser[] = [
+  { name: 'Admin AAM (super usuario)', email: 'admin@aam.demo', role: 'admin', password: 'admin123' },
+  { name: 'Carlos Prueba', email: 'prueba@aam.demo', role: 'cuidador', password: 'prueba123' },
+  { name: 'Don José Pérez', email: 'adulto@aam.demo', role: 'adulto_mayor', password: 'adulto123' },
+  { name: 'María Familiar', email: 'familiar@aam.demo', role: 'familiar', password: 'familiar123' },
+];
+
+export async function ensureDemoUsers(): Promise<void> {
+  const users = await listUsers();
+  for (const demo of DEMO_USERS) {
+    if (users.some((user) => user.email === demo.email)) continue;
+    const salt = randomUUID();
+    users.push({
+      id: randomUUID(),
+      name: demo.name,
+      email: demo.email,
+      role: demo.role,
+      salt,
+      passwordHash: await hashPassword(demo.password, salt),
+      createdAt: new Date().toISOString(),
+    });
+  }
+  await saveObject(StorageKeys.users, users);
 }
