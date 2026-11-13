@@ -47,6 +47,11 @@ export default function LandingMobile() {
           <Pressable onPress={() => router.navigate('/auth')} style={styles.heroButton}>
             <Text style={styles.heroButtonText}>{landingMobile.hero.cta}</Text>
           </Pressable>
+          <Pressable
+            onPress={() => router.navigate('/escanear')}
+            style={styles.heroScanButton}>
+            <Text style={styles.heroScanText}>📷 Vincularme escaneando un QR</Text>
+          </Pressable>
         </View>
 
         {/* Big section chips instead of small text links */}
@@ -165,6 +170,16 @@ const styles = StyleSheet.create({
     borderColor: Palette.ink,
   },
   heroButtonText: { color: Palette.ink, fontWeight: '800' as const, fontSize: 22 },
+  heroScanButton: {
+    backgroundColor: Palette.surface,
+    borderRadius: Radius.pill,
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    borderWidth: 2,
+    borderColor: Palette.yellow,
+  },
+  heroScanText: { color: Palette.ink, fontWeight: '700' as const, fontSize: 18 },
 
   chipRow: {
     flexDirection: 'row',
