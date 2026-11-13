@@ -1,9 +1,0 @@
-{
-  "title": "Dashboard del cuidador",
-  "brief": "Rediseño de la pantalla /caregiver (DashboardPage.jsx de prod): saludo, personas a cargo, nueva actividad, vinculación QR y alertas SOS. Audiencia: familiares/cuidadores. Tokens cálidos del login (crema #fbeed7, dorado #f2b134) integrados con la paleta de prod (azul petróleo #0f3d5c, acento #1f7a8c).",
-  "artboards": [
-    { "file": "01-resumen-radial.html", "title": "Resumen radial", "tradeoff": "Un vistazo da el estado del día con dial de progreso; oculta el detalle por persona cuando hay varios adultos mayores", "width": 1440, "height": 900 },
-    { "file": "02-linea-de-tiempo.html", "title": "Línea de tiempo", "tradeoff": "La rutina completa del día ordenada cronológicamente con sidebar de navegación; más scroll y menos resumen ejecutivo", "width": 1440, "height": 900 },
-    { "file": "03-tarjetas-persona.html", "title": "Tarjetas por persona", "tradeoff": "Escala naturalmente con varios adultos mayores (una tarjeta c/u con métricas); cada persona ocupa más pantalla y el día se ve por persona, no global", "width": 1440, "height": 900 }
-  ]
-}
