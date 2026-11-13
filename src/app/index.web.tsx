@@ -5,6 +5,7 @@
  */
 
 import Head from 'expo-router/head';
+import { router } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { brand, landingWeb, navSections, type NavSectionId } from '@/content';
@@ -36,7 +37,7 @@ export default function LandingWeb() {
             </Pressable>
           ))}
           {/* Log in / Sign up — top-right corner, navigates to the /auth page (S5) */}
-          <Pressable onPress={() => scrollToSection('vision')} style={styles.authButton}>
+          <Pressable onPress={() => router.push('/auth')} style={styles.authButton}>
             {({ pressed }) => (
               <Text style={[styles.authButtonText, pressed && styles.authButtonTextPressed]}>
                 Log in / Sign up
@@ -53,15 +54,20 @@ export default function LandingWeb() {
           <Text style={[styles.heroTitle, styles.lightText]}>{landingWeb.hero.title}</Text>
           <Text style={[styles.heroSubtitle, styles.lightText]}>{landingWeb.hero.subtitle}</Text>
           <View style={styles.heroActions}>
-            <View style={styles.heroButtonRow}>
-              <Pressable
-                onPress={() => scrollToSection('info')}
-                style={styles.heroPrimaryButton}>
-                <Text style={styles.heroPrimaryButtonText}>
-                  {landingWeb.hero.ctaSecondary}
-                </Text>
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={() => router.push('/auth')}
+              style={styles.heroPrimaryButton}>
+              <Text style={styles.heroPrimaryButtonText}>
+                {landingWeb.hero.ctaPrimary}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => scrollToSection('info')}
+              style={styles.heroSecondaryButton}>
+              <Text style={styles.heroSecondaryButtonText}>
+                {landingWeb.hero.ctaSecondary}
+              </Text>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -210,8 +216,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   heroSubtitle: { fontSize: 18, lineHeight: 28, maxWidth: 640, opacity: 0.95 },
-  heroActions: { flexDirection: 'row', marginTop: Spacing.xl },
-  heroButtonRow: { flexDirection: 'row' },
+  heroActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.xl,
+    flexWrap: 'wrap' as const,
+  },
   heroPrimaryButton: {
     backgroundColor: Palette.yellow,
     borderRadius: Radius.pill,
@@ -220,6 +230,18 @@ const styles = StyleSheet.create({
   },
   heroPrimaryButtonText: {
     color: Palette.ink,
+    fontWeight: '700' as const,
+    fontSize: 16,
+  },
+  heroSecondaryButton: {
+    borderRadius: Radius.pill,
+    borderWidth: 2,
+    borderColor: Palette.textOnBlock,
+    paddingVertical: Spacing.md - 2,
+    paddingHorizontal: Spacing.xl,
+  },
+  heroSecondaryButtonText: {
+    color: Palette.textOnBlock,
     fontWeight: '700' as const,
     fontSize: 16,
   },
