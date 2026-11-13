@@ -3,6 +3,7 @@
 **Producto:** aplicación de acompañamiento para adultos mayores con recordatorios de dosificaciones indicadas por un médico, cargadas por un encargado.
 **Alcance de este documento:** funcionalidad observada y verificada en la sesión de desarrollo del 13 de noviembre de 2025 (rama `dev-kevin`, carpeta `mobile-app/`).
 **Criterio de orden:** las historias están numeradas en el orden en que deben desarrollarse, no en el orden en que se descubrieron.
+**Entrega:** cada historia entra en producción como un slice revisable; el corte, los tamaños y las ramas están en `docs/plan-de-slices.md`.
 
 ## Cómo se ordenó el backlog
 

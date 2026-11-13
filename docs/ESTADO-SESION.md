@@ -60,6 +60,7 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 - `mobile-app/src/app/` — rutas: `_layout`, `index`(+`.web`), `auth`, `escanear`, `(dashboard)/{dashboard,dosificaciones,alertas,tareas,citas,mi-qr}`.
 - Documentos ODD: `docs/odd/tasks/landing-page.md`, `docs/odd/tasks/auth-dashboard.md`, `docs/odd/tasks/vinculacion-qr.md` (versionados en el repo).
 - Backlog de historias de usuario: `docs/historias-de-usuario.md`.
+- Plan de entrega por slices (S0 a S8, PRs encadenados): `docs/plan-de-slices.md`.
 
 ## Cómo correr
 
