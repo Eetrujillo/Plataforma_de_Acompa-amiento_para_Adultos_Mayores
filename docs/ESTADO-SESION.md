@@ -7,13 +7,14 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 - **Nombre**: Acompañamiento de Adulto Mayor — recordatorios de dosificaciones indicadas por un médico, cargadas por un encargado.
 - **Audiencia**: web = encargado capacitado (interfaz técnica); app móvil = adulto mayor (simple, tipografía grande).
 - **Stack**: Expo SDK 58 + expo-router + TypeScript estricto (app universal web+móvil), AsyncStorage (localStorage en web) como capa única de persistencia local.
-- **Carpeta de la app**: `acompanamiento-adulto-mayor/` (local) = `mobile-app/` en el repo remoto.
+- **Repositorio local**: el repositorio vive en `C:/Plataforma de Acompañamiento`; la app es la carpeta `mobile-app/` dentro de él.
 - **UI copy en español**; identificadores y commits en inglés.
 
 ## Estado del repositorio
 
 - Remoto: `https://github.com/Eetrujillo/Plataforma_de_Acompa-amiento_para_Adultos_Mayores.git`
 - Despliegue de referencia: `https://adulto-mayor.apolobyte.online/` (caído por un reset completo; se verifica en local mientras se levanta).
+- Traslado de hoy: la copia de trabajo pasó de OneDrive a `C:/Plataforma de Acompañamiento` (mismo disco) porque el cliente de sincronización mantenía identificadores ocupados sobre `node_modules`; el traslado se verificó con `git fsck`, la rama y el estado de push.
 - Rama de trabajo: **`dev-kevin`** (creada desde `origin/main`, push autorizado — SOLO a esta rama).
 - `main` del equipo tiene: `backend/` (solo `prisma/schema.prisma` con proveedor **MongoDB**, `Dockerfile`, `env.sample`; **no hay código de servidor** en el repositorio), `frontend/` (solo Docker/nginx), `docker-compose.yml`, `mongo-init/`.
 - Nuestra app vive en **`mobile-app/`** dentro del repo (integrada por merge de subárbol; historial de 13+ commits progresivos e independientes preservado).
@@ -43,7 +44,7 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 - Siete fases: 1) fundaciones de datos (HU-01 crear base externa, HU-02 conectar backend), 2) identidad y visibilidad (HU-03 a HU-08), 3) capa de datos externa (HU-09), 4) núcleo del cuidado (HU-10 a HU-14), 5) vinculación familiar (HU-15 a HU-18), 6) entrada y presentación (HU-19, HU-20), 7) soporte y cierre (HU-21, HU-22).
 - Camino crítico: `HU-01 → HU-02 → HU-03 → HU-09 → HU-10 → HU-11 → HU-18`.
 - Los parámetros de arquitectura P1–P4 (base de datos externa independiente, persistencia local no definitiva, contrato único de servicios, acceso exclusivo vía backend) condicionan todas las historias.
-- **Estado de la base de datos (S1):** esquema extendido y validado (`npm run db:validate` en verde, 11 modelos), procedimiento de aprovisionamiento documentado en `backend/docs/database.md` y herramientas de Prisma en `backend/package.json`. **Falta aplicar el esquema a la instancia gestionada**, que requiere el URI de conexión en `backend/.env` (ignorado por git).
+- **Estado de la base de datos (S1):** esquema extendido y validado (`npm run db:validate` en verde, 11 modelos), procedimiento de aprovisionamiento documentado en `backend/docs/database.md` y herramientas de Prisma en `backend/package.json`. **Falta aplicar el esquema a la instancia gestionada**, que requiere el URI de conexión en `backend/.env` (ignorado por git). Aplicar el esquema a la instancia gestionada queda bloqueado hasta que el URI de conexión exista en `backend/.env`, que está ignorado por git y no debe versionarse ni pegarse nunca en el chat.
 - **Advertencia de alcance**: todo el núcleo ya implementado corre sobre almacenamiento local; hasta cerrar HU-01, HU-02 y HU-09 los datos solo existen en el dispositivo donde se crearon.
 
 ## Verificación
@@ -65,12 +66,21 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 - Plan de entrega por slices (S0 a S8, PRs encadenados): `docs/plan-de-slices.md`.
 - Auditoría de estructura y SOLID (2025-11-13): el detalle está en `docs/auditoria-solid.md`.
 
+## Pendiente fuera del repositorio
+
+- OneDrive vuelve a restaurar una carpeta residual en `C:/Users/carli/OneDrive/Escritorio/Prueba/acompanamiento-adulto-mayor` que contiene solo `dist/`; debe eliminarse desde el cliente de OneDrive, porque el borrado local lo revierte la sincronización.
+- En la antigua carpeta `Prueba` quedan `.atl/`, `odd/` y un `ESTADO-SESION.md` como puntero; son residuos que pueden borrarse una vez que desaparezca la copia de OneDrive.
+
 ## Cómo correr
 
 ```bash
-cd acompanamiento-adulto-mayor
+cd mobile-app
 npm run web      # versión web (no escanea)
 npm start        # Expo Go en el teléfono (apretar "r" para recargar tras cambios)
+
+cd backend
+npm install
+npm run db:validate  # valida el esquema de Prisma; necesita DATABASE_URL
 ```
 
  pairing de la verificación: frenar cualquier `serve` de `dist/` antes de `expo export` (EBUSY si algún proceso mantiene abierto el directorio).
@@ -90,6 +100,6 @@ Ordenados según el backlog de `docs/historias-de-usuario.md`:
 
 ## Commits
 
-Serie progresiva en `dev-kevin` (push hecho): `4ed9aa1` scaffold → `b3ef530` contenido → `6fec638` landing web → `d7f9259` landing móvil → `4213634` auth diseño → `3f9cb2c` fix botón web → `18eeab5` servicios → `f3c4217` auth real → `2f73624` dashboard → `4805f5c` módulos → `9c34f83` deps → `1faff6b` roles → `41b6869` gitignore → `7b3c567` vínculos → `754604a` pantallas QR → `dbe2a9b` entradas QR → `069007b` fix entrada escaneo → `7f289f2` escaneo en landing → `49e4934` fix QR autoverificable → `feb8de1` integración en `mobile-app/` → `8b01c43` documentos ODD y estado de sesión → `d6f682e` historias de usuario ordenadas por prioridad de desarrollo.
+Serie progresiva en `dev-kevin` (push hecho): `4ed9aa1` scaffold → `b3ef530` contenido → `6fec638` landing web → `d7f9259` landing móvil → `4213634` auth diseño → `3f9cb2c` fix botón web → `18eeab5` servicios → `f3c4217` auth real → `2f73624` dashboard → `4805f5c` módulos → `9c34f83` deps → `1faff6b` roles → `41b6869` gitignore → `7b3c567` vínculos → `754604a` pantallas QR → `dbe2a9b` entradas QR → `069007b` fix entrada escaneo → `7f289f2` escaneo en landing → `49e4934` fix QR autoverificable → `feb8de1` integración en `mobile-app/` → `8b01c43` documentos ODD y estado de sesión → `d6f682e` historias de usuario ordenadas por prioridad de desarrollo → `b92c4d0` auditoría SOLID → `6c9eeb4` esquema de base de datos con entidades de la app → `53f56fe` nota del traslado a disco local.
 
-Pendiente de push: `d6f682e` y el commit que actualiza este documento (locales en `dev-kevin`; `8b01c43` ya está en `origin/dev-kevin`).
+Pendiente de push: todo hasta `53f56fe` ya está en `origin/dev-kevin` (0 commits pendientes); el único commit local es el que actualiza este documento.
