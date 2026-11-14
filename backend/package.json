@@ -1,0 +1,18 @@
+{
+  "name": "acompanamiento-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Database tooling for the platform: schema validation and application. The server runtime is added in a later slice, so this package intentionally contains only the Prisma CLI and client.",
+  "scripts": {
+    "db:validate": "prisma validate",
+    "db:format": "prisma format",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
+  },
+  "devDependencies": {
+    "prisma": "6.19.3"
+  }
+}

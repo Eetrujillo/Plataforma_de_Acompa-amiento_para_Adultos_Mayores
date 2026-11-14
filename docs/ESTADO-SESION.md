@@ -13,6 +13,7 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 ## Estado del repositorio
 
 - Remoto: `https://github.com/Eetrujillo/Plataforma_de_Acompa-amiento_para_Adultos_Mayores.git`
+- Despliegue de referencia: `https://adulto-mayor.apolobyte.online/` (caído por un reset completo; se verifica en local mientras se levanta).
 - Rama de trabajo: **`dev-kevin`** (creada desde `origin/main`, push autorizado — SOLO a esta rama).
 - `main` del equipo tiene: `backend/` (solo `prisma/schema.prisma` con proveedor **MongoDB**, `Dockerfile`, `env.sample`; **no hay código de servidor** en el repositorio), `frontend/` (solo Docker/nginx), `docker-compose.yml`, `mongo-init/`.
 - Nuestra app vive en **`mobile-app/`** dentro del repo (integrada por merge de subárbol; historial de 13+ commits progresivos e independientes preservado).
@@ -42,6 +43,7 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 - Siete fases: 1) fundaciones de datos (HU-01 crear base externa, HU-02 conectar backend), 2) identidad y visibilidad (HU-03 a HU-08), 3) capa de datos externa (HU-09), 4) núcleo del cuidado (HU-10 a HU-14), 5) vinculación familiar (HU-15 a HU-18), 6) entrada y presentación (HU-19, HU-20), 7) soporte y cierre (HU-21, HU-22).
 - Camino crítico: `HU-01 → HU-02 → HU-03 → HU-09 → HU-10 → HU-11 → HU-18`.
 - Los parámetros de arquitectura P1–P4 (base de datos externa independiente, persistencia local no definitiva, contrato único de servicios, acceso exclusivo vía backend) condicionan todas las historias.
+- **Estado de la base de datos (S1):** esquema extendido y validado (`npm run db:validate` en verde, 11 modelos), procedimiento de aprovisionamiento documentado en `backend/docs/database.md` y herramientas de Prisma en `backend/package.json`. **Falta aplicar el esquema a la instancia gestionada**, que requiere el URI de conexión en `backend/.env` (ignorado por git).
 - **Advertencia de alcance**: todo el núcleo ya implementado corre sobre almacenamiento local; hasta cerrar HU-01, HU-02 y HU-09 los datos solo existen en el dispositivo donde se crearon.
 
 ## Verificación

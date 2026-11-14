@@ -8,16 +8,20 @@ datasource db {
 }
 
 /// Caregiver or senior account.
-/// MongoDB has no native enums, so `role` is a validated String (CAREGIVER | SENIOR).
+/// MongoDB has no native enums, so `role` is a validated String.
+/// Canonical values used by the app (mobile-app/src/services/auth.ts):
+/// `administrador` | `adulto_mayor` | `cuidador` | `familiar`.
+/// Legacy values kept readable for documents created before the app existed:
+/// `CAREGIVER` reads as `cuidador`, `SENIOR` reads as `adulto_mayor`.
 model User {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  email        String   @unique
-  passwordHash String?
-  fullName     String
-  role         String
-  phone        String?
-  caregiverId  String?  @db.ObjectId
-  emailVerifiedAt DateTime?
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  email               String    @unique
+  passwordHash        String?
+  fullName            String
+  role                String
+  phone               String?
+  caregiverId         String?   @db.ObjectId
+  emailVerifiedAt     DateTime?
   /// HU-003 lockout state. Nullable on purpose: documents created before this field
   /// existed do not carry it, and Mongo needs no data migration for that. A null value
   /// means "no failed attempts" and "not locked".
@@ -31,15 +35,15 @@ model User {
   /// HU-005 senior profile. A caregiver has no PIN and no link state, so both fields are
   /// nullable; the documents created before this field existed read as "not set" too.
   /// `pinHash` never leaves the persistence layer: the public projection excludes it.
-  pinHash    String?
-  timezone   String?  @default("America/Bogota")
-  linkStatus String?  @default("PENDING")
+  pinHash             String?
+  timezone            String?   @default("America/Bogota")
+  linkStatus          String?   @default("PENDING")
   /// Ley 1581 consent evidence: stamped by the server when the account is created.
-  acceptedTermsAt DateTime?
-  termsVersion    String?
-  ipAddress       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  acceptedTermsAt     DateTime?
+  termsVersion        String?
+  ipAddress           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([role])
   @@index([caregiverId])
@@ -127,4 +131,103 @@ model SosAlert {
 
   @@index([seniorId, status])
   @@index([status])
+}
+
+/// ---------------------------------------------------------------------------
+/// Entidades de la aplicación de acompañamiento (mobile-app/src/modules/models.ts).
+///
+/// Convención intencional: los modelos preservados del equipo usan vocabulario en
+/// inglés (`Activity`, `SosAlert`, `seniorId`); las entidades que nacen con la app
+/// usan el vocabulario del dominio tal como lo nombra la interfaz, para que el mapeo
+/// con `modules/models.ts` sea uno a uno y sin traducciones mentales.
+///
+/// `seniorId` es el adulto mayor destinatario del registro y `createdBy` quien lo
+/// cargó: son la base del filtrado por vínculo (HU-18). La app todavía persiste local,
+/// así que ningún documento existente los tiene; por eso son obligatorios solo para
+/// escrituras nuevas y no se versionan datos históricos.
+/// ---------------------------------------------------------------------------
+
+/// Dosificación indicada por el médico. `horario` usa formato 24 h `HH:MM`.
+model Dosificacion {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId    String   @db.ObjectId
+  createdBy   String   @db.ObjectId
+  medicamento String
+  dosis       String
+  horario     String
+  notas       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([seniorId, horario])
+  @@index([createdBy])
+}
+
+/// Aviso dirigido al adulto mayor y su entorno.
+/// `nivel` es un String validado por la capa de aplicación, no un enum nativo:
+/// los valores canónicos son `informacion` | `importante` (ASCII, sin tilde).
+/// La interfaz muestra «Información»: la traducción es de presentación, no de datos.
+model Alerta {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId  String   @db.ObjectId
+  createdBy String   @db.ObjectId
+  titulo    String
+  mensaje   String
+  nivel     String   @default("informacion")
+  /// Fecha del aviso en formato ISO `AAAA-MM-DD`, igual que la app.
+  fecha     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([seniorId, fecha])
+  @@index([nivel])
+}
+
+/// Tarea de cuidado con seguimiento de completado.
+model Tarea {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId   String   @db.ObjectId
+  createdBy  String   @db.ObjectId
+  titulo     String
+  completada Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([seniorId, completada])
+  @@index([createdBy])
+}
+
+/// Cita médica. `fecha` en `AAAA-MM-DD` y `hora` en 24 h `HH:MM`.
+model Cita {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  seniorId  String   @db.ObjectId
+  createdBy String   @db.ObjectId
+  titulo    String
+  medico    String
+  lugar     String
+  fecha     String
+  hora      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([seniorId, fecha])
+  @@index([createdBy])
+}
+
+/// Vínculo entre un familiar y un adulto mayor.
+/// `codigo` es el identificador que viaja en el QR: 16 caracteres hexadecimales
+/// derivados del correo del familiar (mobile-app/src/services/vinculos.ts). Es único
+/// para impedir que dos vínculos distintos compartan el mismo QR.
+/// Un familiar puede vincularse a un adulto mayor una sola vez: `@@unique` sobre la
+/// pareja evita duplicados por reintentos de escaneo.
+model Vinculo {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  familiarId String   @db.ObjectId
+  seniorId   String   @db.ObjectId
+  codigo     String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([familiarId, seniorId])
+  @@index([seniorId])
 }

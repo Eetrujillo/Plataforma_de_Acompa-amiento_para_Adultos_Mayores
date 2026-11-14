@@ -231,7 +231,7 @@ git diff --shortstat <base>..<slice> → N líneas autoradas
 | Slice | Historias | Rama | Base | Estado |
 | --- | --- | --- | --- | --- |
 | S0 Documentación | — | `dev-kevin` | `dev` | Contenido listo, push a `dev-kevin`; PR a `dev` pendiente de decisión |
-| S1 Base de datos | HU-01 | `feat/database-provisioning` | `dev` | No iniciado |
+| S1 Base de datos | HU-01 | `feat/database-provisioning` | `dev` | Esquema y procedimiento listos y validados; falta aplicar a la instancia gestionada (requiere URI en `backend/.env`) |
 | S2 Conexión | HU-02 | `feat/database-connection` | S1 | No iniciado |
 | S3 Identidad | HU-09 (1/3) | `feat/identity-api` | S2 | No iniciado |
 | S4 Dosificación y citas | HU-09 (2/3), HU-11, HU-12 | `feat/care-data-api` | S3 | No iniciado |
