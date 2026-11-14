@@ -14,7 +14,7 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 
 - Remoto: `https://github.com/Eetrujillo/Plataforma_de_Acompa-amiento_para_Adultos_Mayores.git`
 - Rama de trabajo: **`dev-kevin`** (creada desde `origin/main`, push autorizado — SOLO a esta rama).
-- `main` del equipo tiene: `backend/` (Node + Prisma + Socket.io), `frontend/` (solo Docker/nginx), `docker-compose.yml`, `mongo-init/`.
+- `main` del equipo tiene: `backend/` (solo `prisma/schema.prisma` con proveedor **MongoDB**, `Dockerfile`, `env.sample`; **no hay código de servidor** en el repositorio), `frontend/` (solo Docker/nginx), `docker-compose.yml`, `mongo-init/`.
 - Nuestra app vive en **`mobile-app/`** dentro del repo (integrada por merge de subárbol; historial de 13+ commits progresivos e independientes preservado).
 - IMPORTANTE: push solo a `dev-kevin`. `main`/`dev`/`prod` son decisiones del equipo vía PR.
 
@@ -61,6 +61,7 @@ _Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentl
 - Documentos ODD: `docs/odd/tasks/landing-page.md`, `docs/odd/tasks/auth-dashboard.md`, `docs/odd/tasks/vinculacion-qr.md` (versionados en el repo).
 - Backlog de historias de usuario: `docs/historias-de-usuario.md`.
 - Plan de entrega por slices (S0 a S8, PRs encadenados): `docs/plan-de-slices.md`.
+- Auditoría de estructura y SOLID (2025-11-13): el detalle está en `docs/auditoria-solid.md`.
 
 ## Cómo correr
 

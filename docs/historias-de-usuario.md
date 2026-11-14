@@ -72,7 +72,7 @@ Sin base de datos creada y conectada no hay dónde persistir nada, y todo lo dem
 
 1. Existe una instancia de base de datos dedicada al proyecto, alojada fuera del cliente web y de la aplicación móvil, alcanzable solo desde el backend.
 2. Se define y versiona el esquema de datos de las entidades del sistema: usuarios y roles, dosificaciones, alertas, tareas, citas y vínculos entre familiar y adulto mayor.
-3. El esquema se aplica mediante migraciones reproducibles; una instancia nueva se deja operativa solo con ejecutarlas, sin pasos manuales no documentados.
+3. El esquema se aplica de forma reproducible sobre el motor declarado en `backend/prisma/schema.prisma`; una instancia nueva se deja operativa con un único procedimiento documentado y versionado, sin pasos manuales no registrados.
 4. El esquema declara las restricciones de integridad necesarias: correo único por usuario, referencias obligatorias al adulto mayor en los registros vinculados y borrado coherente de los datos dependientes.
 5. Se crea un usuario de aplicación con permisos mínimos sobre el esquema, distinto del usuario administrador, y no se reutilizan credenciales de otros entornos.
 6. Existen entornos separados para desarrollo y producción, y la base de producción no se usa con datos de prueba.
@@ -473,3 +473,4 @@ Todo el núcleo ya construido (HU-11 a HU-14, HU-15, HU-16) está hecho sobre al
 - La persistencia actual (AsyncStorage en móvil, `localStorage` en web) es un apoyo provisional de desarrollo, no la arquitectura definitiva, y no se sincroniza entre dispositivos; su sustitución es el objeto de HU-09.
 - Las verificaciones ya realizadas sobre esta versión: comprobación de tipos (`tsc --noEmit`), análisis estático (`expo lint`), compilación web (`expo export --platform web`) y recorrido funcional completo en navegador (registro, sesión, alta/edición/borrado en los cuatro módulos, persistencia tras recarga, cierre de sesión y acceso con los cuatro usuarios de demostración).
 - Los textos de interfaz están en español; los identificadores y mensajes de confirmación de cambios se mantienen en inglés por convención del repositorio.
+- **Estado real del backend (verificado el 13-11-2025):** `backend/` contiene solo `prisma/schema.prisma`, `Dockerfile`, `.dockerignore` y `env.sample`; **no hay código de servidor** ni `package.json`. El esquema declara proveedor MongoDB y modela `User`, `EmailVerificationToken`, `PasswordResetToken`, `PairingToken`, `Activity` y `SosAlert`, con los roles `CAREGIVER|SENIOR`. La app, en cambio, usa cuatro roles y las entidades `Dosificacion`, `Alerta`, `Tarea` y `Cita`. Conclusión: antes de conectar el cliente hay que **reconciliar ambos modelos**; el detalle y el resto de los hallazgos están en `docs/auditoria-solid.md`.

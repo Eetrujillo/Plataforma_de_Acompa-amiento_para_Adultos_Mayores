@@ -56,7 +56,6 @@ No se reescribe la historia de la rama. Reescribir 23 commits para «ordenarlos�
 En cualquier caso, **el próximo commit no debe aumentar la deuda**. Todo lo que venga desde ahora entra por slice.
 
 ## 4. Mapa de slices
-
 Cada slice corresponde a una o más historias del backlog. Los tamaños son estimaciones para planificar, no mediciones.
 
 ### S0 — Documentación de producto y entrega
@@ -71,16 +70,16 @@ Cada slice corresponde a una o más historias del backlog. Los tamaños son esti
 
 ### S1 — Crear y aprovisionar la base de datos externa (HU-01)
 
-- **Alcance:** infraestructura de datos y esquema: `backend/prisma/schema.prisma` (modelos de usuario, rol, adulto mayor, dosificación, alerta, tarea, cita, vínculo), migración inicial, usuario de aplicación con permisos mínimos, entornos separados, `backend/docs/database.md` con el procedimiento y la restauración de respaldo.
+- **Alcance:** infraestructura de datos y esquema: **reconciliar** el esquema de `backend/prisma/schema.prisma` (hoy proveedor MongoDB, con `Activity`/`SosAlert` y roles `CAREGIVER|SENIOR`) con el modelo real de la app (`Dosificacion`, `Alerta`, `Tarea`, `Cita` y cuatro roles, en `mobile-app/src/modules/models.ts`); esquema resultante versionado, carga inicial reproducible, usuario de aplicación con permisos mínimos, entornos separados, `backend/docs/database.md` con el procedimiento y la restauración de respaldo.
 - **Fuera de alcance:** endpoints, conexión en tiempo de ejecución (eso es S2), cualquier cambio en `mobile-app/`.
-- **Cierre:** una instancia nueva queda operativa solo ejecutando las migraciones; el correo es único a nivel de esquema; el documento permite restaurar una copia.
+- **Cierre:** una instancia nueva queda operativa ejecutando un procedimiento único y documentado; el correo es único a nivel de esquema; el documento permite restaurar una copia. Al ser MongoDB, la carga inicial se hace con `prisma db push` o una semilla versionada, no con migraciones SQL.
 - **Verificación:** aplicar migraciones sobre una instancia limpia; intentar insertar un correo duplicado y confirmar el rechazo; restaurar una copia de respaldo.
 - **Depende de:** nada. **Base:** `dev`. **Rama:** `feat/database-provisioning`.
 - **Tamaño estimado:** ~350 líneas (schema + migración generada + documentación).
 
 ### S2 — Conectar el backend con la base de datos (HU-02)
 
-- **Alcance:** cliente de base de datos, lectura de credenciales por variables de entorno, `backend/.env.example`, verificación de salud (`/health` o equivalente), arranque y cierre ordenados, registro de errores sin exponer credenciales.
+- **Alcance:** cliente de base de datos, lectura de credenciales por variables de entorno, `backend/.env.example`, verificación de salud (`/health` o equivalente), arranque y cierre ordenados, registro de errores sin exponer credenciales. **El backend no tiene código fuente todavía** (solo `Dockerfile`, `env.sample` y el esquema): este slice crea su estructura mínima en capas (configuración, acceso a datos, HTTP) en lugar de modificar una existente.
 - **Fuera de alcance:** modelo de datos (S1), endpoints de negocio (S3).
 - **Cierre:** el backend arranca contra la instancia externa, informa el estado de la conexión y no expone credenciales en logs ni en respuestas.
 - **Verificación:** arranque con base disponible y con la conexión cortada; revisar que los logs no contengan la cadena de conexión; rotar la credencial sin tocar código.
@@ -137,7 +136,36 @@ Cada slice corresponde a una o más historias del backlog. Los tamaños son esti
 - **Depende de:** material del cliente. **Base:** `dev`. **Rama:** `docs/final-content`.
 - **Tamaño estimado:** menos de 100 líneas.
 
-## 5. Secuencia
+## 5. Slices de saneamiento estructural
+
+Salen de `docs/auditoria-solid.md` (correcciones mínimas 1 a 5). No cambian comportamiento observable y **conviene que precedan a la migración**: si la capa de identidad se construye antes de tener puertos, se escribe dos veces.
+
+### S9 — Puertos de servicios (`AuthPort`, `CollectionStore`)
+
+- **Alcance:** interfaces en `mobile-app/src/services/` con la implementación local actual como única implementación detrás; las pantallas conservan las mismas firmas.
+- **Cierre:** ninguna pantalla ni componente importa AsyncStorage ni funciones concretas de autenticación; los tipos describen el contrato real.
+- **Verificación:** comportamiento idéntico al actual en los flujos de acceso y CRUD; compilación estricta en verde.
+- **Depende de:** nada. **Base:** `dev-kevin`. **Rama:** `refactor/service-ports`. **Tamaño:** ~250 líneas.
+
+### S10 — Política de roles unificada
+
+- **Alcance:** `mobile-app/src/services/roles.ts` con etiquetas, reglas de sobrescritura por plataforma y predicados de visibilidad; consumido por `auth.tsx`, `dashboard.tsx` y `escanear.tsx`.
+- **Cierre:** una regla de rol se cambia en un solo archivo; las ramas `Platform.OS` de los flujos de rol desaparecen de las pantallas.
+- **Depende de:** S9 (opcional pero recomendado). **Base:** `dev-kevin`. **Rama:** `refactor/role-policy`. **Tamaño:** ~150 líneas.
+
+### S11 — Módulos extensibles
+
+- **Alcance:** claves de almacenamiento y colecciones dentro de `modules/registry.ts`; `ModuleScreen<T>` genérico para eliminar `summary as never` y el campo por cadena de `toggleRecord`.
+- **Cierre:** agregar un módulo toca solo el registro y su archivo de ruta; sin castings `as never`.
+- **Depende de:** S9. **Base:** `dev-kevin`. **Rama:** `refactor/module-registry`. **Tamaño:** ~250 líneas.
+
+### S12 — Validación y tema
+
+- **Alcance:** validadores compartidos de correo y contraseña; validación de formularios fuera de `module-screen.tsx`; literales de color reemplazados por tokens de `constants/theme.ts`.
+- **Cierre:** una regla de validación vive en un archivo; cambiar la paleta cambia toda la app.
+- **Depende de:** ninguno. **Base:** `dev-kevin`. **Rama:** `refactor/validation-and-theme`. **Tamaño:** ~250 líneas.
+
+## 6. Secuencia
 
 ```
 dev-kevin (S0, ya integrado)
@@ -153,14 +181,16 @@ S8 contenidos: cuando el cliente entregue el material
 
 S1 a S6 son **PRs encadenados**: cada uno apunta a la rama del anterior. Se revisan en orden y, al mergearse uno, el siguiente se rebasa sobre `dev`. Nunca hay un PR gigante esperando turno.
 
-## 6. Convención de ramas y commits
+Los slices **S9 a S12** son independientes entre sí y se toman en `dev`; el orden recomendado es S9 y S10 antes de S3, S11 antes de S4 (cuando ya haya varios módulos migrados), y S12 cuando haya holgura, porque es el menos urgente.
+
+## 7. Convención de ramas y commits
 
 - **Ramas:** `feat/<conducta-en-ingles>`, `fix/<conducta>`, `docs/<tema>`. Sin iniciales, sin fechas, sin `wip`.
 - **Commits:** Conventional Commits en inglés, alcance por área cuando aporta claridad: `feat(api): expose identity endpoints`, `feat(db): add provisioned schema and migrations`, `docs: …`.
 - **Prohibido en un slice:** `wip`, `stuff`, `fix`, `changes`, `varios`, y cualquier mensaje que no diga qué conducta cambia.
 - **Un commit por slice** cuando el slice es pequeño; hasta cuatro cuando el slice tiene partes verificables por separado, siempre dentro del mismo PR.
 
-## 7. Riesgos del slicing (cómo se hace mal)
+## 8. Riesgos del slicing (cómo se hace mal)
 
 | Error | Por qué duele | Cómo evitarlo |
 | --- | --- | --- |
@@ -170,7 +200,7 @@ S1 a S6 son **PRs encadenados**: cada uno apunta a la rama del anterior. Se revi
 | **Slice de 2 líneas** | Ruido de PRs y trabajo de coordinación sin beneficio | Agrupar conductas del mismo flujo |
 | **PR huérfano** | Queda abierto mientras la base cambia y hay que rebasar mil veces | Encadenar y mergear en orden |
 
-## 8. Plantilla de PR por slice
+## 9. Plantilla de PR por slice
 
 ```markdown
 ## Qué cambia
@@ -196,7 +226,7 @@ HU-XX — <título> (docs/historias-de-usuario.md)
 git diff --shortstat <base>..<slice> → N líneas autoradas
 ```
 
-## 9. Registro de slices
+## 10. Registro de slices
 
 | Slice | Historias | Rama | Base | Estado |
 | --- | --- | --- | --- | --- |
@@ -209,5 +239,9 @@ git diff --shortstat <base>..<slice> → N líneas autoradas
 | S6 Filtrado por vínculo | HU-18 | `feat/data-scoping-by-link` | S5 | No iniciado |
 | S7 Evidencia de escaneo | HU-17 | — | — | No iniciado (requiere dispositivo) |
 | S8 Contenidos | HU-22 | `docs/final-content` | `dev` | Bloqueado por el cliente |
+| S9 Puertos de servicios | auditoría 1–2 | `refactor/service-ports` | `dev-kevin` | No iniciado |
+| S10 Política de roles | auditoría 3 | `refactor/role-policy` | `dev-kevin` | No iniciado |
+| S11 Módulos extensibles | auditoría 4–5 | `refactor/module-registry` | `dev-kevin` | No iniciado |
+| S12 Validación y tema | auditoría 6–7 | `refactor/validation-and-theme` | `dev-kevin` | No iniciado |
 
 Las ramas se crean al iniciar cada slice, no antes: una rama vacía no es planificación, es ruido.
