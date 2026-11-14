@@ -1,6 +1,6 @@
 # Estado de sesión — Acompañamiento de Adulto Mayor
 
-_Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentleman/ODD en `C:/Users/carli/OneDrive/Escritorio/Prueba`._
+_Fecha: 2025-11-13 (hora local)._(1) _Origen: sesión de desarrollo con el Gentleman/ODD. El proyecto pasó de OneDrive a `C:/Plataforma de Acompañamiento` para evitar bloqueos de sincronización sobre `node_modules`._
 
 ## Proyecto
 
@@ -73,7 +73,7 @@ npm run web      # versión web (no escanea)
 npm start        # Expo Go en el teléfono (apretar "r" para recargar tras cambios)
 ```
 
- pairing de la verificación: frenar cualquier `serve` de `dist/` antes de `expo export` (EBUSY por OneDrive).
+ pairing de la verificación: frenar cualquier `serve` de `dist/` antes de `expo export` (EBUSY si algún proceso mantiene abierto el directorio).
 
 ## Pendientes / próximos pasos
 
