@@ -1,5 +1,4 @@
 import { Schema, model } from 'mongoose';
-
 /**
  * Modelo User. Espeja la referencia de datos de `backend/prisma/schema.prisma`
  * (Prisma queda descartado; este modelo es la traducción a Mongoose).

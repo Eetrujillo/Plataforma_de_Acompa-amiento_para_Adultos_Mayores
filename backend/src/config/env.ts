@@ -13,7 +13,12 @@ export interface AppEnv {
    * número real de proxies (nginx, Cloudflare) en `TRUST_PROXY_HOPS`.
    */
   trustProxyHops: number;
-  /** Solo en producción: el backend no arranca sin JWT_SECRET (jwt-security). */
+  /**
+   * JWT_SECRET. Obligatorio en producción: el backend no arranca sin él
+   * (jwt-security). En desarrollo el valor ausente es `null`, fail closed: el
+   * módulo auth igual se niega a componerse — un backend de desarrollo sin
+   * JWT_SECRET tampoco sirve login ni registro (C4).
+   */
   jwtSecret: string | null;
   /** APP_URL: base del enlace de verificación (S5). */
   appUrl: string;
@@ -22,6 +27,13 @@ export interface AppEnv {
   /** RESEND_THROTTLE_MAX / RESEND_THROTTLE_WINDOW_MINUTES (S4). */
   resendThrottleMax: number;
   resendThrottleWindowMinutes: number;
+  /** JWT_EXPIRES_IN: vigencia del token de sesión (login). */
+  jwtExpiresIn: string;
+  /** HU-003: bloqueo de cuenta (S3) y límite por IP del login (S9). */
+  lockoutMaxAttempts: number;
+  lockoutMinutes: number;
+  loginIpMaxAttempts: number;
+  loginIpWindowMinutes: number;
   /** SMTP para el correo de verificación; sin host el canal es console (D4). */
   smtp: {
     host: string | null;
@@ -94,6 +106,42 @@ export function resolveJwtSecret(source: Record<string, string | undefined>): st
   return secret === undefined || secret === '' ? null : secret;
 }
 
+/** Duraciones aceptadas por JWT_EXPIRES_IN: dígitos seguidos de s, m, h o d. */
+const JWT_DURATION_PATTERN = /^\d+[smhd]$/;
+const JWT_DEFAULT_EXPIRES_IN = '7d';
+
+/**
+ * C3: `JWT_EXPIRES_IN` se valida contra `^\d+[smhd]$`. Un valor malformado
+ * antes se lo tragaba `readString` y jsonwebtoken reventaba al firmar, así que
+ * TODO login respondía 500. Cualquier otra cosa — vacío, sólo el número
+ * (`7`), o una duración nula como `0d`/`0h`/`0m`/`0s`, un token que vence al
+ * instante, degenerado igual que un límite de tasa `0` — cae al default `7d`.
+ */
+function readJwtDuration(source: Record<string, string | undefined>, key: string): string {
+  const raw = source[key]?.trim();
+  if (raw === undefined || raw === '') return JWT_DEFAULT_EXPIRES_IN;
+  if (!JWT_DURATION_PATTERN.test(raw)) return JWT_DEFAULT_EXPIRES_IN;
+  return Number.parseInt(raw, 10) > 0 ? raw : JWT_DEFAULT_EXPIRES_IN;
+}
+
+/**
+ * C1 (S9): con el default `TRUST_PROXY_HOPS=0` el backend no confía en ningún
+ * proxy; detrás de nginx o Cloudflare todos los pedidos traen la IP del proxy y
+ * el límite por IP del login — pensado para acotar cada cliente — se vuelve UNA
+ * SOLA BOLSA GLOBAL. En producción eso es una decisión de disponibilidad: el
+ * arranque avisa fuerte, pero parar el proceso (o no) la decide el humano que
+ * hace el deploy — la función sólo devuelve el texto del aviso.
+ */
+export function globalLoginIpBucketWarning(nodeEnv: string, trustProxyHops: number): string | null {
+  if (nodeEnv !== 'production' || trustProxyHops !== 0) return null;
+  return (
+    'TRUST_PROXY_HOPS=0 en producción: no hay ningún proxy de confianza declarado, así que ' +
+    'todos los clientes comparten UNA SOLA BOLSA del límite por IP del login — 20 fallos de ' +
+    'cualquier persona (LOGIN_IP_MAX_ATTEMPTS, default 20) bloquean el login de todo el mundo ' +
+    'durante la ventana de 15 minutos. Declará el número real de proxies delante del backend.'
+  );
+}
+
 function readBool(source: Record<string, string | undefined>, key: string, fallback: boolean): boolean {
   const raw = source[key]?.trim().toLowerCase();
   if (raw === undefined || raw === '') return fallback;
@@ -123,6 +171,11 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     emailVerificationTtlHours: readPositiveInt(source, 'EMAIL_VERIFICATION_TTL_HOURS', 24),
     resendThrottleMax: readPositiveInt(source, 'RESEND_THROTTLE_MAX', 3),
     resendThrottleWindowMinutes: readPositiveInt(source, 'RESEND_THROTTLE_WINDOW_MINUTES', 60),
+    jwtExpiresIn: readJwtDuration(source, 'JWT_EXPIRES_IN'),
+    lockoutMaxAttempts: readPositiveInt(source, 'LOCKOUT_MAX_ATTEMPTS', 5),
+    lockoutMinutes: readPositiveInt(source, 'LOCKOUT_MINUTES', 15),
+    loginIpMaxAttempts: readPositiveInt(source, 'LOGIN_IP_MAX_ATTEMPTS', 20),
+    loginIpWindowMinutes: readPositiveInt(source, 'LOGIN_IP_WINDOW_MINUTES', 15),
     smtp: {
       host: readOptionalString(source, 'SMTP_HOST'),
       port: readInt(source, 'SMTP_PORT', 587),

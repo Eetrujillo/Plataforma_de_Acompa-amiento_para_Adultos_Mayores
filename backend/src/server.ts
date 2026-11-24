@@ -1,6 +1,6 @@
 import { buildApp } from './app.ts';
 import { connectDatabase, disconnectDatabase } from './config/database.ts';
-import { loadEnv } from './config/env.ts';
+import { loadEnv, globalLoginIpBucketWarning } from './config/env.ts';
 import { redactConnectionStrings, redactMongoUrl } from './config/redactMongoUrl.ts';
 import {
   BcryptPasswordHasher,
@@ -28,6 +28,11 @@ function describeStartupError(error: unknown): string {
 
 async function main(): Promise<void> {
   const env = loadEnv();
+  // C1: detrás de un proxy con 0 saltos declarados, el límite por IP del login
+  // se vuelve una bolsa global compartida por todos los clientes — el arranque
+  // lo avisa fuerte en producción; parar el proceso es decisión del humano.
+  const ipBucketWarning = globalLoginIpBucketWarning(env.nodeEnv, env.trustProxyHops);
+  if (ipBucketWarning !== null) console.warn('[server]', ipBucketWarning);
 
   await connectDatabase(env.mongoUrl);
   // La URL puede llevar credenciales: sólo se loguea redactada.
@@ -54,6 +59,16 @@ async function main(): Promise<void> {
       emailVerificationTtlHours: env.emailVerificationTtlHours,
       resendThrottleMax: env.resendThrottleMax,
       resendThrottleWindowMinutes: env.resendThrottleWindowMinutes,
+      // HU-003: la sesión comparte el repositorio; sin JWT_SECRET el router
+      // falla al componerse (fail closed — en producción `loadEnv` ya lo exige).
+      loginStore: userRepository,
+      sessionUserReader: userRepository,
+      jwtSecret: env.jwtSecret,
+      jwtExpiresIn: env.jwtExpiresIn,
+      lockoutMaxAttempts: env.lockoutMaxAttempts,
+      lockoutMinutes: env.lockoutMinutes,
+      loginIpMaxAttempts: env.loginIpMaxAttempts,
+      loginIpWindowMinutes: env.loginIpWindowMinutes,
     },
     { trustProxyHops: env.trustProxyHops },
   );

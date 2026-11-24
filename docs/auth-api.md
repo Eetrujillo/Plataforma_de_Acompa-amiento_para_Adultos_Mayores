@@ -81,11 +81,15 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
 
 ## Otros endpoints del módulo
 
-- `POST /api/auth/login` — `{ email, password }`; `200` con `{ token, user }`. `401`
-  `Invalid credentials` (no revela qué falló), `403` `EMAIL_NOT_VERIFIED` hasta confirmar el correo,
-  `429` `ACCOUNT_LOCKED` si la cuenta está bloqueada por intentos fallidos (ver abajo). El contador
-  incluye los correos sin cuenta: la respuesta es idéntica exista o no, para no revelar qué correos
-  están registrados.
+- `POST /api/auth/login` — `{ email, password }`; `200` con `{ token, user: { id, email, fullName,
+  role } }`. `400` `INVALID_BODY` si falta `email`/`password` o no son texto (no consume intentos);
+  `401` `UNAUTHORIZED` · `Credenciales inválidas` (no revela qué falló, D2 del contrato del módulo:
+  idéntico para correo inexistente y contraseña incorrecta); `403` `EMAIL_NOT_VERIFIED` cuando la
+  contraseña es correcta y el correo no está confirmado; `429` `ACCOUNT_LOCKED` si la cuenta está
+  bloqueada por intentos fallidos; `429` `TOO_MANY_REQUESTS` si la IP agotó su ventana de fallos
+  (ver abajo). **Decisión D1 de HU-003:** un correo que no existe nunca se bloquea ni escribe
+  estado — sigue respondiendo `401`; la consecuencia asumida es que el `429` revela existencia
+  (ver la sección del bloqueo).
 - `POST /api/auth/verify-email` — `{ token }`; `200` con `{ user: { id, email, fullName, role,
   emailVerified: true } }`; `400` `INVALID_TOKEN` si el enlace venció, ya se usó, no existe o es
   malformado (la respuesta es idéntica en los cuatro casos y no trae `details`); `400`
@@ -97,7 +101,18 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
   cuenta**, mismo límite de 3 por hora por correo.
 - `POST /api/auth/reset-password` — `{ token, password }`; `200` con `{ reset: true }`, `400` si el
   enlace no sirve (ver la sección de restablecimiento).
-- `GET /api/auth/me` — requiere `Authorization: Bearer <jwt>`.
+- `GET /api/auth/me` — requiere `Authorization: Bearer <jwt>`; `200` con
+  `{ user: { id, email, fullName, role } }`; `401` `UNAUTHORIZED` · `Falta el token de sesión` con el
+  header ausente, sin el esquema `Bearer` o sin token, y `401` `UNAUTHORIZED` · `La sesión no es
+  válida` con token malformado, con firma ajena, vencido, de un usuario borrado o con el claim `sv`
+  distinto de `sessionVersion`. El `authMiddleware` (`shared/middlewares/authMiddleware.ts`) es el
+  único guard del backend: sin sesión válida la ruta no se ejecuta.
+- Los tokens de sesión llevan exactamente los claims `sub`, `role`, `email` y `sv` (numérico,
+  `sessionVersion` null leído como `0`), más `iat`/`exp` que agrega la librería. Los arma el helper
+  puro `domain/sessionClaims.ts` y los firma únicamente `infrastructure/JwtTokenService.ts` (ningún
+  controlador firma). Vigencia `JWT_EXPIRES_IN` (default `7d`): sólo valen duraciones `\d+[smhd]`
+  no nulas — vacío, `7`, `0d`, `abc` o cualquier otra cosa cae al default en vez de romper el login
+  (C3); no hay refresh token.
 - El claim `sv` de los tokens de sesión se documenta en la sección de restablecimiento (abajo).
 
 ## Token de verificación del correo (HU-002)
@@ -148,7 +163,8 @@ ventana móvil de una hora**. El cuarto devuelve `429`:
 ## Bloqueo de la cuenta por intentos fallidos (HU-003)
 
 `POST /api/auth/login` bloquea la cuenta **tras 5 intentos fallidos consecutivos**. El intento 5 es
-el que bloquea: del 1 al 4 la respuesta es `401` `Invalid credentials`, y el 5.º ya responde `429`:
+el que bloquea: del 1 al 4 la respuesta es `401` `UNAUTHORIZED` · `Credenciales inválidas`, y el 5.º
+ya responde `429`:
 
 ```json
 {
@@ -179,8 +195,49 @@ el que bloquea: del 1 al 4 la respuesta es `401` `Invalid credentials`, y el 5.�
   pasa; la alternativa (un `401` genérico durante el bloqueo) no deja rastro pero deja al usuario
   adivinando.
 - Estado persistido en el documento `User` (`failedLoginAttempts`, `lockedUntil`, ambos nullable), así
-  que un reinicio del backend **no** desbloquea la cuenta. Código: `domain/loginLockout.js` (reglas
-  puras con reloj inyectado) y `application/Login.js`.
+  que un reinicio del backend **no** desbloquea la cuenta. Código: `domain/loginLockout.ts` (reglas
+  puras con reloj inyectado) y `application/Login.ts`.
+- La racha es **por correo normalizado**: `Ana@X.com` y `ana@x.com` comparten contador y bloqueo.
+- La escritura del fallo es **atómica e incondicional** (C2): un update pipeline de un solo
+  `findOneAndUpdate` incrementa `failedLoginAttempts` desde el valor guardado (`$add`, semántica de
+  `$inc`) y fija `lockedUntil` en la MISMA operación cuando la racha alcanza el umbral. 20 fallos
+  en paralelo persisten exactamente 20 — dos contraseñas incorrectas simultáneas no pueden pasarse
+  el bloqueo por la espalda.
+
+## Límite por IP de los intentos de login (HU-003)
+
+Además del bloqueo por cuenta, `POST /api/auth/login` limita los **fallos por IP**: pasados
+`LOGIN_IP_MAX_ATTEMPTS` (default `20`) fallos desde una misma IP dentro de
+`LOGIN_IP_WINDOW_MINUTES` (default `15`) minutos — ventana móvil — la respuesta es `429`:
+
+```json
+{
+  "error": {
+    "code": "TOO_MANY_REQUESTS",
+    "message": "Demasiados intentos desde tu conexión. Esperá unos minutos antes de volver a intentar.",
+    "details": { "retryAfterSeconds": 900 }
+  }
+}
+```
+
+- Es el mismo `429` del reenvío de verificación y **deliberadamente distinto de `ACCOUNT_LOCKED`
+  (D2):** el cliente distingue "esta cuenta está bloqueada" de "esta red hizo demasiados intentos".
+- Se evalúa **antes de tocar la base** (D3): no depende de que el correo exista — el propio límite
+  no se vuelve oráculo — y **no escribe estado en la base**: el contador vive en memoria, por
+  proceso, con el mismo reloj inyectable que el resto de los limitadores. Tiene tope de claves.
+- Cuenta **fallos** (respuestas `401`), desde cuentas reales y correos inexistentes por igual; los
+  rechazados con `429` no se registran, para que insistir no alargue la ventana.
+- Es lo que impide que nadie bloquee a otra persona usando su correo: desde otra IP, la cuenta
+  bloqueada por la primera sigue pudiendo loguear.
+- **Depende de `TRUST_PROXY_HOPS` (C1):** la clave del límite es `req.ip`, y con el default
+  `TRUST_PROXY_HOPS=0` el backend no confía en ningún proxy — detrás del nginx del host todos los
+  pedidos traen la IP del proxy y el límite se convierte en **una sola bolsa global**: 20 fallos de
+  cualquier persona bloquean el login de todo el mundo durante 15 minutos. En producción hay que
+  declarar el número real de proxies delante del backend. Con `NODE_ENV=production` y
+  `TRUST_PROXY_HOPS=0` el arranque imprime un `console.warn` fuerte con esta consecuencia (no
+  corta el arranque: esa decisión de deploy es del humano).
+- Código: `application/LoginIpThrottle.ts`; limitación conocida: con más de una réplica el límite
+  real es *N fallos por ventana por réplica*.
 
 ## Restablecer la contraseña (HU-004)
 

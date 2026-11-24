@@ -1,6 +1,14 @@
+import { isValidObjectId } from 'mongoose';
 import { UserModel } from '../../../shared/models/User.ts';
 import { DuplicateEmailError } from '../application/RegisterCaregiver.ts';
+import type { NextLockoutState } from '../domain/loginLockout.ts';
 import type { StoredUser, UserRepositoryPort } from '../application/RegisterCaregiver.ts';
+import type {
+  LoginCredentials,
+  LoginStorePort,
+  RegisterFailedLoginConfig,
+} from '../application/Login.ts';
+import type { SessionUser, SessionUserReaderPort } from '../../../shared/middlewares/authMiddleware.ts';
 import type { UserEntity, UserRole } from '../domain/User.ts';
 import type {
   VerificationStorePort,
@@ -18,6 +26,20 @@ interface PersistedTokenDoc extends PersistedUser {
   verificationTokenHash: string | null;
   verificationTokenExpiresAt: Date | null;
   emailVerifiedAt: Date | null;
+}
+
+/** Documento proyectado por `findCredentialsByEmail`: HU-003 (S1/S3/S8). */
+interface PersistedCredentials extends PersistedUser {
+  passwordHash: string | null;
+  emailVerifiedAt: Date | null;
+  sessionVersion: number | null;
+  failedLoginAttempts: number | null;
+  lockedUntil: Date | null;
+}
+
+/** Documento proyectado por `findSessionUserById` (authMiddleware, S7). */
+interface PersistedSessionUser extends PersistedUser {
+  sessionVersion: number | null;
 }
 
 /**
@@ -76,7 +98,10 @@ export function isDuplicateKeyError(error: unknown): boolean {
  * VerificationStore (HU-002), sobre el mismo documento User (D3): MongoDB 7
  * vía MONGO_URL. El mismo objeto satisface los dos puertos.
  */
-export function createMongooseUserRepository(): UserRepositoryPort & VerificationStorePort {
+export function createMongooseUserRepository(): UserRepositoryPort &
+  VerificationStorePort &
+  LoginStorePort &
+  SessionUserReaderPort {
   return {
     async findByEmail(email: string): Promise<StoredUser | null> {
       const doc = await UserModel.findOne({ email }).lean();
@@ -163,6 +188,109 @@ export function createMongooseUserRepository(): UserRepositoryPort & Verificatio
         { new: true },
       ).lean<PersistedUser>();
       return doc === null ? null : toStored(doc);
+    },
+
+    /**
+     * HU-003: la única lectura que trae `passwordHash` (y nunca otro campo de
+     * más). Proyección explícita, con la misma disciplina de C1: un campo del
+     * puerto que falte en la proyección se vuelve `null` silencioso.
+     */
+    async findCredentialsByEmail(email: string): Promise<LoginCredentials | null> {
+      const doc = await UserModel.findOne({ email })
+        .select(
+          '_id email fullName role passwordHash emailVerifiedAt sessionVersion failedLoginAttempts lockedUntil',
+        )
+        .lean<PersistedCredentials>();
+      if (doc === null) return null;
+      return {
+        id: doc._id.toString(),
+        email: doc.email,
+        fullName: doc.fullName,
+        role: doc.role as UserRole,
+        passwordHash: doc.passwordHash ?? null,
+        emailVerifiedAt: doc.emailVerifiedAt ?? null,
+        sessionVersion: doc.sessionVersion ?? null,
+        failedLoginAttempts: doc.failedLoginAttempts ?? null,
+        lockedUntil: doc.lockedUntil ?? null,
+      };
+    },
+
+    /**
+     * C2: un solo incremento atómico e incondicional — `findOneAndUpdate` con
+     * un update pipeline cuyo `$add` parte del valor guardado en la base, no de
+     * uno leído antes: 20 fallos simultáneos persisten exactamente 20, sin
+     * incrementos perdidos ni duplicados. La MISMA operación fija `lockedUntil`
+     * cuando la racha alcanza el umbral y devuelve el documento ya actualizado:
+     * ninguna ventana entre leer y escribir puede dejar el bloqueo a medias.
+     * Espeja las reglas puras de `registerFailure` (`domain/loginLockout.ts`):
+     * racha por correo normalizado, un bloqueo ya vencido la reinicia (fallos
+     * consecutivos). Los 429 de cuenta bloqueada no llegan acá: el caso de uso
+     * los corta antes (S12).
+     */
+    async registerFailedLogin(
+      email: string,
+      config: RegisterFailedLoginConfig,
+    ): Promise<NextLockoutState | null> {
+      // `$set` sobre campos del documento: el pipeline calcula la racha desde el
+      // estado actual y el umbral con los valores de configuración del servidor.
+      const pipeline = [
+        {
+          $set: {
+            __streak: {
+              $cond: [
+                { $and: [{ $ne: ['$lockedUntil', null] }, { $lt: ['$lockedUntil', config.now] }] },
+                0,
+                { $ifNull: ['$failedLoginAttempts', 0] },
+              ],
+            },
+          },
+        },
+        {
+          $set: {
+            failedLoginAttempts: { $add: ['$__streak', 1] },
+            lockedUntil: {
+              $cond: [
+                { $gte: [{ $add: ['$__streak', 1] }, config.maxAttempts] },
+                { $add: [config.now, config.lockMs] },
+                null,
+              ],
+            },
+          },
+        },
+        { $unset: '__streak' },
+      ];
+      const doc = await UserModel.findOneAndUpdate({ email }, pipeline, {
+        new: true,
+        projection: 'failedLoginAttempts lockedUntil',
+      }).lean<{ failedLoginAttempts: number; lockedUntil: Date | null }>();
+      if (doc === null) return null;
+      return {
+        failedLoginAttempts: doc.failedLoginAttempts,
+        lockedUntil: doc.lockedUntil ?? null,
+      };
+    },
+
+    /** S5: el login correcto deja la racha en 0 y lockedUntil en null. */
+    async clearFailedLogins(email: string): Promise<void> {
+      await UserModel.updateOne({ email }, { $set: { failedLoginAttempts: 0, lockedUntil: null } });
+    },
+
+    /** HU-003/S7: lectura por id para el authMiddleware, sin datos de más. */
+    async findSessionUserById(id: string): Promise<SessionUser | null> {
+      // Un `sub` que no es ObjectId (token malformado que firma otro) no puede
+      // escaparse como 500: responde `null` y el guard lo traduce a 401.
+      if (!isValidObjectId(id)) return null;
+      const doc = await UserModel.findById(id)
+        .select('_id email fullName role sessionVersion')
+        .lean<PersistedSessionUser>();
+      if (doc === null) return null;
+      return {
+        id: doc._id.toString(),
+        email: doc.email,
+        fullName: doc.fullName,
+        role: doc.role as UserRole,
+        sessionVersion: doc.sessionVersion ?? null,
+      };
     },
   };
 }

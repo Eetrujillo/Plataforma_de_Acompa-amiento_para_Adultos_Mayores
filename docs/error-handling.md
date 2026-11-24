@@ -40,12 +40,12 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `400` | `VALIDATION_ERROR` | falta un campo o no cumple su regla |
 | `400` | `EMAIL_ALREADY_REGISTERED` | el correo ya tiene cuenta |
 | `400` | `INVALID_JSON` | el cuerpo no es JSON válido (`entity.parse.failed`) |
-| `401` | `UNAUTHORIZED` | falta o no sirve el token de sesión |
+| `401` | `UNAUTHORIZED` | falta o no sirve el token de sesión, o credenciales inválidas en el login |
 | `403` | `EMAIL_NOT_VERIFIED` | la cuenta existe pero no confirmó el correo |
 | `404` | `NOT_FOUND` | ruta o recurso inexistente |
 | `409` | `CONFLICT` | el estado actual impide la operación |
 | `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
-| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora) |
+| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora) o el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) |
 | `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
 | `500` | `INTERNAL_ERROR` | error inesperado, o error de Mongoose o del driver sin traducción |
 | `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (las transacciones de Mongoose necesitan un replica set; `rs0` es solo el nombre que fija este compose) |

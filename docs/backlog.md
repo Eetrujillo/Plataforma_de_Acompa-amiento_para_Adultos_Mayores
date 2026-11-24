@@ -36,6 +36,12 @@ del rewrite.
   (notificaciones del navegador, imposible sin web; lo cubre FCM).
 - **L10.** El bloqueo de login cuenta también los correos sin cuenta, para que el `429` no revele
   qué correos están registrados. Se limita además por IP, para que nadie bloquee a un tercero.
+- **L13.** HU-003: el bloqueo de login **no** cuenta los correos sin cuenta (D1 de su tarea, que
+  reconcilia el bullet de abajo con `docs/auth-api.md:172-173` y la excepción registrada en la skill
+  `jwt-security`): un correo inexistente responde siempre `401` y nunca escribe estado. Queda
+  documentada la consecuencia: el `429` del sexto intento revela que la cuenta existe. El límite por
+  IP sigue vigente y es el que frena la enumeración en bloque (responde `429 TOO_MANY_REQUESTS`,
+  distinto del `429 ACCOUNT_LOCKED`).
 - **L11.** La incorporación de otro familiar (HU-011) usa un **token de invitación propio**, enviado
   por correo con enlace. Nunca reusa el QR del adulto mayor: ese token significa "este es su
   dispositivo" y emitirlo invalida el anterior.
@@ -77,8 +83,10 @@ Validar la propiedad de la cuenta por enlace de correo.
 - [ ] Un login correcto limpia el contador.
 - [ ] El token lleva exactamente los claims `sub`, `role`, `email` y `sv`; ningún dato personal más.
 - [ ] Cada request autenticado compara el claim `sv` contra `sessionVersion` del usuario: subir la versión cierra todas las sesiones.
-- [ ] El contador de intentos se lleva por correo normalizado e **incluye los correos sin cuenta**: seis intentos fallidos devuelven el mismo `429` exista o no la cuenta, así el bloqueo no revela qué correos están registrados.
-- [ ] Además del contador por correo, se limita por IP para que nadie bloquee a otra persona usando su correo.
+- [ ] El contador de intentos se lleva por correo normalizado, **sólo para cuentas reales** (decisión
+  L13: un correo sin cuenta responde siempre `401` y nunca escribe estado ni llega al `429`).
+- [ ] Además del contador por correo, se limita por IP (`429 TOO_MANY_REQUESTS`) para que nadie
+  bloquee a otra persona usando su correo.
 - [ ] Acceder a una ruta privada sin token redirige al login sin pedir el recurso.
 
 ### HU-004 · Recuperación de contraseña · `repo 004`
