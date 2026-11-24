@@ -14,6 +14,8 @@ import type {
 import { InMemorySeniorRepository } from './seniorFakes.ts';
 import {
   InMemoryPairingTokenRepository,
+  InMemoryRedeemSeniorWriter,
+  StaticRedeemReader,
 } from './pairingFakes.ts';
 import type { PairingQrEncoderPort } from '../../src/modules/pairing/application/PairingQrEncoderPort.ts';
 import { createPairingQrEncoder, PAIRING_TOKEN_TTL_MINUTES } from '../../src/modules/pairing/index.ts';
@@ -415,6 +417,10 @@ export interface Harness {
   seniorRepo: InMemorySeniorRepository;
   /** HU-008: doble del almacén de tokens de vinculación, compartido con la app. */
   pairingRepo: InMemoryPairingTokenRepository;
+  /** HU-009: doble del lector del canje, compartido con la app. */
+  redeemReader: StaticRedeemReader;
+  /** HU-009: doble del escritor del vínculo y del bloqueo, compartido con la app. */
+  redeemWriter: InMemoryRedeemSeniorWriter;
   /** HU-008: codificador del QR inyectado en la app (real por default). */
   qrEncoder: PairingQrEncoderPort;
   hasher: PasswordHasherPort;
@@ -435,6 +441,14 @@ export interface HarnessOptions {
   qrEncoder?: PairingQrEncoderPort;
   /** HU-008: PAIRING_TTL_MINUTES (D7, default = la constante del dominio). */
   pairingTtlMinutes?: number;
+  /** HU-009: dobles del canje (lector y escritor) compartidos con la app. */
+  redeemProfileReader?: StaticRedeemReader;
+  redeemSeniorWriter?: InMemoryRedeemSeniorWriter;
+  /** HU-009: REDEEM_MAX_ATTEMPTS / REDEEM_LOCKOUT_MINUTES / REDEEM_IP_*. */
+  redeemMaxAttempts?: number;
+  redeemLockoutMinutes?: number;
+  redeemIpMaxAttempts?: number;
+  redeemIpWindowMinutes?: number;
   /** Repositorio compartido: para probar el bloqueo a través de un "reinicio" (S4). */
   repository?: InMemoryUserRepository;
   /** Error que rechaza `repo.save`, para simular fallos del adaptador. */
@@ -479,6 +493,8 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
   const seniorRepository = options.seniorRepository ?? new InMemorySeniorRepository();
   const pairingTokenRepository =
     options.pairingTokenRepository ?? new InMemoryPairingTokenRepository();
+  const redeemProfileReader = options.redeemProfileReader ?? new StaticRedeemReader();
+  const redeemSeniorWriter = options.redeemSeniorWriter ?? new InMemoryRedeemSeniorWriter();
   const qrEncoder = options.qrEncoder ?? createPairingQrEncoder();
   const app = buildApp(
     {
@@ -518,6 +534,13 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
       qrEncoder,
       // D7: el default es la constante del dominio, no otro número a mano.
       pairingTtlMinutes: options.pairingTtlMinutes ?? PAIRING_TOKEN_TTL_MINUTES,
+      // HU-009: canje con los dobles y los límites del contrato, salvo override.
+      redeemProfileReader,
+      redeemSeniorWriter,
+      redeemMaxAttempts: options.redeemMaxAttempts ?? 5,
+      redeemLockoutMinutes: options.redeemLockoutMinutes ?? 15,
+      redeemIpMaxAttempts: options.redeemIpMaxAttempts ?? 20,
+      redeemIpWindowMinutes: options.redeemIpWindowMinutes ?? 15,
     },
     options.app,
   );
@@ -526,6 +549,8 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
     repo,
     seniorRepo: seniorRepository,
     pairingRepo: pairingTokenRepository,
+    redeemReader: redeemProfileReader,
+    redeemWriter: redeemSeniorWriter,
     qrEncoder,
     hasher,
     sender,

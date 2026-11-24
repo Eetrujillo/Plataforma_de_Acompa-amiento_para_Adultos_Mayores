@@ -67,7 +67,9 @@ pide otro. Sin QR no hay credencial: no se responde `201` con la imagen vacía.
   mirar y escribir después: esa ventana permite dos canjes del mismo token.
 - El reclamo va **antes** de escribir el perfil: si la escritura falla, el token queda quemado. La
   alternativa deja un token vivo con un perfil ya vinculado.
-- El canje no crea perfiles y no acepta datos de la ficha: el cuerpo sólo lleva `token`.
+- El canje no crea perfiles y no acepta datos de la ficha (`fullName`, `phone`): el cuerpo lleva
+  `token` y la bandera de consentimiento `acceptedTerms`, nada más. Sin la bandera no hay canje
+  (`400 TERMS_NOT_ACCEPTED`, Ley 1581 §4): el servidor escribe la evidencia, no la inventa.
 - No existe rama legacy. El canje por código tipeado se retiró con el código mismo (L9).
 
 ## 6. Lo que no se hace

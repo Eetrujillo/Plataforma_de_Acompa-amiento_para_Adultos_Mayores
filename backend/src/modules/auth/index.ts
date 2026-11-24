@@ -5,7 +5,7 @@ import { ResetPassword } from './application/ResetPassword.ts';
 import { ConfirmEmail } from './application/ConfirmEmail.ts';
 import { ResendThrottle } from './application/ResendThrottle.ts';
 import { Login } from './application/Login.ts';
-import type { LoginStorePort, PasswordComparerPort } from './application/Login.ts';
+import type { LoginStorePort, PasswordComparerPort, SessionTokenPort } from './application/Login.ts';
 import { LoginIpThrottle } from './application/LoginIpThrottle.ts';
 import { createAuthRoutes } from './infrastructure/authRoutes.ts';
 import type { AuthUseCases } from './infrastructure/AuthController.ts';
@@ -77,6 +77,17 @@ export function buildSessionGuard(deps: AuthDependencies): RequestHandler {
     verifier: new JwtTokenService(deps.jwtSecret, deps.jwtExpiresIn),
     reader: deps.sessionUserReader,
   });
+}
+
+export function buildSessionTokenPort(
+  deps: Pick<AuthDependencies, 'jwtSecret' | 'jwtExpiresIn'>,
+): SessionTokenPort {
+  if (deps.jwtSecret === null) {
+    throw new Error(
+      'JWT_SECRET es obligatorio para emitir sesiones: el login no queda disponible sin él.',
+    );
+  }
+  return new JwtTokenService(deps.jwtSecret, deps.jwtExpiresIn);
 }
 
 /** Punto de montaje del módulo auth: compone los casos de uso y devuelve el router. */

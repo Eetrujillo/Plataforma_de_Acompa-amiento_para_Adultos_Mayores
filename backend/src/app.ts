@@ -1,6 +1,6 @@
 import express from 'express';
 import type { Express } from 'express';
-import { buildAuthRouter, buildSessionGuard } from './modules/auth/index.ts';
+import { buildAuthRouter, buildSessionGuard, buildSessionTokenPort } from './modules/auth/index.ts';
 import type { AuthDependencies } from './modules/auth/index.ts';
 import { buildSeniorsRouter } from './modules/seniors/index.ts';
 import type { SeniorsDependencies } from './modules/seniors/index.ts';
@@ -43,7 +43,16 @@ export function buildApp(
   // HU-008: la emisión del QR es del familiar de la sesión (S10); el mismo
   // guard armado de arriba protege la credencial. La invalidación del QR
   // anterior vive en el caso de uso (S7/S22): no hay otra ruta de regeneración.
-  app.use('/api/pairing', buildPairingRouter({ ...deps, requireSession: buildSessionGuard(deps) }));
+  // HU-009: el canje es público (S11) pero SIEMPRE firma la sesión por el
+  // puerto del módulo auth (D10) — nadie arma un JWT a mano.
+  app.use(
+    '/api/pairing',
+    buildPairingRouter(
+      { ...deps, requireSession: buildSessionGuard(deps) },
+      // D10: el único firmante es el JwtTokenService del módulo auth.
+      { sessionToken: buildSessionTokenPort(deps) },
+    ),
+  );
 
   app.use((_req: express.Request, res: express.Response) => {
     res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Ruta no encontrada' } });

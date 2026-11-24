@@ -1,11 +1,18 @@
 import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../../../shared/errors/AppError.ts';
+import { evidenceIp } from '../../../shared/domain/evidenceIp.ts';
 import { INVALID_SESSION_MESSAGE } from '../../../shared/middlewares/authMiddleware.ts';
 import { GeneratePairingQr } from '../application/GeneratePairingQr.ts';
 import type { PairingQrResult } from '../application/GeneratePairingQr.ts';
+import { RedeemPairingToken } from '../application/RedeemPairingToken.ts';
+import type {
+  RedeemPairingTokenCommand,
+  RedeemPairingTokenResult,
+} from '../application/RedeemPairingToken.ts';
 
 export interface PairingUseCases {
   generatePairingQr: GeneratePairingQr;
+  redeemPairingToken: RedeemPairingToken;
 }
 
 /** Mensaje de INVALID_BODY; `details.field` marca el campo que falló la forma. */
@@ -52,7 +59,32 @@ function emitResponse(res: Response, result: PairingQrResult): void {
   });
 }
 
-/** Controlador HTTP del slice pairing (HU-008). */
+/**
+ * Arma el comando del canje. Sólo se leen `token` y `acceptedTerms` (S19/D3):
+ * los demás campos del cuerpo se ignoran — la ficha la administra el familiar y
+ * la evidencia la arma el servidor desde el reloj, TERMS_VERSION y `req.ip`.
+ */
+function buildRedeemCommand(req: Request): RedeemPairingTokenCommand {
+  const raw = bodyObject(req.body);
+  return {
+    // El token crudo (incluso no-texto) llega al caso de uso: la forma la
+    // valida `isPairingTokenWellFormed` (S12, 400 genérico).
+    token: raw['token'],
+    acceptedTerms: raw['acceptedTerms'] === true,
+    ipAddress: evidenceIp(req.ip),
+  };
+}
+
+function redeemResponse(res: Response, result: RedeemPairingTokenResult): void {
+  // S13: el cuerpo exacto — la sesión de SENIOR y el objeto senior. La ficha
+  // médica nunca viaja (S19/D11).
+  res.status(201).json({
+    token: result.token,
+    senior: { ...result.senior, createdAt: result.senior.createdAt.toISOString() },
+  });
+}
+
+/** Controlador HTTP del slice pairing (HU-008 y HU-009). */
 export function createPairingController(useCases: PairingUseCases) {
   return {
     // Express 4 no propaga los rechazos de handlers async: se capturan y se
@@ -62,6 +94,17 @@ export function createPairingController(useCases: PairingUseCases) {
         const command = buildEmitCommand(req);
         const result = await useCases.generatePairingQr.execute(command);
         emitResponse(res, result);
+      } catch (error: unknown) {
+        next(error);
+      }
+    },
+
+    /** S11: el canje es público — sin guards, el token del QR es la credencial. */
+    async redeem(req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const command = buildRedeemCommand(req);
+        const result = await useCases.redeemPairingToken.execute(command);
+        redeemResponse(res, result);
       } catch (error: unknown) {
         next(error);
       }

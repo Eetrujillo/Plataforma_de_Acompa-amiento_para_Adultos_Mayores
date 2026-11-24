@@ -76,7 +76,7 @@ El teléfono del adulto mayor no tiene sesión todavía: el token del QR es la c
 
 ```http
 POST /api/pairing/redeem
-{ "token": "«43 caracteres base64url»" }
+{ "token": "«43 caracteres base64url»", "acceptedTerms": true }
 ```
 
 ```http
@@ -90,8 +90,13 @@ POST /api/pairing/redeem
 }
 ```
 
-El cuerpo sólo lleva `token`. El canje **no acepta datos de la ficha** (`fullName`, `phone`): el
-perfil ya existe y lo administra el familiar, así que canjear un QR nunca edita ni crea un senior.
+El cuerpo lleva `token` más `acceptedTerms: true` — la bandera de consentimiento (Ley 1581): sin
+ella el canje responde `400 TERMS_NOT_ACCEPTED` antes de mirar la base (§4 de la skill `ley-1581`).
+El resto del cuerpo no importa para la ficha: el canje **no acepta datos de la ficha**
+(`fullName`, `phone`) ni campos de evidencia (`acceptedTermsAt`, `termsVersion`, `ipAddress`). El
+perfil ya existe y lo administra el familiar, así que canjear un QR nunca edita ni crea un senior;
+y la evidencia la arma el servidor con el reloj, `TERMS_VERSION` y la IP del pedido — el cliente
+no la inventa.
 
 El objeto `senior` conserva los campos que la app publicada ya consume (`toPublicUser`) y suma
 `linkStatus` y `timezone`. No pierde campos: se agregó, no se reemplazó.
@@ -102,11 +107,12 @@ El objeto `senior` conserva los campos que la app publicada ya consume (`toPubli
 | `NOT_FOUND` | 404 | El token está bien formado pero la base no lo conoce. |
 | `CONFLICT` | 409 | Ya fue canjeado, o el perfil del token ya no es del mismo familiar. |
 | `SENIOR_ALREADY_LINKED` | 409 | El perfil del token ya está vinculado: el QR no se quema. |
+| `TOO_MANY_REQUESTS` | 429 | Se superó el límite de intentos del canje por IP (`REDEEM_IP_MAX_ATTEMPTS`, default 20, por ventana móvil de `REDEEM_IP_WINDOW_MINUTES`, default 15). También cuentan los intentos con token desconocido; el intento bloqueado no se cuenta. El límite es por proceso: con más de una réplica del backend es N por ventana por réplica. |
+| `ACCOUNT_LOCKED` | 429 | Cinco fallos consecutivos del canje sobre el mismo perfil lo bloquean `REDEEM_LOCKOUT_MINUTES` (default 15 minutos). `details.retryAfterSeconds` trae los segundos restantes, y el intento que dispara el bloqueo ya responde 429. El intento bloqueado no se cuenta. |
 
-Los mensajes del canje son los que define HU-009 (el código de ese endpoint todavía no existe);
-cuando llegue, vivirán junto a los demás textos del slice, en `application/pairingMessages.ts` —
-el mismo módulo que ya concentra los de la emisión. Están en inglés porque los consume la app
-móvil y no se muestran en el panel del cuidador: `pairing token is invalid or expired`,
+Los mensajes del canje viven en `backend/src/modules/pairing/application/pairingMessages.ts`, el
+mismo módulo que concentra los de la emisión. Están en inglés porque los consume la app móvil y no
+se muestran en el panel del cuidador: `pairing token is invalid or expired`,
 `pairing token not found`, `pairing token already used`. `SENIOR_ALREADY_LINKED` sí está en
 español porque también lo muestra el panel.
 
@@ -123,6 +129,31 @@ perfil ajeno responde igual que un token consumido, para no confirmar que el id 
 escritura del perfil falla **después** del reclamo, el token ya quedó quemado (falla cerrado) y el
 familiar genera otro.
 
+La transición `PENDING → LINKED` y la evidencia del consentimiento viajan en la MISMA escritura
+condicional: `acceptedTermsAt` (reloj del servidor), `termsVersion` (`TERMS_VERSION`, default
+`1.0`) y `ipAddress` (la IP del pedido, sólo cuando es una IP válida — `evidenceIp`). O el perfil
+queda vinculado con evidencia, o no queda nada. Quién escribe `LINKED` vive en los detalles de
+`docs/seniors-api.md`.
+
+## Límite de intentos del canje
+
+Con un token de 32 bytes el espacio de búsqueda deja de ser el problema —el viejo código de 6
+dígitos tenía 10^6 combinaciones y ya no existe—, así que el límite queda como defensa en
+profundidad:
+
+- **Por perfil (bloqueo persistido):** 5 fallos consecutivos bloquean los canjes de ese perfil.
+  Umbral `REDEEM_MAX_ATTEMPTS` (default 5) y ventana `REDEEM_LOCKOUT_MINUTES` (default 15). El
+  contador y la fecha viven en el propio documento del adulto mayor (`redeemFailedAttempts` /
+  `redeemLockedUntil`), contados por el adaptador en una escritura atómica con la misma forma del
+  bloqueo de login. Un canje exitoso limpia la racha, y un bloqueo ya vencido la reinicia.
+- **Por IP (en memoria, por proceso):** `REDEEM_IP_MAX_ATTEMPTS` (default 20) intentos fallidos
+  por ventana móvil de `REDEEM_IP_WINDOW_MINUTES` (default 15). Cuenta también los intentos con
+  token desconocido, para que el endpoint no sea un oráculo de qué QR existe. La ventana es móvil
+  con reloj inyectado y el intento bloqueado no se registra. El almacenamiento es del proceso:
+  con más de una réplica del backend el límite real es N por ventana por réplica.
+- Los bloqueos no extienden la ventana (contar los rechazos la haría eterna) y un intento
+  bloqueado nunca quema un QR todavía usable.
+
 ## GET /api/seniors — HU-005
 
 Requiere sesión de `CAREGIVER`. Devuelve sólo los perfiles del familiar con un vínculo `ACTIVE`
@@ -132,13 +163,10 @@ Requiere sesión de `CAREGIVER`. Devuelve sólo los perfiles del familiar con un
 
 ## Lo que este contrato NO cubre todavía
 
-- Escaneo del QR en el teléfono del adulto mayor: HU-009. El endpoint de canje (`/redeem`) todavía
-  no existe en el rewrite: llega con esa HU, junto con el escáner del teléfono; mientras tanto la
-  ruta documentada abajo es el contrato a implementar, no algo que ya esté sirviendo.
-- Límite de intentos del canje: HU-009. Con un token de 32 bytes el espacio de búsqueda deja de
-  ser el problema —el viejo código de 6 dígitos tenía 10^6 combinaciones y ya no existe—, así que el
-  límite queda como defensa en profundidad.
-- Consentimiento del titular antes de compartir actividades, SOS o GPS: HU-009.
+- Escaneo del QR en el teléfono del adulto mayor: HU-009. La pantalla de escaneo, la validación
+  local del sobre, el consentimiento en pantalla y el guardado cifrado del token de dispositivo
+  (MMKV) son de la app; el endpoint de canje ya existe y el contrato es el de arriba.
+- Desvinculación y reasignación del dispositivo (HU-012): estos QR sólo vinculan.
 
 Ver también `.agents/skills/project/pairing-generator/SKILL.md` (reglas del token) y
 `.agents/skills/project/qr-adapter/SKILL.md` (payload y presentación del QR).

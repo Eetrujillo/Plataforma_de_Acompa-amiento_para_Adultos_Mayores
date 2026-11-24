@@ -169,7 +169,11 @@ así que un valor inventado no puede convertirse en Bogotá sin que nadie se ent
 
 - `PENDING` — el familiar cargó el perfil; el teléfono del adulto mayor todavía no lo reclamó.
 - `LINKED` — el teléfono canjeó el token del QR de vinculación. Solo el canje lo escribe; el panel
-  nunca lo marca a mano.
+  nunca lo marca a mano. La escritura la hace el slice `pairing` con su adaptador propio
+  (`MongoosePairingSeniorWriter`): en LA MISMA escritura condicional que fija `LINKED` viaja la
+  evidencia del consentimiento (`acceptedTermsAt`, `termsVersion`, `ipAddress` — Ley 1581), y el
+  filtro exige `linkStatus: 'PENDING'`, así que la carrera de dos canjes no produce dos vínculos.
+  El slice seniors no escribe `LINKED` nunca; al leerlo no distingue quién lo escribió.
 
 El alta escribe `linkStatus: 'PENDING'` siempre, así que ningún perfil del rewrite queda sin el
 campo. Si un documento llegara sin él (escrito a mano o por una versión anterior del modelo), el
@@ -194,10 +198,7 @@ Consecuencias:
 
 ## Pendientes que esta HU deja anotados
 
-- Canje del QR y transición `PENDING → LINKED` (HU-009). El canje nunca crea el perfil: lo crea
-  el familiar acá.
 - Invitación de otro familiar con token propio (HU-011, L11 del backlog). El dominio ya modela el
   vínculo `FAMILY` y el repositorio ya sabe escribirlo de forma idempotente, pero no hay un
   contrato HTTP que lo use.
 - Edición de la ficha médica por el familiar y su consentimiento separado (HU-012 y HU-025).
-- Límite de intentos del canje de QR, con bloqueo por perfil (HU-009).

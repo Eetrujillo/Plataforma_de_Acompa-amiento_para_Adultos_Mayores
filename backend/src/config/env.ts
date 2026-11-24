@@ -40,6 +40,11 @@ export interface AppEnv {
   lockoutMinutes: number;
   loginIpMaxAttempts: number;
   loginIpWindowMinutes: number;
+  /** HU-009: canje del QR — bloqueo por perfil (S7) y límite por IP (S21). */
+  redeemMaxAttempts: number;
+  redeemLockoutMinutes: number;
+  redeemIpMaxAttempts: number;
+  redeemIpWindowMinutes: number;
   /** SMTP para el correo de verificación; sin host el canal es console (D4). */
   smtp: {
     host: string | null;
@@ -188,6 +193,12 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     lockoutMinutes: readPositiveInt(source, 'LOCKOUT_MINUTES', 15),
     loginIpMaxAttempts: readPositiveInt(source, 'LOGIN_IP_MAX_ATTEMPTS', 20),
     loginIpWindowMinutes: readPositiveInt(source, 'LOGIN_IP_WINDOW_MINUTES', 15),
+    // HU-009: 5 fallos consecutivos bloquean el canje 15 minutos (S7); el
+    // límite por IP comparte la postura defensiva del login (D9/S21).
+    redeemMaxAttempts: readPositiveInt(source, 'REDEEM_MAX_ATTEMPTS', 5),
+    redeemLockoutMinutes: readPositiveInt(source, 'REDEEM_LOCKOUT_MINUTES', 15),
+    redeemIpMaxAttempts: readPositiveInt(source, 'REDEEM_IP_MAX_ATTEMPTS', 20),
+    redeemIpWindowMinutes: readPositiveInt(source, 'REDEEM_IP_WINDOW_MINUTES', 15),
     smtp: {
       host: readOptionalString(source, 'SMTP_HOST'),
       port: readInt(source, 'SMTP_PORT', 587),

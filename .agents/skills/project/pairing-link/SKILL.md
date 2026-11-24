@@ -14,7 +14,9 @@ cubre el otro lado: qué hace el teléfono con él. Es la mitad de HU-009 que nu
    abrir la app).
 2. **Validar el sobre en el dispositivo**, antes de cualquier llamada de red.
 3. **Mostrar el consentimiento** de la Ley 1581 (HU-009) con la tipografía de `senior-ui-wcag`.
-4. **Canjear** el token contra `POST /api/pairing/redeem`.
+4. **Canjear** el token contra `POST /api/pairing/redeem` con
+   `{ "token": "...", "acceptedTerms": true }`: la bandera del paso 3 es obligatoria en el
+   cuerpo; sin ella el backend responde `400 TERMS_NOT_ACCEPTED` antes de mirar la base.
 5. **Guardar el token de dispositivo** y pasar el perfil a `LINKED`.
 6. Abrir la rutina del día.
 
@@ -33,28 +35,37 @@ se guarda nada**: ni token de dispositivo, ni estado, ni un registro parcial.
 
 ## 3. Canje: una sola vez, sin reintento automático
 
-- `POST /api/pairing/redeem` con `{ "token": "..." }` y sin sesión: el token **es** la credencial.
-- La respuesta exitosa trae el token de dispositivo. Es la única vez que se entrega.
-- `409` (vencido, reemplazado o ya canjeado) **no se reintenta**: se muestra el mensaje y se ofrece
-  escanear otro. Reintentar un token quemado solo gasta intentos y nunca va a funcionar.
+- `POST /api/pairing/redeem` con `{ "token": "...", "acceptedTerms": true }` y sin sesión: el
+  token **es** la credencial (la ruta es pública, sin `Authorization`).
+- La respuesta exitosa (`201`) trae el token de dispositivo. Es la única vez que se entrega.
+- Los códigos del servidor, según `docs/pairing-api.md`: vencido o reemplazado → `400
+  VALIDATION_ERROR` con el mensaje genérico en inglés; ya canjeado o perfil ajeno → `409
+  CONFLICT`; perfil ya vinculado → `409 SENIOR_ALREADY_LINKED` (el QR no se quema); desconocido
+  pero bien formado → `404 NOT_FOUND`; bloqueado → `429`. Ninguno de esos errores se reintenta
+  automáticamente: se muestra el mensaje y se ofrece escanear otro. Reintentar un token quemado
+  solo gasta intentos y nunca va a funcionar.
 - La escritura del servidor es atómica: dos escaneos simultáneos del mismo QR terminan con un solo
   `201` y el resto en `409`. El cliente no necesita deduplicar, pero tampoco puede asumir dos
   éxitos.
-- El canje no crea perfiles ni manda datos de la ficha: el cuerpo solo lleva `token`.
+- El canje no crea perfiles ni manda datos de la ficha: el cuerpo solo lleva `token` y la bandera
+  de consentimiento; la evidencia (`acceptedTermsAt`, `termsVersion`, `ipAddress`) la arma el
+  servidor — el cliente no la inventa.
 
 ## 4. Mensajes exactos
 
 | Situación | Texto en pantalla |
 | --- | --- |
-| QR vencido o reemplazado (409) | **"Pídele a tu familiar un QR nuevo"** |
-| QR ya usado (409) | "Este código ya se usó. Pídele a tu familiar un QR nuevo." |
+| QR vencido o reemplazado (`400` del servidor, mensaje genérico) | **"Pídele a tu familiar un QR nuevo"** |
+| QR ya usado (`409` del servidor) | "Este código ya se usó. Pídele a tu familiar un QR nuevo." |
 | QR de otra app (validación local) | "Este código no es de la app." |
 | Sin conexión | "Sin conexión. Reintentando..." (con reintento manual visible) |
 | Bloqueado por intentos | "Demasiados intentos. Espera 15 minutos." |
 | Cámara denegada | "No podemos usar la cámara. Actívala en los ajustes del teléfono." |
 
-El mensaje de 409 no distingue entre vencido, reemplazado y usado: es la misma respuesta del
-servidor a propósito, y el texto tampoco lo desambigua.
+El mensaje de 409 no distingue entre ya usado y perfil ajeno: es la misma respuesta del servidor
+a propósito, y el texto tampoco lo desambigua. Los errores (“400 del servidor”, “409 del
+servidor”) no cambian el texto de pantalla: la app decide qué mostrar por código, nunca por el
+mensaje en inglés que llega en `error.message`.
 
 ## 5. Sin PIN: el canje no pide ninguna credencial
 
@@ -84,7 +95,24 @@ servidor a propósito, y el texto tampoco lo desambigua.
   la app vuelve a la pantalla de vinculación: el cliente no decide la desvinculación, la detecta por
   el rechazo del servidor.
 
-## 8. Lo que no se hace
+## 8. Lo que ya vive en el backend (HU-009, canje)
+
+Las reglas de los puntos anteriores se cumplen en el servidor `backend/src/modules/pairing/`
+(caso de uso `RedeemPairingToken`, ruta pública `POST /api/pairing/redeem`):
+
+- El reclamo es una escritura condicional de un solo uso **antes** de tocar el perfil: dos
+  escaneos simultáneos producen un solo `201` y el resto `409`. Si la escritura del perfil falla
+  después, el token queda quemado (falla cerrado): el familiar emite otro QR.
+- El consentimiento (`acceptedTerms`) es obligatorio y la evidencia (`acceptedTermsAt`,
+  `termsVersion`, `ipAddress`) se escribe en la misma escritura que `linkStatus: 'LINKED'`, sobre
+  el propio documento del adulto mayor.
+- El bloqueo por perfil vive en el servidor (5 fallos → 15 minutos, `429 ACCOUNT_LOCKED`; el
+  intento bloqueado no se cuenta) y el límite por IP (`429 TOO_MANY_REQUESTS`) cuenta también los
+  intentos con token desconocido. Un cliente modificado no puede saltarse ninguno de los dos.
+- El mensaje `pairing token already used` (y sus dos hermanos en inglés) son los que la app
+  mapea a los textos de pantalla de los puntos 3 y 4; el backend no muestra pantallas.
+
+## 9. Lo que no se hace
 
 - No hay campo para tipear el token, ni "pegar código", ni código de 6 dígitos legible.
 - No se acepta un QR que venga por URL con la credencial adentro.
@@ -100,5 +128,8 @@ servidor a propósito, y el texto tampoco lo desambigua.
   `react-native-vision-camera` y decodificación de QR local).
 - Consentimiento: `app/src/features/consent/ui/senior/ConsentScreen.tsx`.
 - Contrato del canje: `docs/pairing-api.md` · contrato del perfil: `docs/seniors-api.md`.
+- Backend del canje: `backend/src/modules/pairing/application/RedeemPairingToken.ts` y
+  `backend/src/modules/pairing/infrastructure/` (`MongoosePairingTokenRepository.claimUnused`,
+  `MongoosePairingSeniorWriter`).
 - Emisión del QR (el otro lado): `pairing-generator` y `qr-adapter`.
 - Persistencia local: `mobile-storage-mmkv` (token) y `mobile-storage-sqlite-powersync` (cola offline).

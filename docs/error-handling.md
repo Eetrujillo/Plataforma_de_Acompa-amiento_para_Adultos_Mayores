@@ -37,21 +37,22 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 
 | Status | `error.code` | Cuándo |
 | --- | --- | --- |
-| `400` | `VALIDATION_ERROR` | falta un campo o no cumple su regla |
+| `400` | `VALIDATION_ERROR` | falta un campo o no cumple su regla; en el canje del QR, un token de vinculación malformado, vencido o invalidado (el mismo mensaje genérico en los tres casos) |
 | `400` | `EMAIL_ALREADY_REGISTERED` | el correo ya tiene cuenta |
 | `400` | `INVALID_JSON` | el cuerpo no es JSON válido (`entity.parse.failed`) |
 | `400` | `SENIOR_ID_REQUIRED` | falta `seniorId` en la emisión del QR de vinculación o no tiene forma de id de Mongo (24 hex) |
 | `401` | `UNAUTHORIZED` | falta o no sirve el token de sesión, o credenciales inválidas en el login |
 | `403` | `EMAIL_NOT_VERIFIED` | la cuenta existe pero no confirmó el correo |
 | `403` | `FORBIDDEN` | el rol de la sesión no tiene permiso sobre la ruta (guard `requireRole`) |
-| `404` | `NOT_FOUND` | ruta o recurso inexistente |
+| `404` | `NOT_FOUND` | ruta o recurso inexistente; en el canje del QR, un token bien formado que la base no conoce (*pairing token not found*) |
 | `404` | `SENIOR_NOT_FOUND` | perfil inexistente, ajeno, mal formado o de otro rol: respuesta idéntica en los cuatro casos |
-| `409` | `CONFLICT` | el estado actual impide la operación |
-| `409` | `SENIOR_ALREADY_LINKED` | el perfil ya figura vinculado (o es anterior a HU-005, sin `linkStatus`): no se emite un QR nuevo |
+| `409` | `CONFLICT` | el estado actual impide la operación; en el canje del QR, el token ya fue canjeado o el perfil del token ya no es del mismo familiar (*pairing token already used*: la respuesta jamás confirma que el id exista) |
+| `409` | `SENIOR_ALREADY_LINKED` | el perfil ya figura vinculado (o es anterior a HU-005, sin `linkStatus`): no se emite un QR nuevo y el canje llega sin quemarlo |
 | `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
-| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora), el límite de pedidos de recuperación de contraseña (3 por hora, HU-004) o el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) |
-| `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
+| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora), el límite de pedidos de recuperación de contraseña (3 por hora, HU-004), el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) o el límite de intentos del canje por IP (`REDEEM_IP_MAX_ATTEMPTS`, default 20, por ventana de `REDEEM_IP_WINDOW_MINUTES`, default 15; HU-009) |
+| `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) o el perfil del canje está bloqueado por intentos fallidos del QR (`REDEEM_MAX_ATTEMPTS`, default 5; `REDEEM_LOCKOUT_MINUTES`, default 15; HU-009). En los dos casos `details.retryAfterSeconds` trae los segundos restantes y el intento bloqueado no se cuenta |
 | `400` | `WEAK_PASSWORD` | la contraseña no cumple la regla (mínimo 8 caracteres, con al menos una letra y un dígito) |
+| `400` | `TERMS_NOT_ACCEPTED` | la bandera de consentimiento `acceptedTerms` falta o no es `true` (registro del familiar y canje del QR del adulto mayor; Ley 1581) |
 | `400` | `INVALID_EMAIL` | el correo no tiene formato válido (registro, reenvío de verificación o recuperación de contraseña) |
 | `400` | `INVALID_BODY` | falta un campo del cuerpo, no es texto o no es del tipo esperado (en el alta de seniors, `details.field` marca el campo) |
 | `400` | `INVALID_NAME` | el nombre del perfil senior falta, no es texto o queda con menos de 3 caracteres tras normalizar (máximo 120) |
