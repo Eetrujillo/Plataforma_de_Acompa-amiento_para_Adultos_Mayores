@@ -10,6 +10,11 @@ import {
 } from './modules/auth/index.ts';
 import type { AuthLogger } from './modules/auth/index.ts';
 import { createMongooseSeniorRepository } from './modules/seniors/index.ts';
+import {
+  createMongoosePairingSeniorReader,
+  createMongoosePairingTokenRepository,
+  createPairingQrEncoder,
+} from './modules/pairing/index.ts';
 
 /**
  * Describe un fallo de arranque para el log: el texto se scrubea porque el
@@ -50,6 +55,11 @@ async function main(): Promise<void> {
   // HU-005/HU-007: el slice seniors tiene su propio adaptador (D6): perfiles
   // en `users` con la ficha médica y vínculos en `seniorlinks`.
   const seniorRepository = createMongooseSeniorRepository();
+  // HU-008: credenciales de vinculación en su colección propia (D6) y el QR
+  // codificado por el puerto propio (D9). El lector de perfiles es la misma
+  // instancia del repositorio de seniors (D4): una sola fuente de verdad.
+  const pairingTokenRepository = createMongoosePairingTokenRepository();
+  const pairingSeniorReader = createMongoosePairingSeniorReader(seniorRepository);
   const app = buildApp(
     {
       userRepository,
@@ -81,6 +91,13 @@ async function main(): Promise<void> {
       // HU-005/HU-007: los perfiles y sus vínculos comparten el reloj del
       // servidor; la persistencia es el adaptador mongoose del slice.
       seniorRepository,
+      // HU-008: emisión del QR de vinculación (S1-S15). El lector delega la
+      // propiedad en el repositorio de seniors y detecta el documento sin
+      // `linkStatus` (D12): ese perfil cuenta como ya vinculado.
+      pairingSeniorReader,
+      pairingTokenRepository,
+      qrEncoder: createPairingQrEncoder(),
+      pairingTtlMinutes: env.pairingTtlMinutes,
     },
     { trustProxyHops: env.trustProxyHops },
   );

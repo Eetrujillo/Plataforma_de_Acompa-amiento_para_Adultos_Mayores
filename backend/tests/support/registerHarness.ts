@@ -12,6 +12,11 @@ import type {
   UserRepositoryPort,
 } from '../../src/modules/auth/application/RegisterCaregiver.ts';
 import { InMemorySeniorRepository } from './seniorFakes.ts';
+import {
+  InMemoryPairingTokenRepository,
+} from './pairingFakes.ts';
+import type { PairingQrEncoderPort } from '../../src/modules/pairing/application/PairingQrEncoderPort.ts';
+import { createPairingQrEncoder, PAIRING_TOKEN_TTL_MINUTES } from '../../src/modules/pairing/index.ts';
 import type {
   ConsentEvidence,
   UserEntity,
@@ -408,6 +413,10 @@ export interface Harness {
   repo: InMemoryUserRepository;
   /** HU-005/HU-007: doble del puerto de seniors, compartido con la app. */
   seniorRepo: InMemorySeniorRepository;
+  /** HU-008: doble del almacén de tokens de vinculación, compartido con la app. */
+  pairingRepo: InMemoryPairingTokenRepository;
+  /** HU-008: codificador del QR inyectado en la app (real por default). */
+  qrEncoder: PairingQrEncoderPort;
   hasher: PasswordHasherPort;
   sender: FakeEmailSender;
   logger: CapturingLogger;
@@ -420,6 +429,12 @@ export interface HarnessOptions {
   app?: AppOptions;
   /** HU-005/HU-007: repositorio de seniors compartido con la app (sembrar vínculos). */
   seniorRepository?: InMemorySeniorRepository;
+  /** HU-008: almacén de tokens de vinculación compartido con la app. */
+  pairingTokenRepository?: InMemoryPairingTokenRepository;
+  /** HU-008: codificador de QR alternativo (FailingQrEncoder para S4). */
+  qrEncoder?: PairingQrEncoderPort;
+  /** HU-008: PAIRING_TTL_MINUTES (D7, default = la constante del dominio). */
+  pairingTtlMinutes?: number;
   /** Repositorio compartido: para probar el bloqueo a través de un "reinicio" (S4). */
   repository?: InMemoryUserRepository;
   /** Error que rechaza `repo.save`, para simular fallos del adaptador. */
@@ -462,6 +477,9 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
   const logger = new CapturingLogger();
   const clock = { now: FIXED_NOW };
   const seniorRepository = options.seniorRepository ?? new InMemorySeniorRepository();
+  const pairingTokenRepository =
+    options.pairingTokenRepository ?? new InMemoryPairingTokenRepository();
+  const qrEncoder = options.qrEncoder ?? createPairingQrEncoder();
   const app = buildApp(
     {
       userRepository: repo,
@@ -492,10 +510,28 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
       loginIpWindowMinutes: options.loginIpWindowMinutes ?? 15,
       // HU-005/HU-007: el mismo doble de seniors que exponen los tests.
       seniorRepository,
+      // HU-008: emisión del QR con los dobles (o el codificador real). El lector
+      // es el doble de seniors: en producción el adaptador de pairing añade la
+      // detección del documento sin `linkStatus` (D12), pineada contra Mongo.
+      pairingSeniorReader: seniorRepository,
+      pairingTokenRepository,
+      qrEncoder,
+      // D7: el default es la constante del dominio, no otro número a mano.
+      pairingTtlMinutes: options.pairingTtlMinutes ?? PAIRING_TOKEN_TTL_MINUTES,
     },
     options.app,
   );
-  return { app, repo, seniorRepo: seniorRepository, hasher, sender, logger, clock };
+  return {
+    app,
+    repo,
+    seniorRepo: seniorRepository,
+    pairingRepo: pairingTokenRepository,
+    qrEncoder,
+    hasher,
+    sender,
+    logger,
+    clock,
+  };
 }
 
 export async function withServer(
@@ -516,6 +552,8 @@ export interface PostResult {
   status: number;
   json: unknown;
   text: string;
+  /** Headers de la respuesta (HU-008: Cache-Control de S21/D10). */
+  headers: Headers;
 }
 
 export async function post(
@@ -555,7 +593,7 @@ async function request(
   } catch {
     json = null;
   }
-  return { status: response.status, json, text };
+  return { status: response.status, json, text, headers: response.headers };
 }
 
 export const VALID_BODY = {

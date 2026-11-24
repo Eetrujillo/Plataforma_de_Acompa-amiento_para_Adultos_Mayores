@@ -29,6 +29,8 @@ export interface AppEnv {
   resendThrottleWindowMinutes: number;
   /** HU-004: enlace de restablecimiento (S2) y límite propio de forgot-password (S9). */
   passwordResetTtlMinutes: number;
+  /** HU-008: vigencia del QR de vinculación (S14, D7). Default: 24 horas. */
+  pairingTtlMinutes: number;
   forgotThrottleMax: number;
   forgotThrottleWindowMinutes: number;
   /** JWT_EXPIRES_IN: vigencia del token de sesión (login). */
@@ -177,6 +179,8 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     resendThrottleWindowMinutes: readPositiveInt(source, 'RESEND_THROTTLE_WINDOW_MINUTES', 60),
     // HU-004: el default del criterio de aceptación es 60 minutos (S2).
     passwordResetTtlMinutes: readPositiveInt(source, 'PASSWORD_RESET_TTL_MINUTES', 60),
+    // HU-008: 24 horas por defecto (S14), la constante del dominio es el default (D7).
+    pairingTtlMinutes: readPositiveInt(source, 'PAIRING_TTL_MINUTES', 1440),
     forgotThrottleMax: readPositiveInt(source, 'FORGOT_THROTTLE_MAX', 3),
     forgotThrottleWindowMinutes: readPositiveInt(source, 'FORGOT_THROTTLE_WINDOW_MINUTES', 60),
     jwtExpiresIn: readJwtDuration(source, 'JWT_EXPIRES_IN'),
