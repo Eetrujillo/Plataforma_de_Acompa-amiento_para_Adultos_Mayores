@@ -85,20 +85,17 @@ Las skills de `project/` son obligatorias, no sugerencias:
 
 ## Flujo de trabajo
 
-Cada tarea vive en su propia rama. **Nada se commitea directo en `main` ni en `prod`.**
+El contrato operativo completo vive en **`docs/flujo-de-trabajo.md`**: ramas, pruebas, integración,
+promoción a producción, commits, base de datos de trabajo y las reglas duras. Se lee antes de abrir
+una rama.
 
-1. Rama desde `main`: `hu-00X-<slug>` para una HU, `fix/<slug>` o `feat/<slug>` para lo demás.
-2. Implementación con criterio de aceptación observable por delante.
-3. Antes de integrar, en verde y con la salida real a la vista:
-   - `cd backend && npm test`
-   - `cd app && npm run typecheck && npm run lint` (cuando exista el proyecto React Native)
-   - el build del APK solo se exige cuando la HU toca código nativo
-   - criterios de aceptación de la HU, uno por uno, verificados de verdad.
-4. Merge a la rama de integración **solo** si los tres puntos anteriores pasaron.
-5. Promoción a `prod` con confirmación explícita del humano. Es el único paso que toca el VPS.
+Lo mínimo que no se negocia:
 
-> Mientras la app no compile, **ningún push a `prod`**: el workflow hace `docker compose up --build`
-> y fallaría el deploy.
+1. Rama propia desde `main` (`hu-00X-<slug>`, `fix/…`, `feat/…`, `chore/…`). Nunca commitear en `main`
+   ni en `prod`.
+2. Antes de integrar: `npm test` y `npm run typecheck` en verde, y los criterios de aceptación de la
+   HU verificados uno por uno.
+3. El push a `prod` lo confirma el humano: dispara el deploy por SSH y no hay paso intermedio.
 
 ## Base de datos
 

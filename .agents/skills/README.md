@@ -10,14 +10,14 @@ abajo son el HEAD del repo de origen al momento de copiar.
 
 | Repo | Commit | Skills copiadas |
 | --- | --- | --- |
-| `agents-inc/skills` | `845a1f2` | `api-database-mongoose`, `api-framework-express`, `mobile-framework-react-native`, `mobile-navigation-react-navigation`, `mobile-notifications-push`, `mobile-deep-linking-app-links`, `mobile-security-react-native`, `mobile-camera-vision-camera`, `mobile-storage-mmkv`, `mobile-storage-sqlite-powersync`, `mobile-background-tasks`, `mobile-performance-react-native`, `mobile-testing-maestro`, `web-realtime-socket-io`, `web-accessibility-web-accessibility`, `web-forms-zod-validation`, `web-utilities-date-fns`, `shared-security-auth-security`, `shared-tooling-typescript-config`, `meta-design-expressive-typescript`, `infra-ci-cd-docker` |
-| `mongodb/agent-skills` | `180d6a3` | `mongodb`, `mongodb-connection`, `mongodb-schema-design`, `mongodb-query-optimizer` |
-| `iDiagoValeta/hexagonal-architecture` | `d15997c` | `hexagonal-architecture` (audita la dependency rule en el código) |
-| `Jeffallan/claude-skills` | `d98d06e` | `secure-code-guardian` (`plugin/skills/`) |
-| `jaballer/react-claude-skills` | `a846192` | las 21 `react-*` |
-| `anthropics/skills` | `e4bb5d9` | `frontend-design`, `skill-creator` |
-| `mastepanoski/claude-skills` | `ac30238` | `wcag-accessibility-audit` |
-| `shawnmcb/claude-a11y-skills` | `0e793f1` | `wcag-check` |
+| `agents-inc/skills` | `845a1f2833eedc494bb82e3172710c06cab547a1` | `api-database-mongoose`, `api-framework-express`, `mobile-framework-react-native`, `mobile-navigation-react-navigation`, `mobile-notifications-push`, `mobile-deep-linking-app-links`, `mobile-security-react-native`, `mobile-camera-vision-camera`, `mobile-storage-mmkv`, `mobile-storage-sqlite-powersync`, `mobile-background-tasks`, `mobile-performance-react-native`, `mobile-testing-maestro`, `web-realtime-socket-io`, `web-accessibility-web-accessibility`, `web-forms-zod-validation`, `web-utilities-date-fns`, `shared-security-auth-security`, `shared-tooling-typescript-config`, `meta-design-expressive-typescript`, `infra-ci-cd-docker` |
+| `mongodb/agent-skills` | `180d6a3386c1d1dc44cdab300cc0f7ed0843c9e0` | `mongodb`, `mongodb-connection`, `mongodb-schema-design`, `mongodb-query-optimizer` |
+| `iDiagoValeta/hexagonal-architecture` | `d15997cc094a1a2a7490fe4e0000f15b5d5025c0` | `hexagonal-architecture` (audita la dependency rule en el código) |
+| `Jeffallan/claude-skills` | `d98d06edb54c25cfb94017c0ef830342a34a43ba` | `secure-code-guardian` (`plugin/skills/`) |
+| `jaballer/react-claude-skills` | `a846192857412ba6a23b00f11343e6d48a317c55` | las 21 `react-*` |
+| `anthropics/skills` | `e4bb5d960d87126ff3b3a8af1a104b7db67560ba` | `frontend-design`, `skill-creator` |
+| `mastepanoski/claude-skills` | `ac3023830834f9c7c181649f31fbfd48c91837d3` | `wcag-accessibility-audit` |
+| `shawnmcb/claude-a11y-skills` | `0e793f1ef9b1dc788402a0109e79638eb83ee7b3` | `wcag-check` |
 
 > No se vendoriza `capawesome-team/skills`: su colección `capacitor-plugins` son 244 páginas de
 > referencia upstream y Capacitor salió del stack. Se consulta en línea cuando haga falta.

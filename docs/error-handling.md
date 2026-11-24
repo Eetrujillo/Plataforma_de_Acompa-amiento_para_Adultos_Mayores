@@ -48,7 +48,7 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora) |
 | `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
 | `500` | `INTERNAL_ERROR` | error inesperado, o error de Mongoose o del driver sin traducción |
-| `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (Mongoose necesita `rs0` para transacciones) |
+| `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (las transacciones de Mongoose necesitan un replica set; `rs0` es solo el nombre que fija este compose) |
 | `503` | `DATABASE_UNAVAILABLE` | el driver no pudo contactar la base |
 
 Un JSON inválido y un cuerpo demasiado grande se traducen a `400`/`413` antes de caer en el `500`

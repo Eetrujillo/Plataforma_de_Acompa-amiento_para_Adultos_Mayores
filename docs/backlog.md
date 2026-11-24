@@ -47,6 +47,8 @@ Crear una cuenta de familiar para administrar adultos mayores y alertas.
 - [ ] Correo ya existente responde HTTP 400 indicando duplicidad.
 - [ ] Exige contraseña alfanumérica de al menos 8 caracteres.
 - [ ] Exige aceptación de la política de tratamiento de datos; sin ella responde HTTP 400 y no escribe nada.
+- [ ] Normaliza el correo a minúsculas y sin espacios antes de validar duplicidad y de guardar: `Ana@X.com` y `ana@x.com` son la misma cuenta.
+- [ ] Persiste solo el hash bcrypt de la contraseña (costo 10); el texto plano no se guarda ni se loguea.
 
 ### HU-002 · Confirmación del correo electrónico · `repo 002`
 Validar la propiedad de la cuenta por enlace de correo.
@@ -55,6 +57,9 @@ Validar la propiedad de la cuenta por enlace de correo.
 - [ ] La verificación marca el correo como confirmado.
 - [ ] Token expirado o ya usado responde el error del contrato, sin distinguir cuál de los dos fue.
 - [ ] Bloquea el reenvío al cuarto intento dentro de una hora (HTTP 429).
+- [ ] Arma el enlace con `APP_URL` de configuración, nunca con el header `Host` del pedido.
+- [ ] Persiste solo `sha256(token)`; el token en claro viaja únicamente en el correo.
+- [ ] El contador de reenvíos se incrementa también para correos inexistentes o ya verificados: un 429 que solo aparece con cuentas reales es un oráculo de existencia.
 
 ### HU-003 · Inicio de sesión con bloqueo por intentos · `repo 003`
 **Skills:** `jwt-security`, `rate-limiting`, `secure-code-guardian`
@@ -63,6 +68,9 @@ Validar la propiedad de la cuenta por enlace de correo.
 - [ ] Bloquea la cuenta 15 minutos tras 5 intentos fallidos consecutivos.
 - [ ] El bloqueo se persiste en el usuario: un reinicio del backend no desbloquea.
 - [ ] Un login correcto limpia el contador.
+- [ ] El token lleva exactamente los claims `sub`, `role`, `email` y `sv`; ningún dato personal más.
+- [ ] Cada request autenticado compara el claim `sv` contra `sessionVersion` del usuario: subir la versión cierra todas las sesiones.
+- [ ] El `429 ACCOUNT_LOCKED` solo aparece para cuentas reales: excepción registrada, aceptada a cambio de que la persona bloqueada entienda qué le pasa.
 - [ ] Acceder a una ruta privada sin token redirige al login sin pedir el recurso.
 
 ### HU-004 · Recuperación de contraseña · `repo 004`
@@ -70,6 +78,8 @@ Validar la propiedad de la cuenta por enlace de correo.
 - [ ] Responde un mensaje genérico exista o no el correo ingresado.
 - [ ] El enlace funciona una sola vez y expira en 60 minutos.
 - [ ] Al completar el cambio se invalidan todas las sesiones previas (sube `sessionVersion`).
+- [ ] Persiste solo `sha256(token)` del enlace de reset; el token en claro viaja únicamente en el correo.
+- [ ] El endpoint no distingue entre token vencido y token ya usado.
 
 ### HU-005 · Varios familiares por adulto mayor con permisos equivalentes · `nueva`
 Un adulto mayor puede estar vinculado a más de un familiar, y cualquiera de ellos puede administrarlo.
@@ -95,6 +105,10 @@ Un adulto mayor puede estar vinculado a más de un familiar, y cualquiera de ell
 - [ ] Restringe la vista del perfil a los familiares vinculados.
 - [ ] La proyección pública excluye los campos médicos sensibles salvo para el familiar vinculado.
 - [ ] El alta no registra consentimiento del titular: eso ocurre en HU-009, cuando el adulto mayor acepta.
+- [ ] El perfil se crea con una única fábrica (`User.createSenior`); el alta del panel y el canje del dispositivo usan la misma.
+- [ ] El `caregiverId` sale de la sesión, nunca del cuerpo del pedido.
+- [ ] El senior no tiene correo propio: lleva un correo sintético único y `passwordHash` nulo.
+- [ ] Valida la ficha antes de escribir: grupo sanguíneo de una enumeración cerrada, listas acotadas y longitudes máximas.
 
 ### HU-008 · Generar el QR de vinculación · `repo 006`
 **Skills:** `pairing-generator`, `qr-adapter`
@@ -102,6 +116,10 @@ Un adulto mayor puede estar vinculado a más de un familiar, y cualquiera de ell
 - [ ] El payload es `{"type":"senior-pairing","token":"…"}`: el token nunca aparece como texto en pantalla.
 - [ ] Impide generar un QR si el perfil ya figura vinculado.
 - [ ] Si el codificador del QR falla, responde 503 y **no** invalida el QR anterior.
+- [ ] El token es de 32 bytes en base64url (43 caracteres) y se persiste solo su `sha256`.
+- [ ] El token no aparece en el cuerpo de la respuesta ni en los logs: la única copia en claro es la imagen del QR.
+- [ ] Solo existe un QR activo por perfil: emitir invalida los anteriores no usados.
+- [ ] Responde 400 sin `seniorId`, 404 con perfil ajeno o inexistente y 409 si el perfil ya está vinculado.
 
 ### HU-009 · Vincular el dispositivo con consentimiento previo · `repo 007 + repo 008`
 **Skills:** `pairing-link`, `ley-1581`, `qr-adapter`, `senior-ui-wcag`
@@ -112,6 +130,9 @@ Un adulto mayor puede estar vinculado a más de un familiar, y cualquiera de ell
 - [ ] Registra fecha, hora y versión del consentimiento aceptado.
 - [ ] QR vencido o ya usado muestra exactamente **"Pídele a tu familiar un QR nuevo"**.
 - [ ] Bloquea nuevos intentos 15 minutos tras 5 fallos consecutivos.
+- [ ] El canje es una escritura condicional atómica: dos escaneos simultáneos del mismo QR producen un solo vínculo y el resto recibe 409.
+- [ ] El cliente no reintenta un 409 automáticamente: pide un QR nuevo.
+- [ ] El token de dispositivo se guarda cifrado en el almacenamiento local (MMKV), nunca en texto plano ni en logs.
 
 ### HU-010 · Regenerar el QR · `repo 006 (invalidación)`
 **Skills:** `pairing-generator`, `qr-adapter`
@@ -146,12 +167,14 @@ Un adulto mayor puede estar vinculado a más de un familiar, y cualquiera de ell
 - [ ] Rechaza títulos vacíos o de más de 60 caracteres.
 - [ ] Avisa al familiar si la fecha u hora agendada ya pasó.
 - [ ] Asocia la actividad a un perfil del cual el familiar es dueño; un perfil ajeno responde 404.
+- [ ] La actividad nace en estado "por aprobar" y no aparece en la rutina del adulto mayor hasta la aprobación de HU-017.
 
 ### HU-014 · Repetir una actividad · `repo 013`
 **Skills:** `activities-scheduler`
 - [ ] Permite "Una sola vez", "Todos los días" o días específicos de la semana.
 - [ ] Exige marcar al menos un día al elegir la opción por días.
 - [ ] Genera las ocurrencias en la rutina del adulto mayor en los días elegidos.
+- [ ] La repetición exige fecha de fin o cantidad máxima de ocurrencias: no se generan ocurrencias indefinidas.
 
 ### HU-015 · Editar una actividad · `repo 014`
 **Skills:** `activities-hexagonal`, `timezone-bogota`
@@ -204,6 +227,7 @@ El anteproyecto introduce la aprobación por parte del adulto mayor o de un cuid
 - [ ] Registra una nota de texto del familiar asociada al adulto mayor y a una fecha.
 - [ ] La hora se asigna automáticamente en el servidor: el cliente no la puede imponer.
 - [ ] Rechaza notas vacías y por encima del límite de caracteres definido.
+- [ ] El límite de la nota es de 1000 caracteres, validado en el servidor y no solo en el cliente.
 - [ ] Solo los familiares vinculados pueden escribir en la bitácora de ese adulto.
 
 ### HU-022 · Ver la bitácora del día con avance e historial · `nueva + repo 021 + repo 022`
@@ -263,6 +287,7 @@ El anteproyecto introduce la aprobación por parte del adulto mayor o de un cuid
 - [ ] Muestra la ubicación recibida en un mapa interactivo centrado en la posición, con su marca de tiempo.
 - [ ] Muestra "Ubicación no disponible" si el SOS llegó sin coordenadas, sin romper la alerta.
 - [ ] El canal en tiempo real exige autenticación: ninguna alerta de un adulto llega a un cuidador ajeno.
+- [ ] Si el familiar no tiene la app abierta, la alerta llega igual por FCM: el canal en tiempo real acelera, no reemplaza.
 
 ### HU-027 · Ubicación periódica y ubicación con la alerta · `nueva + repo 029`
 **Skills:** `mobile-storage-mmkv`, `ley-1581`, `sos-hexagonal`
@@ -279,6 +304,7 @@ El anteproyecto introduce la aprobación por parte del adulto mayor o de un cuid
 - [ ] No confunde "sin conexión" con "app cerrada": el aviso se basa en el silencio del heartbeat, no en un único evento.
 - [ ] Un dispositivo que recupera el reporte cancela el aviso sin intervención del familiar.
 - [ ] El aviso no se repite en cada ciclo mientras dure la desconexión.
+- [ ] El umbral de silencio que dispara el aviso es explícito y configurable; no se infiere de un único evento perdido.
 
 ---
 

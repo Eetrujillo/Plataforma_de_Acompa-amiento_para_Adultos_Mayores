@@ -119,11 +119,12 @@ alimentan actividades y SOS), con `{ "seniors": [ ... ] }`. Sin cambios en esta 
 
 ## Lo que este contrato NO cubre todavía
 
-- Escaneo del QR en el teléfono del adulto mayor: HU-007. Hoy el backend ya expone `/redeem`, pero
+- Escaneo del QR en el teléfono del adulto mayor: HU-009. Hoy el backend ya expone `/redeem`, pero
   no hay escáner en el frontend; la pantalla del teléfono sin vincular sólo explica qué falta.
-- Límite de intentos del canje: HU-009. Con un token de 32 bytes el espacio de búsqueda
-  deja de ser el problema (10^6 ya no existe), así que el límite queda como defensa en profundidad.
-- Consentimiento del titular antes de compartir actividades, SOS o GPS: HU-008.
+- Límite de intentos del canje: HU-009. Con un token de 32 bytes el espacio de búsqueda deja de
+  ser el problema —el viejo código de 6 dígitos tenía 10^6 combinaciones y ya no existe—, así que el
+  límite queda como defensa en profundidad.
+- Consentimiento del titular antes de compartir actividades, SOS o GPS: HU-009.
 
 Ver también `skills/pairing-generator.md` (reglas del token) y `skills/qr-adapter.md` (payload y
 presentación del QR).
