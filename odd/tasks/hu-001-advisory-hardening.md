@@ -86,8 +86,7 @@ persistencia (S3):
   el mensaje se scrubea con `redactConnectionStrings` antes de loguearse.
   Además el MINOR de la IP no válida se cerró en el controlador (`evidenceIp` usa `net.isIP`): con
   proxies confiables de más, `X-Forwarded-For: not-an-ip` ya no se guarda como evidencia.
-- **L6.** Hallazgos diferidos aceptados, no bloqueantes: (i) no hay aviso de arranque cuando
-  `TRUST_PROXY_HOPS=0` y llega un `X-Forwarded-For`: un deploy que olvide la variable guarda la IP
+- **L6.** Hallazgos diferidos aceptados, no bloqueantes: (i) no hay aviso de arranque cuando  `TRUST_PROXY_HOPS=0` y llega un `X-Forwarded-For`: un deploy que olvide la variable guarda la IP
   del nginx del host como evidencia (fail closed, degradado); (ii) `docker-compose.yml` no nombra
   `TRUST_PROXY_HOPS` (llega por `env_file`, pero no está documentado en el compose); (iii) un
   `backend/dist` viejo en local seguiría con `trust proxy: true` (está en `.gitignore` y la imagen
@@ -95,3 +94,15 @@ persistencia (S3):
   probar hasta que haya Mongo local (no hay ninguno corriendo en esta máquina); (v) el `.env` real no
   se inspeccionó (guard de rutas sensibles): si producción no define `TRUST_PROXY_HOPS`, hay que
   hacerlo en el deploy.
+- **L7.** Revisión nativa `review-eb36e2dc57247c51` (tier alto por escalado del ítem 2, lentes
+  risk+reliability): **aprobada**, autoridad quemada. Advisory no bloqueantes: `R1-deploy-hops`
+  (WARNING: un deploy detrás de proxy que olvide `TRUST_PROXY_HOPS` registra la IP del nginx — es el
+  fail-closed pedido, con dependencia operativa ya anotada), `R1-redact-parse-fallback` (SUGGESTION:
+  el fallback de texto sobre-redacta, sin fuga), `R3-adapter-11000-unproved` (WARNING: la ida y
+  vuelta real del `11000` sigue sin probar sin Mongo local, ya diferida en L6(iv)),
+  `R3-default-trust-degraded-evidence` (SUGGESTION: avisar en arranque cuando llega
+  `X-Forwarded-For` con 0 saltos), `R3-startup-stack-drop` (WARNING).
+- **L8.** `R3-startup-stack-drop` era una regresión propia y se cerró enseguida: el log de arranque
+  ahora conserva el stack (scrubeado) en vez de sólo `name: message`. Verificado ejecutando el
+  binario contra `MONGO_URL='mongodb://app:SuperSecret1@/db'`: sale `Protocol and host list are
+  required in "mongodb://***@/db"` con los frames y **cero** apariciones del secreto.

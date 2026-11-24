@@ -7,6 +7,22 @@ import {
   createMongooseUserRepository,
 } from './modules/auth/index.ts';
 
+/**
+ * Describe un fallo de arranque para el log: el texto se scrubea porque el
+ * driver repite la URI de conexión con credenciales, y las líneas del stack se
+ * conservan porque son el único diagnóstico de un arranque caído.
+ */
+function describeStartupError(error: unknown): string {
+  if (!(error instanceof Error)) return redactConnectionStrings(String(error));
+  const header = `${error.name}: ${redactConnectionStrings(error.message)}`;
+  if (error.stack === undefined) return header;
+  const [first, ...rest] = error.stack.split('\n');
+  // El stack empieza repitiendo `name: message`; se descarta esa línea y se
+  // conservan los frames, scrubeados por si alguno nombra la conexión.
+  void first;
+  return [header, ...rest.map((line) => redactConnectionStrings(line))].join('\n');
+}
+
 async function main(): Promise<void> {
   const env = loadEnv();
 
@@ -39,12 +55,8 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  // Los errores del driver repiten la URI de conexión con credenciales: el
-  // mensaje se scrubea antes de imprimirse.
-  const detail =
-    error instanceof Error
-      ? `${error.name}: ${redactConnectionStrings(error.message)}`
-      : redactConnectionStrings(String(error));
-  console.error('[server]', 'no se pudo arrancar el backend:', detail);
+  // Los errores del driver repiten la URI de conexión con credenciales: se
+  // scrubea el texto, pero se conserva el stack para poder diagnosticar.
+  console.error('[server]', 'no se pudo arrancar el backend:', describeStartupError(error));
   process.exit(1);
 });
