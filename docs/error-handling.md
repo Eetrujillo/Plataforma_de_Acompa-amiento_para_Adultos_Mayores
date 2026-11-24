@@ -42,14 +42,23 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `400` | `INVALID_JSON` | el cuerpo no es JSON válido (`entity.parse.failed`) |
 | `401` | `UNAUTHORIZED` | falta o no sirve el token de sesión, o credenciales inválidas en el login |
 | `403` | `EMAIL_NOT_VERIFIED` | la cuenta existe pero no confirmó el correo |
+| `403` | `FORBIDDEN` | el rol de la sesión no tiene permiso sobre la ruta (guard `requireRole`) |
 | `404` | `NOT_FOUND` | ruta o recurso inexistente |
+| `404` | `SENIOR_NOT_FOUND` | perfil inexistente, ajeno, mal formado o de otro rol: respuesta idéntica en los cuatro casos |
 | `409` | `CONFLICT` | el estado actual impide la operación |
 | `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
 | `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora), el límite de pedidos de recuperación de contraseña (3 por hora, HU-004) o el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) |
 | `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
 | `400` | `WEAK_PASSWORD` | la contraseña no cumple la regla (mínimo 8 caracteres, con al menos una letra y un dígito) |
 | `400` | `INVALID_EMAIL` | el correo no tiene formato válido (registro, reenvío de verificación o recuperación de contraseña) |
-| `400` | `INVALID_BODY` | falta un campo del cuerpo o no es texto |
+| `400` | `INVALID_BODY` | falta un campo del cuerpo, no es texto o no es del tipo esperado (en el alta de seniors, `details.field` marca el campo) |
+| `400` | `INVALID_NAME` | el nombre del perfil senior falta, no es texto o queda con menos de 3 caracteres tras normalizar (máximo 120) |
+| `400` | `INVALID_TIMEZONE` | la zona horaria no es una zona IANA válida |
+| `400` | `INVALID_BLOOD_TYPE` | el grupo sanguíneo no está en la enumeración cerrada (`A+ A- B+ B- AB+ AB- O+ O-`); si el campo falta o no es texto, la respuesta es `INVALID_BODY` con `details.field` |
+| `400` | `INVALID_ALLERGIES` | las alergias tienen más de 20 ítems, o un ítem queda vacío o con más de 80 caracteres |
+| `400` | `INVALID_CONDITIONS` | ídem para las condiciones |
+| `400` | `INVALID_MEDICATIONS` | ídem para la medicación |
+| `400` | `INVALID_EMERGENCY_CONTACT` | el contacto de emergencia necesita nombre de 3 a 120 caracteres y teléfono de 6 a 20 con `+`, dígitos, espacios o guiones |
 | `400` | `INVALID_TOKEN` | el enlace de verificación de correo o de restablecimiento de contraseña no sirve: vencido, ya usado, inexistente o malformado (respuesta idéntica en los cuatro casos, sin `details`) |
 | `500` | `INTERNAL_ERROR` | error inesperado, o error de Mongoose o del driver sin traducción |
 | `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (las transacciones de Mongoose necesitan un replica set; `rs0` es solo el nombre que fija este compose) |

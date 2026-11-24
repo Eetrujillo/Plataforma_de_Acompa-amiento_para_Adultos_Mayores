@@ -1,14 +1,38 @@
 # Seniors API — contrato del módulo seniors
 
-Perfil del adulto mayor creado por el familiar que lo administra (HU-005). El senior es un
-`User` con `role: SENIOR` y `caregiverId` del familiar dueño; no tiene correo propio ni
-contraseña: se vincula escaneando el QR que genera su familiar (HU-006/HU-007). El QR lleva un
-token opaco de un solo uso y 24 h de vigencia; no hay código que tipear.
+Perfil del adulto mayor creado por el familiar que lo administra (HU-005/HU-007). El senior es
+un `User` con `role: SENIOR`; no tiene correo propio ni contraseña y **no hay PIN**: se vincula
+escaneando el QR que genera su familiar (HU-009). La propiedad del perfil no vive en el
+documento: vive en la colección `seniorlinks` (ver «Propiedad por vínculos»).
 
 Todas las rutas exigen `Authorization: Bearer <jwt>` de un usuario con rol `CAREGIVER`.
-Sin token: `401`. Con rol `SENIOR`: `403`.
+Sin token: `401 UNAUTHORIZED`. Con sesión de otro rol (por ejemplo `SENIOR`): `403 FORBIDDEN`.
+El guard de rol es `requireRole('CAREGIVER')`
+(`backend/src/shared/middlewares/requireRole.ts`) y va siempre después del guard de sesión.
 
-## POST /api/seniors — HU-005
+## Propiedad por vínculos
+
+El perfil ya no lleva `caregiverId`: la propiedad es un registro de la colección `seniorlinks`
+(`backend/src/shared/models/SeniorLink.ts`, índice único compuesto `(seniorId, caregiverId)`).
+
+| Campo | Significado |
+| --- | --- |
+| `seniorId` | id del adulto mayor. |
+| `caregiverId` | id del familiar vinculado. |
+| `role` | `OWNER` (el familiar que dio el alta) o `FAMILY` (el resto). Informativo: **no** cambia permisos. |
+| `status` | `ACTIVE` o `REVOKED`. Solo un vínculo activo autoriza; revocar desactiva, nunca borra. |
+| `invitedBy` | quién agregó el vínculo; `null` en el vínculo `OWNER` del alta. |
+| `createdAt` | fecha del vínculo. |
+
+Consecuencias:
+
+- Un adulto mayor admite N familiares `ACTIVE` simultáneos, con permisos equivalentes: ninguno
+  queda en solo lectura.
+- Agregar un familiar no toca los vínculos existentes: entra como `FAMILY`, no revoca a nadie y
+  nunca se duplica (el índice único lo impide; la escritura es idempotente).
+- Un vínculo `REVOKED`, como un vínculo inexistente, no autoriza: la respuesta es `404`.
+
+## POST /api/seniors — HU-007
 
 ```http
 POST /api/seniors
@@ -34,19 +58,40 @@ Content-Type: application/json
 }
 ```
 
+La respuesta del alta es exactamente la proyección pública: sin ficha médica, sin correo
+sintético y sin consentimiento.
+
+Notas del alta:
+
+- El `caregiverId` **nunca** viaja en el cuerpo: lo pone el servidor desde la sesión. Un cliente
+  no puede crear un perfil bajo otra cuenta.
+- El orden de escritura es perfil y después el vínculo `OWNER` de quien lo pidió, **sin
+  transacción**. Si el vínculo no se puede escribir, la respuesta es `500` y el perfil queda sin
+  vínculo: nadie lo puede listar, abrir ni reclamar (falla cerrado), y el alta se reintenta entera.
+- El perfil nace `PENDING`, con `acceptedTermsAt` y `termsVersion` en `null`: el consentimiento lo
+  da el titular en HU-009, no el familiar que lo administra.
+- El perfil lleva un correo sintético único `senior+<uuid12>@seniors.local` y `passwordHash` nulo.
+
 Errores (todos `400`, con `error.code` para que la pantalla marque el campo):
 
 | `error.code` | Cuándo |
 | --- | --- |
-| `INVALID_NAME` | El nombre falta, no es texto o queda con menos de 3 caracteres después de normalizar. |
-| `INVALID_TIMEZONE` | La zona no es una zona IANA válida. No se cae a Bogotá en silencio. |
+| `INVALID_NAME` | El nombre falta, no es texto o queda con menos de 3 caracteres después de normalizar (máximo 120). |
+| `INVALID_TIMEZONE` | La zona no es una zona IANA válida. No se cae a Bogotá en silencio; si falta o viene vacía sí se guarda `America/Bogota`. |
+| `INVALID_BLOOD_TYPE` | El grupo sanguíneo falta o no está en la enumeración cerrada `A+ A- B+ B- AB+ AB- O+ O-` (es obligatorio). |
+| `INVALID_ALLERGIES` | Una lista tiene más de 20 ítems, o un ítem queda vacío o con más de 80 caracteres. |
+| `INVALID_CONDITIONS` | Ídem para las condiciones. |
+| `INVALID_MEDICATIONS` | Ídem para la medicación. |
+| `INVALID_EMERGENCY_CONTACT` | El nombre queda fuera de 3 a 120 caracteres, o el teléfono fuera de 6 a 20 caracteres con `+`, dígitos, espacios o guiones. |
 
-El `caregiverId` **nunca** viaja en el cuerpo: lo pone el servidor desde la sesión. Un
-cliente no puede crear un perfil bajo otra cuenta.
+Además, cuando un campo no es del tipo esperado (una zona que no es texto ni `null`, una lista que
+no es array de textos, un contacto que no es objeto), responde `400 INVALID_BODY` con
+`details.field` indicando el campo.
 
 ## GET /api/seniors — HU-005
 
-Devuelve solo los perfiles del familiar autenticado.
+Devuelve solo los perfiles con un vínculo `ACTIVE` con el familiar autenticado (los `PENDING` y
+los `LINKED` incluidos), del más reciente al más antiguo.
 
 ```http
 200 OK
@@ -60,7 +105,7 @@ Sin perfiles: `{ "seniors": [] }`, no un `404`.
 ## GET /api/seniors/:id — HU-005
 
 ```http
-200 OK   → el mismo objeto del alta
+200 OK   → el mismo objeto público del alta
 404      → { "error": { "code": "SENIOR_NOT_FOUND", "message": "No encontramos ese perfil" } }
 ```
 
@@ -69,16 +114,39 @@ caracteres hexadecimales) y un `id` que corresponde a un `CAREGIVER` devuelven e
 `404`. Distinguirlos confirmaría que un id existe: es exactamente la filtración que la regla
 de propiedad evita.
 
-## Propiedad del perfil (seguridad)
+## GET /api/seniors/:id/medical — HU-007
 
-La regla vive en el caso de uso, no en el controlador ni en la consulta del panel:
+```http
+200 OK
 
-- La lista se acota en la consulta (`caregiverId` + `role: SENIOR`), así el perfil ajeno no
-  se carga.
-- El detalle compara `senior.caregiverId === caregiverId` con el id que llega **por
-  parámetro**; el caso de uso no lee `req`.
-- El `id` se valida en forma antes de ir a la base: si llegara al driver un id que no es un
-  `ObjectId`, la respuesta sería un `500` en vez del `404` prometido.
+{
+  "bloodType": "O+",
+  "allergies": ["penicilina"],
+  "conditions": ["hipertensión"],
+  "medications": ["losartán"],
+  "emergencyContact": { "fullName": "Ana Pérez", "phone": "+573001234567" }
+}
+```
+
+Esta ruta existe para que «la proyección pública excluye los campos médicos sensibles salvo para
+el familiar vinculado» sea observable por HTTP no solo un deseo: el detalle
+`GET /api/seniors/:id` queda intacto (el mismo objeto del alta, sin ficha), y la ficha médica se
+lee por una ruta y una proyección propias (`toSeniorMedicalRecord`). Responde `200` solo para un
+familiar vinculado; en cualquier otro caso responde el mismo `404 SENIOR_NOT_FOUND` que el
+detalle: ajeno, inexistente, mal formado o el `id` de un `CAREGIVER`.
+
+## GET /api/seniors/:id/caregivers — HU-005
+
+```http
+200 OK
+
+{ "caregivers": [ { "id": "…", "fullName": "Juan Gómez", "role": "OWNER", "linkedAt": "…" },
+                   { "id": "…", "fullName": "María López", "role": "FAMILY", "linkedAt": "…" } ] }
+```
+
+Enumera los N familiares del adulto mayor (solo vínculos `ACTIVE`), del vínculo más antiguo al
+más nuevo. El `role` es el informativo del vínculo. El listado solo lo ve un familiar vinculado
+al perfil; en cualquier otro caso responde el mismo `404 SENIOR_NOT_FOUND`.
 
 ## Sin PIN, y por qué
 
@@ -100,22 +168,28 @@ así que un valor inventado no puede convertirse en Bogotá sin que nadie se ent
 `linkStatus` tiene dos valores:
 
 - `PENDING` — el familiar cargó el perfil; el teléfono del adulto mayor todavía no lo reclamó.
-- `LINKED` — el teléfono canjeó el token del QR de vinculación, o el perfil es anterior a HU-005
-  (cuando vincular era el único camino de alta, la ausencia del campo significa vinculado).
+- `LINKED` — el teléfono canjeó el token del QR de vinculación. Solo el canje lo escribe; el panel
+  nunca lo marca a mano.
 
-Consecuencias, ya vigentes:
+El alta escribe `linkStatus: 'PENDING'` siempre, así que ningún perfil del rewrite queda sin el
+campo. Si un documento llegara sin él (escrito a mano o por una versión anterior del modelo), el
+adaptador lo lee como `PENDING`: un perfil del que no consta el vínculo no se trata como vinculado.
 
-- `GET /api/pairing/seniors` (el selector del panel, que alimenta las actividades) devuelve
-  solo perfiles no pendientes.
+Consecuencias:
+
+- El listado del panel incluye los pendientes: el familiar administra perfiles que aún no
+  reclamó su dueño. Un endpoint futuro que alimente acciones del adulto mayor tendrá que filtrar
+  los `PENDING`.
 - Un perfil `PENDING` no puede recolectar actividades, SOS ni GPS: el consentimiento lo da el
-  titular al vincular su app (HU-008), no el familiar que lo administra. El alta de HU-005 deja
+  titular al aceptar en su app (HU-009), no el familiar que lo administra. El alta deja
   `acceptedTermsAt` y `termsVersion` en `null` a propósito.
 
 ## Pendientes que esta HU deja anotados
 
-- Límite de intentos del canje de QR (HU-009), con bloqueo por perfil.
-- Transición `PENDING → LINKED` en el canje del token del QR (HU-006/HU-007) y un evento para que
-  el panel se actualice sin recargar. El canje nunca crea el perfil: lo crea el familiar acá.
-- Edición de la ficha médica por el familiar y su consentimiento separado (HU-007 y HU-025).
-- `GET /api/pairing/seniors` y `GET /api/seniors` listan senior con criterios distintos
-  (vinculados vs todos). Si se unifican, el selector de actividades tiene que seguir filtrando.
+- Canje del QR y transición `PENDING → LINKED` (HU-009). El canje nunca crea el perfil: lo crea
+  el familiar acá.
+- Invitación de otro familiar con token propio (HU-011, L11 del backlog). El dominio ya modela el
+  vínculo `FAMILY` y el repositorio ya sabe escribirlo de forma idempotente, pero no hay un
+  contrato HTTP que lo use.
+- Edición de la ficha médica por el familiar y su consentimiento separado (HU-012 y HU-025).
+- Límite de intentos del canje de QR, con bloqueo por perfil (HU-009).
