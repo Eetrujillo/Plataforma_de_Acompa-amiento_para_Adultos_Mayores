@@ -1,11 +1,11 @@
 # Pairing API — contrato del QR de vinculación
 
-Cómo el familiar emite el QR de un perfil y cómo el teléfono del adulto mayor lo canjea (HU-006,
+Cómo el familiar emite el QR de un perfil y cómo el teléfono del adulto mayor lo canjea (HU-008 a HU-010,
 rework QR-only de L9). **No existe un código legible por una persona**: la credencial es un token
 opaco de 32 bytes en base64url (43 caracteres) que viaja únicamente dentro del QR. No se muestra en
 pantalla, no se dicta, no se tipea. Este contrato es seguridad, no comodidad.
 
-## POST /api/pairing/qr — HU-006
+## POST /api/pairing/qr — HU-008 (emisión) y HU-010 (regeneración)
 
 Requiere sesión de un usuario con rol `CAREGIVER`.
 
@@ -61,7 +61,7 @@ con `invalidatedAt` **antes** de crear el nuevo. Consecuencias deliberadas:
   pide otro, nadie queda con un QR viejo vivo.
 - Un fallo **del codificador** ocurre antes de la invalidación (ver `PAIRING_QR_UNAVAILABLE`).
 
-## POST /api/pairing/redeem — HU-006 (público)
+## POST /api/pairing/redeem — HU-009 (público)
 
 El teléfono del adulto mayor no tiene sesión todavía: el token del QR es la credencial.
 
@@ -121,7 +121,7 @@ alimentan actividades y SOS), con `{ "seniors": [ ... ] }`. Sin cambios en esta 
 
 - Escaneo del QR en el teléfono del adulto mayor: HU-007. Hoy el backend ya expone `/redeem`, pero
   no hay escáner en el frontend; la pantalla del teléfono sin vincular sólo explica qué falta.
-- Límite de intentos del canje y del PIN: HU-007. Con un token de 32 bytes el espacio de búsqueda
+- Límite de intentos del canje: HU-009. Con un token de 32 bytes el espacio de búsqueda
   deja de ser el problema (10^6 ya no existe), así que el límite queda como defensa en profundidad.
 - Consentimiento del titular antes de compartir actividades, SOS o GPS: HU-008.
 

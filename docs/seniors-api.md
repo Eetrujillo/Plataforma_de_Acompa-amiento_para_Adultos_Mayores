@@ -14,7 +14,10 @@ Sin token: `401`. Con rol `SENIOR`: `403`.
 POST /api/seniors
 Content-Type: application/json
 
-{ "fullName": "Rosa Pérez", "pin": "4821", "timezone": "America/Bogota" }
+{ "fullName": "Rosa Pérez", "timezone": "America/Bogota",
+  "bloodType": "O+", "allergies": ["penicilina"], "conditions": ["hipertensión"],
+  "medications": ["losartán"],
+  "emergencyContact": { "fullName": "Ana Pérez", "phone": "+573001234567" } }
 ```
 
 `timezone` es opcional: si falta, viene vacía o `null`, se guarda `America/Bogota`.
@@ -35,7 +38,6 @@ Errores (todos `400`, con `error.code` para que la pantalla marque el campo):
 
 | `error.code` | Cuándo |
 | --- | --- |
-| `INVALID_PIN` | El PIN no es exactamente 4 dígitos ASCII (`"123"`, `"12345"`, `"12a4"`, `" 1234"`, dígitos de otro alfabeto). |
 | `INVALID_NAME` | El nombre falta, no es texto o queda con menos de 3 caracteres después de normalizar. |
 | `INVALID_TIMEZONE` | La zona no es una zona IANA válida. No se cae a Bogotá en silencio. |
 
@@ -75,20 +77,17 @@ La regla vive en el caso de uso, no en el controlador ni en la consulta del pane
   se carga.
 - El detalle compara `senior.caregiverId === caregiverId` con el id que llega **por
   parámetro**; el caso de uso no lee `req`.
-- El `id` se valida en forma antes de ir a la base: si llegara a Prisma un id que no es un
+- El `id` se valida en forma antes de ir a la base: si llegara al driver un id que no es un
   `ObjectId`, la respuesta sería un `500` en vez del `404` prometido.
 
-## PIN: qué se guarda y qué no
+## Sin PIN, y por qué
 
-- Se acepta solo `/^\d{4}$/` y se valida **antes** de hashear: un pedido rechazado no gasta
-  bcrypt ni escribe nada.
-- Se guarda `pinHash` con bcrypt, costo 12. El texto plano no se persiste, no se loguea y no
-  aparece en ninguna respuesta: la proyección pública (`toPublicSenior`) no incluye el campo.
-- El PIN no se puede consultar. Si el adulto mayor lo olvida, el familiar lo vuelve a definir;
-  no hay "recordarme el PIN" ni envío por correo o SMS.
-- Un PIN de 4 dígitos son 10 000 combinaciones: el hash encarece el ataque offline, pero la
-  defensa real es limitar intentos. Ese límite se implementa en HU-007, junto con la primera
-  verificación de PIN del servidor. Ver `skills/bcrypt-pin.md`.
+- El contrato **no acepta ni devuelve PIN**. El anteproyecto exige la ausencia de credenciales para
+  el adulto mayor (decisión L3 del backlog): un PIN es una credencial, y cuatro dígitos son 10 000
+  combinaciones, defendibles solo con límite de intentos por perfil.
+- El perfil tampoco guarda `pinHash`. Quien agregue ese campo reabre una decisión ya cerrada.
+- La protección del acceso es el vínculo del dispositivo con token de un solo uso más el
+  consentimiento registrado, no un secreto que la persona deba recordar.
 
 ## Zona horaria
 
@@ -114,9 +113,9 @@ Consecuencias, ya vigentes:
 
 ## Pendientes que esta HU deja anotados
 
-- Límite de intentos del PIN (HU-007), con bloqueo por perfil.
+- Límite de intentos del canje de QR (HU-009), con bloqueo por perfil.
 - Transición `PENDING → LINKED` en el canje del token del QR (HU-006/HU-007) y un evento para que
   el panel se actualice sin recargar. El canje nunca crea el perfil: lo crea el familiar acá.
-- Cambio de PIN por el familiar: hoy solo se define al crear el perfil.
+- Edición de la ficha médica por el familiar y su consentimiento separado (HU-007 y HU-025).
 - `GET /api/pairing/seniors` y `GET /api/seniors` listan senior con criterios distintos
   (vinculados vs todos). Si se unifican, el selector de actividades tiene que seguir filtrando.

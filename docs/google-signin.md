@@ -6,9 +6,10 @@ Google nunca crea cuentas acá: si el correo no tiene cuenta, el backend respond
 
 El flujo es de **ID token**, no de redirección con `code`:
 
-1. El navegador pide el `id_token` a Google Identity Services con el `client_id` que obtiene en
-   tiempo de ejecución de `GET /api/auth/google/config`.
-2. El navegador manda ese `id_token` a `POST /api/auth/google`.
+1. La app (React Native, `@react-native-google-signin/google-signin`) pide el `id_token` a Google
+   con el `client_id` que obtiene en tiempo de ejecución de `GET /api/auth/google/config`. El
+   cliente OAuth debe estar registrado como **Android**, no como aplicación web.
+2. La app manda ese `id_token` a `POST /api/auth/google`.
 3. El backend lo verifica con `google-auth-library` (`OAuth2Client.verifyIdToken`) contra el
    `GOOGLE_CLIENT_ID`, busca la cuenta por el correo del token y devuelve `{ token, user }`.
 

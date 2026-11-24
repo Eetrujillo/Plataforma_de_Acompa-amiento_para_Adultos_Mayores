@@ -47,16 +47,16 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
 | `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora) |
 | `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
-| `500` | `INTERNAL_ERROR` | error inesperado, o error de Prisma sin traducción |
-| `503` | `DATABASE_NOT_READY` | Prisma `P2031`: MongoDB no acepta escrituras (replica set sin iniciar) |
-| `503` | `DATABASE_UNAVAILABLE` | Prisma `P2010` de conexión: no se pudo contactar la base |
+| `500` | `INTERNAL_ERROR` | error inesperado, o error de Mongoose o del driver sin traducción |
+| `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (Mongoose necesita `rs0` para transacciones) |
+| `503` | `DATABASE_UNAVAILABLE` | el driver no pudo contactar la base |
 
 Un JSON inválido y un cuerpo demasiado grande se traducen a `400`/`413` antes de caer en el `500`
-enmascarado. Las fallas de Prisma que no están en la tabla se responden como `500 INTERNAL_ERROR`.
+enmascarado. Las fallas de Mongoose o del driver que no están en la tabla se responden como `500 INTERNAL_ERROR`.
 
 ## Lo que nunca llega al cliente
 
-El cliente **no** recibe stack, rutas de archivo, query, ni mensajes internos de Prisma o del driver.
+El cliente **no** recibe stack, rutas de archivo, query, ni mensajes internos de Mongoose o del driver.
 Un error no operativo se enmascara como `500 INTERNAL_ERROR` con el mensaje genérico
 `Unexpected server error`.
 
@@ -77,7 +77,7 @@ Los `4xx` operativos no se loguean como error.
 
 1. Se loguea el nombre, el mensaje y el stack del error.
 2. Se ejecuta el mismo apagado ordenado que con `SIGINT`/`SIGTERM`: cerrar Socket.IO, cerrar el
-   servidor HTTP y desconectar Prisma.
+   servidor HTTP y desconectar Mongoose.
 3. El proceso sale con código `1`.
 4. Un watchdog de `5s` fuerza la salida con `1` si el apagado no termina; una segunda caída durante
    el apagado también sale de inmediato con `1`.

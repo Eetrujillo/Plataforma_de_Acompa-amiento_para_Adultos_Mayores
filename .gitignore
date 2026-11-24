@@ -6,4 +6,3 @@ dist/
 # Local override that points this machine at the deployed database: never commit it.
 docker-compose.override.yml
 
-# Fetched at a pinned commit by .agents/skills/fetch-vendor.sh: too large to review in git.

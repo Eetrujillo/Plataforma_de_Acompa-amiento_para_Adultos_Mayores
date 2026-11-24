@@ -77,11 +77,10 @@ Las skills de `project/` son obligatorias, no sugerencias:
 | `rate-limiting` | límites por ventana móvil |
 | `email-adapter` | puerto de correo, smtp/console |
 | `ley-1581` | consentimiento y evidencia legal |
-| `bcrypt-pin` | PIN de 4 dígitos |
 | `profiles-hexagonal` | slice de perfiles seniors |
 | `pairing-generator` | emisión del token/QR |
 | `qr-adapter` | payload y presentación del QR |
-| `pairing-link` | canje en el teléfono |
+| `pairing-link` | canje en el teléfono (sin PIN) |
 | `senior-ui-wcag` | accesibilidad de la app del adulto mayor |
 
 ## Flujo de trabajo
@@ -92,7 +91,8 @@ Cada tarea vive en su propia rama. **Nada se commitea directo en `main` ni en `p
 2. Implementación con criterio de aceptación observable por delante.
 3. Antes de integrar, en verde y con la salida real a la vista:
    - `cd backend && npm test`
-   - `cd frontend && npm run build`
+   - `cd app && npm run typecheck && npm run lint` (cuando exista el proyecto React Native)
+   - el build del APK solo se exige cuando la HU toca código nativo
    - criterios de aceptación de la HU, uno por uno, verificados de verdad.
 4. Merge a la rama de integración **solo** si los tres puntos anteriores pasaron.
 5. Promoción a `prod` con confirmación explícita del humano. Es el único paso que toca el VPS.
