@@ -77,3 +77,15 @@ Fuente de requisitos: `docs/backlog.md` (HU-001), `docs/auth-api.md`, y las skil
   genérico que mostraba el contrato. Se reconcilió `docs/auth-api.md` para que el documento diga lo
   que el código hace: un código por motivo, `VALIDATION_ERROR` queda genérico, y la respuesta de
   201 lleva solo `{ user: { id, email, fullName, role } }` — `verificationSent` llega con HU-002.
+- **L5.** Revisión nativa `review-2dd0fd8b10d7bd70` (tier alto, lentes risk+reliability, refutador y
+  validador incluidos): **aprobada** tras una corrección acotada. El hallazgo CRITICAL
+  `R3-test-script-node20` era real: la suite usa type-stripping de Node (≥22.18) pero `engines`
+  declaraba ≥20 y el Dockerfile fijaba `node:20-alpine`, así que `npm test` fallaba dentro de su
+  propio piso declarado. Corregido en `c2820b8` (imagen `node:22-alpine`, `engines >=22.18.0`),
+  validado por el proveedor.
+- **L6.** Hallazgos no bloqueantes aceptados como trabajo posterior, priorizados: (a) `trust proxy`
+  confía en cada salto y la IP del consentimiento puede ser elegida por el cliente (WARNING, legal);
+  (b) carrera registro duplicado → E11000 aparece como 500 en vez de 400 (WARNING); (c) el log de
+  arranque imprime `MONGO_URL` completa, con credenciales si las hubiera (WARNING); (d) bcrypt trunca
+  a 72 bytes sin tope declarado; (e) apagado no espera drenar; (f) teléfono sin test; (g) `MONGO_URL`
+  vacío no cae al default. Los tres primeros entran como criterios/tests antes del primer deploy.
