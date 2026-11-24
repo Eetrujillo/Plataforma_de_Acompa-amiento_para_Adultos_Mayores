@@ -1,3 +1,13 @@
+import {
+  collapseSpaces,
+  isValidFullName,
+  isValidPhone,
+} from '../../../shared/domain/text.ts';
+
+// Las reglas de texto son compartidas: seniors (HU-005/HU-007) valida con las
+// mismas funciones, así no hay dos definiciones de "nombre válido".
+export { collapseSpaces, isValidFullName, isValidPhone };
+
 export type UserRole = 'CAREGIVER' | 'SENIOR';
 
 /** Evidencia de consentimiento de la Ley 1581 de 2012, fijada por el servidor. */
@@ -32,8 +42,6 @@ export interface UserEntity {
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** 6 a 20 caracteres: `+`, dígitos, espacios o guiones (docs/auth-api.md). */
-const PHONE_PATTERN = /^\+?[0-9\s-]{6,20}$/;
 /** Mínimo 8 caracteres, con al menos una letra y un dígito (docs/auth-api.md). */
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*[0-9]).{8,}$/;
 
@@ -48,19 +56,6 @@ export function isValidEmailFormat(email: string): boolean {
 
 export function isValidPassword(password: string): boolean {
   return PASSWORD_PATTERN.test(password);
-}
-
-/** Colapsa espacios internos y recorta los de los bordes. */
-export function collapseSpaces(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
-}
-
-export function isValidFullName(fullName: string): boolean {
-  return collapseSpaces(fullName).length >= 3;
-}
-
-export function isValidPhone(phone: string): boolean {
-  return PHONE_PATTERN.test(phone);
 }
 
 export function createConsentEvidence(input: {
