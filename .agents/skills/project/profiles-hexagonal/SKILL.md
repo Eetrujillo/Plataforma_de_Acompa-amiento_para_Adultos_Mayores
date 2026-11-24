@@ -39,7 +39,7 @@ Cómo se modela y se toca el perfil del adulto mayor. Se lee antes de escribir c
   no conoce `req`.
 - Un perfil ajeno responde igual que uno inexistente: `404 SENIOR_NOT_FOUND`. Un `403` confirmaría
   que el id existe.
-- El id se valida en forma (24 hex) antes de consultar: un id malformado que llega a Prisma
+- El id se valida en forma (24 hex) antes de consultar: un id malformado que llega al driver
   termina en `500`, no en el `404` que promete el contrato.
 
 ## 4. Proyección pública: la lista blanca manda

@@ -81,5 +81,5 @@ pide otro. Sin QR no hay credencial: no se responde `201` con la imagen vacía.
 
 - Reglas puras y TTL: `backend/src/modules/pairing/domain/pairingToken.js`.
 - Emisión: `application/GeneratePairingToken.js` · Canje: `application/RedeemPairingToken.js`.
-- Persistencia y reclamo atómico: `infrastructure/PrismaPairingRepository.js`.
+- Persistencia y reclamo atómico: `infrastructure/MongoosePairingRepository.ts`.
 - Contrato: `docs/pairing-api.md`. QR: `skills/qr-adapter.md`.

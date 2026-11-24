@@ -34,6 +34,13 @@ del rewrite.
 - **L8.** El **QR se genera antes de vincular**: HU-008 genera, HU-009 vincula, HU-010 regenera.
 - **L9.** Se retiran del alcance: HU-011 del backlog anterior (cierre con PIN) y HU-025
   (notificaciones del navegador, imposible sin web; lo cubre FCM).
+- **L10.** El bloqueo de login cuenta también los correos sin cuenta, para que el `429` no revele
+  qué correos están registrados. Se limita además por IP, para que nadie bloquee a un tercero.
+- **L11.** La incorporación de otro familiar (HU-011) usa un **token de invitación propio**, enviado
+  por correo con enlace. Nunca reusa el QR del adulto mayor: ese token significa "este es su
+  dispositivo" y emitirlo invalida el anterior.
+- **L12.** La ubicación de seguimiento se conserva **30 días** y se purga por job; la de un SOS vive
+  mientras exista la alerta. El consentimiento informa ese plazo y se testea que coincida.
 
 ---
 
@@ -70,7 +77,8 @@ Validar la propiedad de la cuenta por enlace de correo.
 - [ ] Un login correcto limpia el contador.
 - [ ] El token lleva exactamente los claims `sub`, `role`, `email` y `sv`; ningún dato personal más.
 - [ ] Cada request autenticado compara el claim `sv` contra `sessionVersion` del usuario: subir la versión cierra todas las sesiones.
-- [ ] El `429 ACCOUNT_LOCKED` solo aparece para cuentas reales: excepción registrada, aceptada a cambio de que la persona bloqueada entienda qué le pasa.
+- [ ] El contador de intentos se lleva por correo normalizado e **incluye los correos sin cuenta**: seis intentos fallidos devuelven el mismo `429` exista o no la cuenta, así el bloqueo no revela qué correos están registrados.
+- [ ] Además del contador por correo, se limita por IP para que nadie bloquee a otra persona usando su correo.
 - [ ] Acceder a una ruta privada sin token redirige al login sin pedir el recurso.
 
 ### HU-004 · Recuperación de contraseña · `repo 004`
@@ -144,6 +152,13 @@ Un adulto mayor puede estar vinculado a más de un familiar, y cualquiera de ell
 ### HU-011 · Red de cuidadores y asignación · `nueva`
 **Skills:** `profiles-hexagonal`, `pairing-generator`
 - [ ] Un familiar ya vinculado puede incorporar a otro familiar al mismo adulto mayor.
+- [ ] La invitación es un token propio de 32 bytes, independiente del QR del adulto mayor: en la base queda solo su `sha256`, con `seniorId`, quién invitó, correo normalizado, vencimiento a 72 h, `usedAt` y `revokedAt`.
+- [ ] La respuesta al pedido de invitación es `202` siempre, exista o no una cuenta con ese correo.
+- [ ] El enlace se arma con `APP_URL` y viaja solo en el correo.
+- [ ] La aceptación es atómica y exige sesión: el invitado se identifica con su propia cuenta, nunca con la del invitado.
+- [ ] Usado, vencido y revocado responden el mismo `409`, sin distinguir cuál fue.
+- [ ] Aceptar no modifica los vínculos existentes: los vínculos son aditivos.
+- [ ] El invitador puede revocar una invitación pendiente, y el pedido de invitación tiene límite por ventana.
 - [ ] El nuevo familiar se identifica con su propia cuenta: no se comparte usuario ni contraseña.
 - [ ] Se puede asignar un cuidador principal entre los vinculados.
 - [ ] Un familiar no vinculado no puede invitar ni asignar: responde 404, nunca 403.
@@ -297,6 +312,9 @@ El anteproyecto introduce la aprobación por parte del adulto mayor o de un cuid
 - [ ] Solicita el permiso de ubicación informando su uso exclusivo para SOS y seguimiento consentido.
 - [ ] El seguimiento periódico se detiene al desvincular el dispositivo.
 - [ ] El titular puede revocar el consentimiento de ubicación sin perder el vínculo ni las actividades.
+- [ ] Los puntos de seguimiento se purgan a los **30 días** de su captura mediante un job programado.
+- [ ] La ubicación adjunta a una alerta SOS **no** entra en esa purga: se conserva mientras exista la alerta y se borra con ella.
+- [ ] El texto de consentimiento informa esa retención, y una prueba verifica que el código y el texto dicen el mismo plazo.
 
 ### HU-028 · Aviso de desconexión del dispositivo · `nueva`
 **Skills:** `web-realtime-socket-io`, `mobile-notifications-push`

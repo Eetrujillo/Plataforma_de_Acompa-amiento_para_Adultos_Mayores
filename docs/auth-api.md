@@ -64,7 +64,9 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
 
 - `POST /api/auth/login` — `{ email, password }`; `200` con `{ token, user }`. `401`
   `Invalid credentials` (no revela qué falló), `403` `EMAIL_NOT_VERIFIED` hasta confirmar el correo,
-  `429` `ACCOUNT_LOCKED` si la cuenta está bloqueada por intentos fallidos (ver abajo).
+  `429` `ACCOUNT_LOCKED` si la cuenta está bloqueada por intentos fallidos (ver abajo). El contador
+  incluye los correos sin cuenta: la respuesta es idéntica exista o no, para no revelar qué correos
+  están registrados.
 - `POST /api/auth/verify-email` — `{ token }`; `200` con `{ token, user }`, `400` si el enlace
   expiró o ya se usó.
 - `POST /api/auth/resend-verification` — `{ email }`; `202` con `{ accepted: true }`, **3 intentos

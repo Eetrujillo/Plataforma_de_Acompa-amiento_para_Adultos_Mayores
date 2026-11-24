@@ -20,4 +20,4 @@ backend/src/modules/auth/
     ├── http/
     │   └── authController.js       # Controlador Express (POST /api/auth/register)
     └── persistence/
-        └── prismaUserRepository.js # Adaptador de Prisma para MongoDB
+        └── mongooseUserRepository.ts # Adaptador de Mongoose para MongoDB
