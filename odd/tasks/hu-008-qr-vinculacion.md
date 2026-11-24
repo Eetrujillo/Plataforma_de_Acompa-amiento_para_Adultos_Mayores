@@ -225,3 +225,17 @@ deja de servir»: la emisión es también la regeneración; no se agrega otra ru
   de cualquier escritura), etiqueta de spec corregida en el controlador y notas del contrato
   (mensajes del canje y la carrera de D13). El hallazgo 6 queda para el humano: es el `.env` del
   VPS, no el repositorio.
+- **L10** — Revisión nativa `review-5a9788059e64daca` sobre el rango `a735d5a..f2267ce`, lentes
+  `risk` + `resilience`, con el contexto de pedido de este documento: **aprobada**, autoridad
+  quemada. Cinco advisories no bloqueantes, ninguna abrió corrección: dos son el mismo hecho ya
+  decidido en D13 (carrera de dos emisiones simultáneas, WARNING en `risk` y en `resilience`), una
+  pide un índice para la escritura de invalidación (WARNING), una sugiere purga/retención de tokens
+  vencidos (SUGGESTION) y otra sugiere plegar la consulta extra de D12 en una sola agregación
+  (SUGGESTION).
+- **L11** — Cierre de los advisories posibles sin reabrirlo: se agregó el índice
+  `{ seniorId, usedAt, invalidatedAt }` al modelo con su pin contra Mongo real (el de la escritura
+  caliente de cada emisión, que sin él recorre la colección). Quedan como trabajo posterior, fuera
+  del alcance de esta HU: la retención de tokens vencidos (índice TTL o purga) y el endurecimiento
+  de la carrera de D13, que pertenece a HU-009. Checks al cerrar: `typecheck` y `build` verdes,
+  `npm test` 179 pass + 15 skipped sin base y 195/195 con Mongo real. La rama queda 42 commits
+  adelante de `origin/main`, nada pusheado.

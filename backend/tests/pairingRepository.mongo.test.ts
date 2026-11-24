@@ -207,3 +207,19 @@ mongoTest('create después de invalidar deja el token nuevo activo con el expire
   const docs = await PairingTokenModel.find({ seniorId: SENIOR_ID }).lean();
   assert.equal(docs.length, 2, 'los invalidados quedan con su historia, no se borran');
 });
+
+// Consejo R4 de la revisión nativa: la invalidación corre por perfil con los dos
+// flags en null y es una escritura de cada pedido; sin índice recorre la
+// colección entera. El pin la ata al modelo, no al olvido.
+mongoTest('el modelo indexa la escritura de invalidación por perfil', async () => {
+  await db();
+  const built = await PairingTokenModel.collection.indexes();
+  const bySenior = built.find((entry) => {
+    const fields = entry['key'] as Record<string, unknown>;
+    return fields['seniorId'] === 1;
+  });
+  assert.ok(bySenior !== undefined, 'falta el índice de invalidación por seniorId');
+  const fields = bySenior['key'] as Record<string, unknown>;
+  assert.equal(fields['usedAt'], 1);
+  assert.equal(fields['invalidatedAt'], 1);
+});

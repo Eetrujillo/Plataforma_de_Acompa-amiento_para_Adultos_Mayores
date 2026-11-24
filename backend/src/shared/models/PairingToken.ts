@@ -27,5 +27,9 @@ const pairingTokenSchema = new Schema(
 // D6: `tokenHash` único, igual que en PasswordResetToken — el canje consulta
 // por el hash en la base, y que un hash se repita no tiene modelo posible.
 pairingTokenSchema.index({ tokenHash: 1 }, { unique: true });
+// La emisión invalida por `seniorId` con los dos flags en `null` (una escritura
+// caliente por pedido): sin este índice esa escritura recorre la colección
+// entera, que crece con todos los tokens emitidos.
+pairingTokenSchema.index({ seniorId: 1, usedAt: 1, invalidatedAt: 1 });
 
 export const PairingTokenModel = model('PairingToken', pairingTokenSchema);
