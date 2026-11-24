@@ -64,6 +64,12 @@ con `invalidatedAt` **antes** de crear el nuevo. Consecuencias deliberadas:
   pide otro, nadie queda con un QR viejo vivo.
 - Un fallo **del codificador** ocurre antes de la invalidación (ver `PAIRING_QR_UNAVAILABLE`).
 
+Nota sobre la concurrencia: dos emisiones simultáneas para el mismo perfil pueden dejar dos tokens
+vivos, porque `invalidar → crear` son dos escrituras y no hay transacción. El caso lo cierra el
+canje de HU-009: un perfil que ya está vinculado responde `SENIOR_ALREADY_LINKED` **sin quemar** el
+token, así que en cuanto se canjea el primero, el segundo QR simplemente deja de servir. Endurecerlo
+sería una escritura condicional única, anotada como posible para HU-009.
+
 ## POST /api/pairing/redeem — HU-009 (público)
 
 El teléfono del adulto mayor no tiene sesión todavía: el token del QR es la credencial.
@@ -97,10 +103,12 @@ El objeto `senior` conserva los campos que la app publicada ya consume (`toPubli
 | `CONFLICT` | 409 | Ya fue canjeado, o el perfil del token ya no es del mismo familiar. |
 | `SENIOR_ALREADY_LINKED` | 409 | El perfil del token ya está vinculado: el QR no se quema. |
 
-Los mensajes son los de `domain/pairingToken.ts`, en inglés porque los consume la app móvil y no se
-muestran en el panel del cuidador: `pairing token is invalid or expired`, `pairing token not found`,
-`pairing token already used`. `SENIOR_ALREADY_LINKED` sí está en español porque también lo muestra
-el panel.
+Los mensajes del canje son los que define HU-009 (el código de ese endpoint todavía no existe);
+cuando llegue, vivirán junto a los demás textos del slice, en `application/pairingMessages.ts` —
+el mismo módulo que ya concentra los de la emisión. Están en inglés porque los consume la app
+móvil y no se muestran en el panel del cuidador: `pairing token is invalid or expired`,
+`pairing token not found`, `pairing token already used`. `SENIOR_ALREADY_LINKED` sí está en
+español porque también lo muestra el panel.
 
 ## Canje de un solo uso (atómico)
 
@@ -124,8 +132,9 @@ Requiere sesión de `CAREGIVER`. Devuelve sólo los perfiles del familiar con un
 
 ## Lo que este contrato NO cubre todavía
 
-- Escaneo del QR en el teléfono del adulto mayor: HU-009. Hoy el backend ya expone `/redeem`, pero
-  no hay escáner en el frontend; la pantalla del teléfono sin vincular sólo explica qué falta.
+- Escaneo del QR en el teléfono del adulto mayor: HU-009. El endpoint de canje (`/redeem`) todavía
+  no existe en el rewrite: llega con esa HU, junto con el escáner del teléfono; mientras tanto la
+  ruta documentada abajo es el contrato a implementar, no algo que ya esté sirviendo.
 - Límite de intentos del canje: HU-009. Con un token de 32 bytes el espacio de búsqueda deja de
   ser el problema —el viejo código de 6 dígitos tenía 10^6 combinaciones y ya no existe—, así que el
   límite queda como defensa en profundidad.

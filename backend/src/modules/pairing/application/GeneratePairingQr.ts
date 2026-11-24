@@ -87,8 +87,14 @@ export class GeneratePairingQr {
     const token = generatePairingToken();
     // 3. …y se codifica el QR ANTES de tocar la base (S13): el pedido se arma
     // completo, así que un 503 deja el QR anterior vigente y se puede reintentar.
-    // El adaptador traduce cualquier fallo del codificador al 503 (D9).
-    const qrCodeDataUrl = await this.qrEncoder.toDataUrl(buildPairingQrPayload(token));
+    // El adaptador traduce cualquier fallo del codificador al 503 (D9). Si el
+    // codificador igual resuelve una cadena vacía (o algo que no es texto),
+    // tampoco hay imagen que mostrar: el mismo 503 sin tocar la base (S13).
+    const payload = buildPairingQrPayload(token);
+    const qrCodeDataUrl = await this.qrEncoder.toDataUrl(payload);
+    if (typeof qrCodeDataUrl !== 'string' || qrCodeDataUrl === '') {
+      throw new AppError(503, 'PAIRING_QR_UNAVAILABLE', PAIRING_QR_UNAVAILABLE_MESSAGE);
+    }
     const now = this.clock();
     const expiresAt = new Date(now.getTime() + this.ttlMinutes * 60_000);
     // 4. Los anteriores no usados del perfil quedan reemplazados (S15/S7).

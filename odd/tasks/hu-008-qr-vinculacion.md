@@ -145,6 +145,16 @@ deja de servir»: la emisión es también la regeneración; no se agrega otra ru
   conserva la semántica visible de `GET /api/seniors/:id` (documentada en `docs/seniors-api.md`) y
   sólo cambia la decisión que crea una credencial: un perfil sin el campo **no** recibe un QR nuevo.
 
+- **D13 — S7 vale en secuencia, no bajo concurrencia (hallazgo 1 de la verificación, L8).** Dos
+  emisiones simultáneas del mismo perfil pueden dejar dos tokens vivos: `invalidar → crear` son dos
+  escrituras y no hay transacción (Mongo sin sesión, por D4 de HU-005). Se descartan el índice
+  parcial único (la condición de "vivo" sería `usedAt`/`invalidatedAt` en `null`, justo lo que Mongo
+  no admite como filtro parcial fiable) y la transacción (exigiría replica set en todos los entornos
+  de prueba, contra `docs/error-handling.md:50`). El caso lo cierra el canje de HU-009: un perfil ya
+  vinculado responde `SENIOR_ALREADY_LINKED` sin quemar el token, así que el segundo QR queda
+  inutilizable en cuanto se canjea el primero. Queda anotado como endurecimiento posible en HU-009
+  (una escritura condicional única) y como nota en `docs/pairing-api.md`.
+
 ## Tasks
 
 - **T1** · S5, S14, S16, S19 · inline · dominio: `pairingToken.ts` con generación, validación de
@@ -192,3 +202,26 @@ deja de servir»: la emisión es también la regeneración; no se agrega otra ru
 - **L6** — El TTL aparece dos veces por diseño: la constante del dominio es el default del slice y
   `env.ts` declara `1440` como default de `PAIRING_TTL_MINUTES`. `config/` no importa un slice, así
   que el número se repite a propósito; el caso de uso no lo duplica (lo recibe por dependencia).
+- **L7** — Tres unidades de entrega en `chore/deploy-mongoose`: `6233dd2` (T1-T2, dominio + puertos +
+  persistencia + dobles + pines de dominio y de Mongo), `a27789a` (T3-T5, la unidad con los ítems de
+  riesgo 2 y 5 sola en su commit: caso de uso, codificador, lector de D12, HTTP, composición, config
+  y las dos dependencias) y `0ca7a43` (T6, contratos, catálogo de errores, plantilla de entorno,
+  skills y este documento). Checks al cerrar la última: `typecheck` y `build` verdes, `npm test`
+  **178 pass + 15 skipped** sin base y **193/193** con Mongo real. Nada pusheado: la rama queda 40
+  commits adelante de `origin/main`. Las tres unidades pasan el slice de ~400 líneas de revisión; el
+  corte de entrega se decide al publicar (la rama completa es una sola revisión de HU, no de commit).
+- **L8** — Verificación independiente (`Risk: items 2 y 5`): **PASS en S1-S22**, sin bloqueantes.
+  Puntos altos de la evidencia: el token crudo no aparece en base, respuesta, log ni mensaje de
+  error (probado también con el 500); 2000 tokens generados son siempre 43 caracteres base64url y
+  el hash es sha256 hex; el PNG del adaptador real mide 320×320, usa margen 1 módulo y la matriz
+  canónica de nivel `M`, y `zbarimg` decodifica el sobre exacto; un documento sin `linkStatus`
+  responde 409 contra Mongo real, no sólo contra el doble. Hallazgos: 1 WARNING (S7 con dos
+  emisiones simultáneas → D13), 1 NOTE de endurecimiento (imagen vacía → se corrige en el commit de
+  follow-up), 1 NOTE de etiqueta de spec, 1 NOTE de mensajes del canje aún inexistentes, 1 NOTE de
+  despliegue (si el `.env` del VPS conserva `PAIRING_TTL_MINUTES=15` de la plantilla vieja, la
+  emisión de producción usaría 15 minutos: es decisión y operación del humano) y 1 NOTE de costo
+  (una consulta `exists` extra por emisión, deliberada en D12).
+- **L9** — Follow-up de los hallazgos 2, 3 y 5: guarda de imagen vacía en el caso de uso (503 antes
+  de cualquier escritura), etiqueta de spec corregida en el controlador y notas del contrato
+  (mensajes del canje y la carrera de D13). El hallazgo 6 queda para el humano: es el `.env` del
+  VPS, no el repositorio.

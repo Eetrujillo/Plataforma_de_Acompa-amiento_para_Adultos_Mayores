@@ -19,7 +19,7 @@ function bodyObject(body: unknown): Record<string, unknown> {
 }
 
 function sessionCaregiverId(req: Request): string {
-  // S14: el caregiverId sale de la sesión, nunca del cuerpo del pedido.
+  // pairing-generator §6: el caregiverId sale de la sesión, nunca del cuerpo del pedido.
   const user = req.sessionUser;
   if (user === undefined) {
     throw new AppError(401, 'UNAUTHORIZED', INVALID_SESSION_MESSAGE);

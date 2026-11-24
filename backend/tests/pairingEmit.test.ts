@@ -24,6 +24,7 @@ import {
   SENIOR_ALREADY_LINKED_MESSAGE,
   SENIOR_ID_REQUIRED_MESSAGE,
 } from '../src/modules/pairing/application/GeneratePairingQr.ts';
+import type { PairingQrEncoderPort } from '../src/modules/pairing/application/PairingQrEncoderPort.ts';
 import { hashPairingToken } from '../src/modules/pairing/domain/pairingToken.ts';
 import {
   FailingQrEncoder,
@@ -43,7 +44,7 @@ const STRANGER_ID = '507f1f77bcf86cd7994390bb';
 interface Deps {
   reader: StaticSeniorReader;
   tokens: InMemoryPairingTokenRepository;
-  encoder: RecordingQrEncoder | FailingQrEncoder;
+  encoder: RecordingQrEncoder | FailingQrEncoder | PairingQrEncoderPort;
   clock: () => Date;
   ttlMinutes: number;
 }
@@ -223,7 +224,14 @@ test('S8: perfil ajeno, inexistente o cuenta CAREGIVER: el mismo 404 SENIOR_NOT_
   assert.equal(deps.tokens.invalidations.length, 0);
 });
 
-test('S4/S13: si el codificador falla, 503 PAIRING_QR_UNAVAILABLE sin invalidar el QR anterior', async () => {
+/** S13: el codificador sordo que resuelve una imagen vacía en vez de fallar. */
+class EmptyQrEncoder implements PairingQrEncoderPort {
+  async toDataUrl(): Promise<string> {
+    return '';
+  }
+}
+
+ test('S4/S13: si el codificador falla, 503 PAIRING_QR_UNAVAILABLE sin invalidar el QR anterior', async () => {
   const { useCase, deps } = makeUseCase({
     encoder: new FailingQrEncoder(),
   });
@@ -251,6 +259,26 @@ test('S4/S13: si el codificador falla, 503 PAIRING_QR_UNAVAILABLE sin invalidar 
   const previous = [...deps.tokens.tokens.values()][0];
   assert.ok(previous !== undefined);
   assert.equal(previous.invalidatedAt, null, 'el QR anterior sigue vigente');
+});
+
+test('S13: un codificador que resuelve una imagen vacía no produce 201: 503 sin invalidar ni crear', async () => {
+  const { useCase, deps } = makeUseCase({
+    encoder: new EmptyQrEncoder(),
+  });
+  seedPendingProfile(deps.reader);
+
+  await assert.rejects(
+    useCase.execute({ seniorId: SENIOR_ID, caregiverId: CAREGIVER_ID }),
+    (error: unknown) => {
+      const appError = error as { statusCode?: number; code?: string; message?: string };
+      assert.equal(appError.statusCode, 503);
+      assert.equal(appError.code, 'PAIRING_QR_UNAVAILABLE');
+      assert.equal(appError.message, PAIRING_QR_UNAVAILABLE_MESSAGE);
+      return true;
+    },
+  );
+  assert.equal(deps.tokens.invalidations.length, 0, 'sin imagen no se toca la base');
+  assert.equal(deps.tokens.createCalls, 0, 'sin imagen no se crea ningún token');
 });
 
 test('S15: si la escritura del token nuevo falla, el anterior YA quedó inválido (falla cerrado)', async () => {
