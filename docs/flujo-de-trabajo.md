@@ -71,11 +71,21 @@ tampoco cuenta.
 
 ## 6. Base de datos de trabajo
 
-- La base de los contenedores es la del VPS y es la fuente de verdad única.
-- Toda prueba que escriba datos usa un prefijo identificable (`chk-`, `e2e-`, `smoke-`) y los borra al
-  terminar.
-- **Nunca** contra la base desplegada: borrados masivos, `db.dropDatabase()`, `deleteMany({})`, ni
-  cambios de esquema destructivos.
+Hay dos bases y no son intercambiables:
+
+| Base | Para qué | Escritura |
+| --- | --- | --- |
+| **Local** (`127.0.0.1:4301`, el `mongo` del compose) | desarrollo y toda la suite de tests | libre: se destruye y se recrea sin costo |
+| **VPS** (producción) | usuarios reales, fuente de verdad del negocio | solo lectura por defecto |
+
+- **Los tests corren contra la base local.** No hay excepción: `npm test` nunca apunta al VPS.
+- Contra el VPS solo se permiten **pruebas de humo explícitas**, autorizadas por el humano, con datos
+  prefijados (`chk-`, `e2e-`, `smoke-`) que se borran al terminar y dejando constancia de qué se creó.
+- **Prohibido contra el VPS, sin excepción**: `db.dropDatabase()`, `deleteMany({})` o cualquier
+  borrado masivo, cambios de esquema destructivos, migraciones sobre colecciones existentes, y
+  cualquier escritura sin prefijo identificable.
+- Si una prueba necesita un estado que la base local no puede dar, se levanta otra base local. El VPS
+  no se usa como entorno de pruebas.
 
 ## 7. Commits
 
