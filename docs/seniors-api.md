@@ -173,7 +173,15 @@ así que un valor inventado no puede convertirse en Bogotá sin que nadie se ent
 
 El alta escribe `linkStatus: 'PENDING'` siempre, así que ningún perfil del rewrite queda sin el
 campo. Si un documento llegara sin él (escrito a mano o por una versión anterior del modelo), el
-adaptador lo lee como `PENDING`: un perfil del que no consta el vínculo no se trata como vinculado.
+adaptador de este slice lo lee como `PENDING` para poder mostrarlo.
+
+**Eso no se extiende a la emisión del QR.** Un perfil sin el campo no lo escribió el rewrite: nació en
+el camino de vinculación de la versión anterior, o sea que ya tiene un dispositivo. Por eso el lector
+del slice `pairing` consulta la presencia real del campo y lo cuenta como **ya vinculado**: pedir un
+QR para él responde `409 SENIOR_ALREADY_LINKED` (decisión D12 de HU-008, falla cerrado). Si esa
+ausencia resultara ser un dato huérfano y no un perfil vinculado, la salida es una migración de una
+sola vez sobre los datos (`{ linkStatus: { $exists: false } }` → `LINKED`), nunca aflojar la regla en
+el código.
 
 Consecuencias:
 

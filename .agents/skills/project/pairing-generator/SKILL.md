@@ -3,8 +3,8 @@ name: pairing-generator
 description: Reglas del token de vinculación HU-008: 32 bytes base64url, sólo sha256 en base, vigencia 24h, un token por perfil, invalidación previa, orden token-QR-persistencia y canje atómico.
 ---
 
-> Recuperado de `25672da:skills/pairing-generator.md`. Las rutas que nombra son la estructura objetivo
-> del rewrite, todavía no escrita.
+> Recuperado de `25672da:skills/pairing-generator.md` y alineado con la implementación de HU-008
+> (`backend/src/modules/pairing/`, TypeScript).
 
 # Reglas del token de vinculación — HU-008
 
@@ -40,7 +40,9 @@ El token es la credencial con la que el teléfono del adulto mayor reclama un pe
 - Perfil de otro familiar, inexistente o con rol `CAREGIVER` ⇒ `404 SENIOR_NOT_FOUND`. Un 403
   confirmaría que el id existe.
 - Perfil ya vinculado ⇒ `409 SENIOR_ALREADY_LINKED`. Un documento sin `linkStatus` cuenta como
-  vinculado: es anterior a HU-007 y se creó por el canje.
+  vinculado: es anterior a HU-007 y se creó por el canje. La ausencia hay que preguntarla sobre el
+  BSON (`$exists`), porque el esquema hidrata el campo con su default `PENDING` y taparía el caso:
+  eso lo hace `infrastructure/MongoosePairingSeniorReader.ts`.
 - Emitir invalida **todos** los tokens previos no usados de ese perfil (`invalidatedAt`), antes de
   crear el nuevo. `usedAt` (canjeado) e `invalidatedAt` (reemplazado) son hechos distintos: no se
   reutiliza uno para el otro.
@@ -79,7 +81,10 @@ pide otro. Sin QR no hay credencial: no se responde `201` con la imagen vacía.
 
 ## 7. Dónde vive
 
-- Reglas puras y TTL: `backend/src/modules/pairing/domain/pairingToken.js`.
-- Emisión: `application/GeneratePairingToken.js` · Canje: `application/RedeemPairingToken.js`.
-- Persistencia y reclamo atómico: `infrastructure/MongoosePairingRepository.ts`.
-- Contrato: `docs/pairing-api.md`. QR: `skills/qr-adapter.md`.
+- Reglas puras y TTL: `backend/src/modules/pairing/domain/pairingToken.ts` (`PAIRING_TOKEN_TTL_MINUTES`,
+  `generatePairingToken`, `isPairingTokenWellFormed`, `hashPairingToken`, `buildPairingQrPayload`).
+- Emisión: `application/GeneratePairingQr.ts` · Canje: `application/RedeemPairingToken.ts` (HU-009).
+- Persistencia: `infrastructure/MongoosePairingTokenRepository.ts` (colección `pairing_tokens`,
+  modelo en `shared/models/PairingToken.ts`). El canje de HU-009 agrega el reclamo atómico ahí mismo.
+- Lector del perfil: `infrastructure/MongoosePairingSeniorReader.ts` (delega la propiedad en seniors).
+- Contrato: `docs/pairing-api.md`. QR: `.agents/skills/project/qr-adapter/SKILL.md`.

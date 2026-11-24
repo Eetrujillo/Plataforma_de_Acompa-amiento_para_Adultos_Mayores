@@ -3,8 +3,8 @@ name: qr-adapter
 description: Reglas del QR de vinculación: payload {type:senior-pairing,token}, PNG data URL 320px, fallo cerrado sin QR, legibilidad mínima 240px y prohibición de mostrar o tipear el token. Usar en HU-008, HU-009 y HU-010.
 ---
 
-> Recuperado de `25672da:skills/qr-adapter.md`. Las rutas que nombra son la estructura objetivo
-> del rewrite, todavía no escrita.
+> Recuperado de `25672da:skills/qr-adapter.md` y alineado con la implementación de HU-008
+> (TypeScript). La pantalla del panel todavía no existe: la app React Native es trabajo pendiente.
 
 # Reglas del QR de vinculación — HU-008
 
@@ -19,7 +19,7 @@ forma de vincular el perfil.
   valor, y el que deja lugar a futuros tipos sin reinterpretar cadenas.
 - Motivo: un QR es visual y público —queda en una pantalla, en una captura, en una foto—. El token
   que lleva es de un solo uso, está atado a un perfil y a una vigencia de 24 h; nada más viaja ahí.
-- Cuerpo exacto en `buildPairingQrPayload()` (`backend/src/modules/pairing/infrastructure/QrGenerator.js`),
+- Cuerpo exacto en `buildPairingQrPayload()` (`backend/src/modules/pairing/domain/pairingToken.ts`),
   fuera del codificador, para que el contrato sea verificable sin decodificar una imagen.
 - Debe canjearse por el mismo `POST /api/pairing/redeem` que usa cualquier QR. Un solo camino: no
   hay ruta alterna por código tipeado.
@@ -56,6 +56,10 @@ forma de vincular el perfil.
 
 ## 5. Dónde vive
 
-- Generación: `backend/src/modules/pairing/infrastructure/QrGenerator.js` (data URL, sin estado).
-- Presentación: `frontend/src/features/pairing/ui/PairingQrPanel.jsx`.
-- Contrato: `docs/pairing-api.md`. Token y vigencia: `skills/pairing-generator.md`.
+- Generación: `backend/src/modules/pairing/infrastructure/QrGenerator.ts` (`renderPngDataUrl` y
+  `createPairingQrEncoder`, data URL sin estado; el fallo del codificador se traduce ahí a
+  `503 PAIRING_QR_UNAVAILABLE`).
+- Presentación: pendiente (app React Native del cuidador). El panel muestra la imagen y la fecha de
+  `expiresAt`; no hay token en texto, ni campo para tipearlo, ni botón de copiar.
+- Contrato: `docs/pairing-api.md`. Token y vigencia:
+  `.agents/skills/project/pairing-generator/SKILL.md`.

@@ -42,10 +42,13 @@ payload del QR es un sobre con el token, sin URL y sin datos del adulto mayor:
 imagen) antes de tocar la base, así que no se invalidó ningún token vigente y se puede reintentar.
 La emisión no devuelve un `201` con `qrCodeDataUrl: null`: sin imagen no hay nada que mostrar.
 
+La respuesta de emisión lleva `Cache-Control: no-store`: el QR es una credencial viva y no se cachea
+en intermediarios ni en disco.
+
 ## Vigencia
 
 24 horas por defecto (`PAIRING_TTL_MINUTES`, default `1440`, la constante
-`PAIRING_TOKEN_TTL_MINUTES` de `domain/pairingToken.js`). Se calcula al emitir y se devuelve en
+`PAIRING_TOKEN_TTL_MINUTES` de `domain/pairingToken.ts`). Se calcula al emitir y se devuelve en
 `expiresAt`: el cliente muestra esa fecha, no un número escrito a mano.
 
 ## Invalidación de tokens previos
@@ -94,7 +97,7 @@ El objeto `senior` conserva los campos que la app publicada ya consume (`toPubli
 | `CONFLICT` | 409 | Ya fue canjeado, o el perfil del token ya no es del mismo familiar. |
 | `SENIOR_ALREADY_LINKED` | 409 | El perfil del token ya está vinculado: el QR no se quema. |
 
-Los mensajes son los de `domain/pairingToken.js`, en inglés porque los consume la app móvil y no se
+Los mensajes son los de `domain/pairingToken.ts`, en inglés porque los consume la app móvil y no se
 muestran en el panel del cuidador: `pairing token is invalid or expired`, `pairing token not found`,
 `pairing token already used`. `SENIOR_ALREADY_LINKED` sí está en español porque también lo muestra
 el panel.
@@ -112,10 +115,12 @@ perfil ajeno responde igual que un token consumido, para no confirmar que el id 
 escritura del perfil falla **después** del reclamo, el token ya quedó quemado (falla cerrado) y el
 familiar genera otro.
 
-## GET /api/pairing/seniors — HU-005
+## GET /api/seniors — HU-005
 
-Requiere sesión de `CAREGIVER`. Devuelve sólo los perfiles **vinculados** del familiar (los que
-alimentan actividades y SOS), con `{ "seniors": [ ... ] }`. Sin cambios en esta HU.
+Requiere sesión de `CAREGIVER`. Devuelve sólo los perfiles del familiar con un vínculo `ACTIVE`
+(los `PENDING` y los `LINKED` incluidos), con `{ "seniors": [ ... ] }`. El contrato completo está en
+`docs/seniors-api.md`: el listado ya existía y esta HU no lo cambia. La ruta vive bajo
+`/api/seniors`, no bajo `/api/pairing`.
 
 ## Lo que este contrato NO cubre todavía
 
@@ -126,5 +131,5 @@ alimentan actividades y SOS), con `{ "seniors": [ ... ] }`. Sin cambios en esta 
   límite queda como defensa en profundidad.
 - Consentimiento del titular antes de compartir actividades, SOS o GPS: HU-009.
 
-Ver también `skills/pairing-generator.md` (reglas del token) y `skills/qr-adapter.md` (payload y
-presentación del QR).
+Ver también `.agents/skills/project/pairing-generator/SKILL.md` (reglas del token) y
+`.agents/skills/project/qr-adapter/SKILL.md` (payload y presentación del QR).

@@ -40,12 +40,14 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `400` | `VALIDATION_ERROR` | falta un campo o no cumple su regla |
 | `400` | `EMAIL_ALREADY_REGISTERED` | el correo ya tiene cuenta |
 | `400` | `INVALID_JSON` | el cuerpo no es JSON válido (`entity.parse.failed`) |
+| `400` | `SENIOR_ID_REQUIRED` | falta `seniorId` en la emisión del QR de vinculación o no tiene forma de id de Mongo (24 hex) |
 | `401` | `UNAUTHORIZED` | falta o no sirve el token de sesión, o credenciales inválidas en el login |
 | `403` | `EMAIL_NOT_VERIFIED` | la cuenta existe pero no confirmó el correo |
 | `403` | `FORBIDDEN` | el rol de la sesión no tiene permiso sobre la ruta (guard `requireRole`) |
 | `404` | `NOT_FOUND` | ruta o recurso inexistente |
 | `404` | `SENIOR_NOT_FOUND` | perfil inexistente, ajeno, mal formado o de otro rol: respuesta idéntica en los cuatro casos |
 | `409` | `CONFLICT` | el estado actual impide la operación |
+| `409` | `SENIOR_ALREADY_LINKED` | el perfil ya figura vinculado (o es anterior a HU-005, sin `linkStatus`): no se emite un QR nuevo |
 | `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
 | `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora), el límite de pedidos de recuperación de contraseña (3 por hora, HU-004) o el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) |
 | `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
@@ -63,6 +65,7 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `500` | `INTERNAL_ERROR` | error inesperado, o error de Mongoose o del driver sin traducción |
 | `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (las transacciones de Mongoose necesitan un replica set; `rs0` es solo el nombre que fija este compose) |
 | `503` | `DATABASE_UNAVAILABLE` | el driver no pudo contactar la base |
+| `503` | `PAIRING_QR_UNAVAILABLE` | no se pudo codificar la imagen del QR de vinculación: no se creó ninguna credencial y el QR anterior sigue vigente |
 
 Un JSON inválido y un cuerpo demasiado grande se traducen a `400`/`413` antes de caer en el `500`
 enmascarado. Las fallas de Mongoose o del driver que no están en la tabla se responden como `500 INTERNAL_ERROR`.
