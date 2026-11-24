@@ -340,7 +340,7 @@ test('S20: sin token 401 UNAUTHORIZED; con token de rol SENIOR 403 FORBIDDEN', a
     assert.equal(rolIncorrecto.status, 403, `cuerpo: ${rolIncorrecto.text}`);
     const envelope = errorEnvelope(rolIncorrecto.json);
     assert.equal(envelope.code, 'FORBIDDEN');
-    assert.equal(envelope.message, 'La ruta es solo para el rol CAREGIVER');
+    assert.equal(envelope.message, 'La ruta no está disponible para el rol de la sesión');
   });
 });
 
@@ -438,5 +438,59 @@ test('S4/caregivers: el listado de familiares solo lo ve un vinculado, con N fam
     const ajena = await get(base, `${SENIORS}/${id}/caregivers`, auth(tercera.token));
     assert.equal(ajena.status, 404, `cuerpo: ${ajena.text}`);
     assert.equal(errorEnvelope(ajena.json).code, 'SENIOR_NOT_FOUND');
+  });
+});
+
+// R3-2 de la revisión nativa: una zona de solo espacios es «vacía», así que
+// cae a Bogotá en vez de guardar un valor inventado.
+test('S17: una zona de solo espacios se trata como ausente y se guarda Bogotá', async () => {
+  const harness = makeHarness();
+  await withServer(harness, async (base) => {
+    const caregiver = await seedCaregiver(harness, base, 'espacios@example.com');
+    const created = await post(
+      base,
+      SENIORS,
+      { ...PROFILE_BODY, timezone: '   ' },
+      auth(caregiver.token),
+    );
+
+    assert.equal(created.status, 201, `cuerpo: ${created.text}`);
+    assert.equal((created.json as { timezone: string }).timezone, 'America/Bogota');
+  });
+});
+
+// R3-3 de la revisión nativa: el orden del listado es parte de lo observable.
+test('S21: el listado devuelve el perfil más reciente primero', async () => {
+  const harness = makeHarness();
+  await withServer(harness, async (base) => {
+    const caregiver = await seedCaregiver(harness, base, 'orden@example.com');
+    const first = await createSenior(base, caregiver.token, { fullName: 'Rosa Pérez' });
+    harness.clock.now = new Date(FIXED_NOW.getTime() + 60_000);
+    const second = await createSenior(base, caregiver.token, { fullName: 'Marta Gómez' });
+
+    const listed = await get(base, SENIORS, auth(caregiver.token));
+    assert.equal(listed.status, 200);
+    const ids = (listed.json as { seniors: { id: string }[] }).seniors.map((senior) => senior.id);
+    assert.deepEqual(ids, [second.id, first.id]);
+  });
+});
+
+// R3-4 de la revisión nativa: el modo de falla documentado del alta (D4).
+test('D4: si el vínculo no se puede escribir, el alta responde 500 y el perfil queda inerte', async () => {
+  const harness = makeHarness();
+  await withServer(harness, async (base) => {
+    const caregiver = await seedCaregiver(harness, base, 'sin-vinculo@example.com');
+    harness.seniorRepo.linkError = new Error('el segundo write falló');
+
+    const failed = await post(base, SENIORS, PROFILE_BODY, auth(caregiver.token));
+
+    assert.equal(failed.status, 500);
+    assert.equal(errorEnvelope(failed.json).code, 'INTERNAL_ERROR');
+    // El perfil existe, pero nadie lo lista ni lo puede abrir: el alta se
+    // reintenta entera y no queda un vínculo a medias que autorice de más.
+    assert.equal(harness.seniorRepo.profiles.size, 1);
+    assert.equal(harness.seniorRepo.links.length, 0);
+    const listed = await get(base, SENIORS, auth(caregiver.token));
+    assert.deepEqual(listed.json, { seniors: [] });
   });
 });

@@ -144,3 +144,12 @@ pública y 404 para el no vinculado.»
   **161/161** con `MONGO_URL` (`chk-*` con `directConnection=true` en el Mongo local del 4301). El
   archivo de pines de Mongo aísla su base (`…-seniors`) porque `node --test` corre los archivos en
   paralelo y el de HU-004 dropea la suya.
+- **L8** — Revisión nativa: `review-d11f3904e976084e` sobre `67e12da` (la unidad con el ítem de riesgo
+  2), lentes `risk` + `reliability`: **aprobada**, autoridad quemada. Cinco advisories no
+  bloqueantes; cuatro cerrados en el commit de hardening (el 403 ya no repite el rol requerido, la
+  tabla del alta dice `INVALID_BODY` para el grupo sanguíneo ausente, el doble ordena como el
+  adaptador y tres tests nuevos pinen la zona de solo espacios, el orden del listado y el modo de
+  falla D4 sin vínculo). El quinto (una zona de solo espacios) quedó cubierto por el test nuevo y la
+  documentación.
+- **L9** — Cierre: `typecheck` y `build` verdes; `npm test` **154 pass + 10 skipped** sin base y
+  **164/164** con Mongo real. Nada pusheado: la rama sigue 37 commits adelante de `origin/main`.

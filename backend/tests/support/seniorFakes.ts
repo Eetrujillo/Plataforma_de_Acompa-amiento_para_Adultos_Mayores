@@ -75,7 +75,10 @@ export class InMemorySeniorRepository implements SeniorRepositoryPort {
         .filter((link) => link.status === 'ACTIVE' && link.caregiverId === caregiverId)
         .map((link) => link.seniorId),
     );
-    return [...this.profiles.values()].filter((profile) => seniorIds.has(profile.id));
+    // Mismo orden observable que el adaptador real: más reciente primero.
+    return [...this.profiles.values()]
+      .filter((profile) => seniorIds.has(profile.id))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id));
   }
 
   async findSeniorForCaregiver(

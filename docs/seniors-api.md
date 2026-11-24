@@ -44,7 +44,7 @@ Content-Type: application/json
   "emergencyContact": { "fullName": "Ana Pérez", "phone": "+573001234567" } }
 ```
 
-`timezone` es opcional: si falta, viene vacía o `null`, se guarda `America/Bogota`.
+`timezone` es opcional: si falta, viene vacía, solo con espacios o `null`, se guarda `America/Bogota`.
 
 ```http
 201 Created
@@ -77,8 +77,8 @@ Errores (todos `400`, con `error.code` para que la pantalla marque el campo):
 | `error.code` | Cuándo |
 | --- | --- |
 | `INVALID_NAME` | El nombre falta, no es texto o queda con menos de 3 caracteres después de normalizar (máximo 120). |
-| `INVALID_TIMEZONE` | La zona no es una zona IANA válida. No se cae a Bogotá en silencio; si falta o viene vacía sí se guarda `America/Bogota`. |
-| `INVALID_BLOOD_TYPE` | El grupo sanguíneo falta o no está en la enumeración cerrada `A+ A- B+ B- AB+ AB- O+ O-` (es obligatorio). |
+| `INVALID_TIMEZONE` | La zona no es una zona IANA válida. No se cae a Bogotá en silencio; si falta, viene vacía o solo con espacios, sí se guarda `America/Bogota`. |
+| `INVALID_BLOOD_TYPE` | El grupo sanguíneo no está en la enumeración cerrada `A+ A- B+ B- AB+ AB- O+ O-` (es obligatorio). Si el campo falta o no es texto, la respuesta es `INVALID_BODY` con `details.field`. |
 | `INVALID_ALLERGIES` | Una lista tiene más de 20 ítems, o un ítem queda vacío o con más de 80 caracteres. |
 | `INVALID_CONDITIONS` | Ídem para las condiciones. |
 | `INVALID_MEDICATIONS` | Ídem para la medicación. |

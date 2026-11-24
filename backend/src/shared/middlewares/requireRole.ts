@@ -17,9 +17,10 @@ export function requireRole(role: string): RequestHandler {
       return;
     }
     if (user.role !== role) {
-      // D5: el código 403 FORBIDDEN es propio de acá; el mensaje nombra el rol
-      // requerido porque el guard ya consumió su valor.
-      next(new AppError(403, 'FORBIDDEN', `La ruta es solo para el rol ${role}`));
+      // D5: el código 403 FORBIDDEN es propio de acá. El mensaje NO nombra el
+      // rol requerido: a una sesión autenticada de otro rol no se le cuenta
+      // qué rol pide la ruta.
+      next(new AppError(403, 'FORBIDDEN', 'La ruta no está disponible para el rol de la sesión'));
       return;
     }
     next();
