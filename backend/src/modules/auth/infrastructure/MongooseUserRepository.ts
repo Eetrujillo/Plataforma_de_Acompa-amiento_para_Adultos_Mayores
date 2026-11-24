@@ -154,7 +154,7 @@ export function createMongooseUserRepository(): UserRepositoryPort & Verificatio
       verifiedAt: Date,
     ): Promise<StoredUser | null> {
       const doc = await UserModel.findOneAndUpdate(
-        { email, verificationTokenHash: tokenHash, emailVerifiedAt: null },
+        { email, verificationTokenHash: tokenHash, emailVerifiedAt: null, verificationTokenExpiresAt: { $gt: verifiedAt } },
         {
           emailVerifiedAt: verifiedAt,
           verificationTokenHash: null,

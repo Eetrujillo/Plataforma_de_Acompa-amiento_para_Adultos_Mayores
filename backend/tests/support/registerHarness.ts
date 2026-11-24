@@ -112,6 +112,9 @@ export class InMemoryUserRepository implements UserRepositoryPort, VerificationS
     const user = this.users.get(email);
     const token = this.savedTokens.get(email);
     if (user === undefined || token === undefined || token.tokenHash !== tokenHash) return null;
+    // El vencimiento entra en la condición atómica: un token que cruzó su
+    // expiresAt no se canjea aunque el chequeo previo lo haya visto vigente.
+    if (token.expiresAt.getTime() <= verifiedAt.getTime()) return null;
     if ((this.verifiedAt.get(email) ?? null) !== null) return null;
     this.verifiedAt.set(email, verifiedAt);
     // Un solo uso: el token queda invalidado al marcar el correo como verificado.

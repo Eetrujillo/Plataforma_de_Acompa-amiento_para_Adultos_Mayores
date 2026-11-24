@@ -97,8 +97,8 @@ export function resolveJwtSecret(source: Record<string, string | undefined>): st
 function readBool(source: Record<string, string | undefined>, key: string, fallback: boolean): boolean {
   const raw = source[key]?.trim().toLowerCase();
   if (raw === undefined || raw === '') return fallback;
-  if (raw === 'true') return true;
-  if (raw === 'false') return false;
+  if (raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on') return true;
+  if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
   return fallback;
 }
 
@@ -120,7 +120,7 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     trustProxyHops: readHopCount(source, 'TRUST_PROXY_HOPS'),
     jwtSecret: resolveJwtSecret(source),
     appUrl: readString(source, 'APP_URL', 'http://localhost:3500'),
-    emailVerificationTtlHours: readInt(source, 'EMAIL_VERIFICATION_TTL_HOURS', 24),
+    emailVerificationTtlHours: readPositiveInt(source, 'EMAIL_VERIFICATION_TTL_HOURS', 24),
     resendThrottleMax: readPositiveInt(source, 'RESEND_THROTTLE_MAX', 3),
     resendThrottleWindowMinutes: readPositiveInt(source, 'RESEND_THROTTLE_WINDOW_MINUTES', 60),
     smtp: {
