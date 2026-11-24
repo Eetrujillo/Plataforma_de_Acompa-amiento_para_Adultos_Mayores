@@ -98,12 +98,24 @@ export class InMemoryUserRepository implements UserRepositoryPort, VerificationS
     return null;
   }
 
-  async markEmailVerified(email: string, verifiedAt: Date): Promise<StoredUser> {
+  /**
+   * C2: canje atómico y condicionado, igual que el `findOneAndUpdate` del
+   * adaptador real — sólo triunfa con el hash vigente y el correo aún sin
+   * verificar; devuelve `null` en el caso contrario para que `ConfirmEmail`
+   * responda el INVALID_TOKEN único.
+   */
+  async markEmailVerified(
+    email: string,
+    tokenHash: string,
+    verifiedAt: Date,
+  ): Promise<StoredUser | null> {
+    const user = this.users.get(email);
+    const token = this.savedTokens.get(email);
+    if (user === undefined || token === undefined || token.tokenHash !== tokenHash) return null;
+    if ((this.verifiedAt.get(email) ?? null) !== null) return null;
     this.verifiedAt.set(email, verifiedAt);
     // Un solo uso: el token queda invalidado al marcar el correo como verificado.
     this.savedTokens.delete(email);
-    const user = this.users.get(email);
-    if (user === undefined) throw new Error('markEmailVerified: la cuenta no existe');
     return user;
   }
 }

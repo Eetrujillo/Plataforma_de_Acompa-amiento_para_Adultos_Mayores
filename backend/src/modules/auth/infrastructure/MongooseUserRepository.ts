@@ -20,6 +20,35 @@ interface PersistedTokenDoc extends PersistedUser {
   emailVerifiedAt: Date | null;
 }
 
+/**
+ * C1: los campos que la proyección de `findByVerificationTokenHash` debe traer
+ * para que el mapeo produzca un `VerificationTokenTarget` completo — todos los
+ * que el puerto devuelve, más `_id`, del que sale `id`. La proyección vive
+ * entera en esta constante: devolver un campo nuevo sin sumarlo acá hace
+ * fallar el test de `tests/emailVerificationAdapter.test.ts`. El defecto
+ * original era un `email` ausente que terminaba en `markEmailVerified(undefined,…)`.
+ */
+export const VERIFICATION_TOKEN_FIELDS = [
+  '_id',
+  'email',
+  'fullName',
+  'verificationTokenHash',
+  'verificationTokenExpiresAt',
+  'emailVerifiedAt',
+] as const;
+
+/** Mapeo del documento proyectado al target del puerto (exportado para el test de C1). */
+export function mapVerificationTokenTarget(doc: PersistedTokenDoc): VerificationTokenTarget {
+  return {
+    id: doc._id.toString(),
+    email: doc.email,
+    fullName: doc.fullName,
+    tokenHash: doc.verificationTokenHash ?? '',
+    expiresAt: doc.verificationTokenExpiresAt ?? null,
+    emailVerifiedAt: doc.emailVerifiedAt ?? null,
+  };
+}
+
 function toStored(doc: PersistedUser): StoredUser {
   return {
     id: doc._id.toString(),
@@ -103,35 +132,37 @@ export function createMongooseUserRepository(): UserRepositoryPort & Verificatio
 
     async findByVerificationTokenHash(tokenHash: string): Promise<VerificationTokenTarget | null> {
       // select: false en el esquema: los campos del token se piden acá de
-      // forma explícita para que ninguna otra consulta los traiga por descuido.
+      // forma explícita — la constante publica la proyección completa (C1)
+      // para que ningún campo del puerto quede fuera por descuido.
       const doc = await UserModel.findOne({ verificationTokenHash: tokenHash })
-        .select(
-          'fullName emailVerifiedAt verificationTokenHash verificationTokenExpiresAt',
-        )
+        .select(VERIFICATION_TOKEN_FIELDS.join(' '))
         .lean<PersistedTokenDoc>();
       if (doc === null) return null;
-      return {
-        id: doc._id.toString(),
-        email: doc.email,
-        fullName: doc.fullName,
-        tokenHash: doc.verificationTokenHash ?? '',
-        expiresAt: doc.verificationTokenExpiresAt ?? null,
-        emailVerifiedAt: doc.emailVerifiedAt ?? null,
-      };
+      return mapVerificationTokenTarget(doc);
     },
 
-    async markEmailVerified(email: string, verifiedAt: Date): Promise<StoredUser> {
-      await UserModel.updateOne(
-        { email },
+    /**
+     * C2: canje atómico y condicionado — `findOneAndUpdate` con el hash vigente
+     * y `emailVerifiedAt: null` en el filtro. Dos usos del mismo token no pueden
+     * dar dos escrituras: el perdedor obtiene `null` y el caso de uso responde
+     * el mismo `INVALID_TOKEN` (D2). `new: true` devuelve el documento ya
+     * actualizado, con `emailVerifiedAt` fijado y el token quemado.
+     */
+    async markEmailVerified(
+      email: string,
+      tokenHash: string,
+      verifiedAt: Date,
+    ): Promise<StoredUser | null> {
+      const doc = await UserModel.findOneAndUpdate(
+        { email, verificationTokenHash: tokenHash, emailVerifiedAt: null },
         {
           emailVerifiedAt: verifiedAt,
           verificationTokenHash: null,
           verificationTokenExpiresAt: null,
         },
-      );
-      const doc = await UserModel.findOne({ email }).lean<PersistedUser>();
-      if (doc === null) throw new Error('markEmailVerified: la cuenta no existe');
-      return toStored(doc);
+        { new: true },
+      ).lean<PersistedUser>();
+      return doc === null ? null : toStored(doc);
     },
   };
 }

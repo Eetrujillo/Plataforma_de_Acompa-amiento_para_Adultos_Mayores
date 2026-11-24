@@ -23,8 +23,17 @@ export interface VerificationStorePort {
   ): Promise<{ fullName: string; emailVerifiedAt: Date | null } | null>;
   /** Búsqueda por hash: el token en claro nunca llega a la base (S6). */
   findByVerificationTokenHash(tokenHash: string): Promise<VerificationTokenTarget | null>;
-  /** Marca el correo verificado con el reloj del servidor y quema el token (S2). */
-  markEmailVerified(email: string, verifiedAt: Date): Promise<StoredUser>;
+  /**
+   * Marca el correo verificado con el reloj del servidor y quema el token (S2).
+   * C2: el canje es atómico y condicionado — devuelve `null` en lugar de
+   * escribir cuando el hash ya no matchea o el correo ya está verificado, para
+   * que dos usos del mismo token no puedan dar dos escrituras.
+   */
+  markEmailVerified(
+    email: string,
+    tokenHash: string,
+    verifiedAt: Date,
+  ): Promise<StoredUser | null>;
 }
 
 export interface VerificationTokenTarget {

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ResendThrottle } from '../src/modules/auth/application/ResendThrottle.ts';
+import { loadEnv } from '../src/config/env.ts';
 import {
   FIXED_NOW,
   VALID_BODY,
@@ -171,6 +172,30 @@ test('rate-limiting: la clave se normaliza; mayúsculas y espacios comparten con
     const fourth = await post(base, RESEND, { email: 'cuidador@example.com' });
     assert.equal(fourth.status, 429, 'la cuarta variante agotó el mismo contador');
   });
+});
+
+test('C3: RESEND_THROTTLE_MAX y RESEND_THROTTLE_WINDOW_MINUTES aceptan sólo enteros positivos', () => {
+  // Válidos se respetan.
+  assert.equal(loadEnv({ RESEND_THROTTLE_MAX: '5' }).resendThrottleMax, 5);
+  assert.equal(loadEnv({ RESEND_THROTTLE_WINDOW_MINUTES: '90' }).resendThrottleWindowMinutes, 90);
+
+  // C3: vacío, 0, negativo o malformado caen al default (3 / 60): un límite de
+  // tasa no se puede desactivar por configuración accidental.
+  const invalidos = ['0', '-1', 'abc', '1.5', '', '   ', '3x', '+3'];
+  for (const invalido of invalidos) {
+    assert.equal(
+      loadEnv({ RESEND_THROTTLE_MAX: invalido }).resendThrottleMax,
+      3,
+      `RESEND_THROTTLE_MAX=${JSON.stringify(invalido)} cae al default`,
+    );
+    assert.equal(
+      loadEnv({ RESEND_THROTTLE_WINDOW_MINUTES: invalido }).resendThrottleWindowMinutes,
+      60,
+      `RESEND_THROTTLE_WINDOW_MINUTES=${JSON.stringify(invalido)} cae al default`,
+    );
+  }
+  assert.equal(loadEnv({}).resendThrottleMax, 3);
+  assert.equal(loadEnv({}).resendThrottleWindowMinutes, 60);
 });
 
 test('unidad ResendThrottle: ventana vencida vuelve a permitir, clave normalizada comparte contador y el tope de claves poda el store', () => {

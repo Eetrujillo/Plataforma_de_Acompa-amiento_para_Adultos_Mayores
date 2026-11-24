@@ -37,4 +37,8 @@ const userSchema = new Schema(
   { timestamps: true, collection: 'users' },
 );
 
+// C4: `verify-email` es un endpoint público y busca por el hash — sin índice
+// cada intento de canje escanearía la colección completa.
+userSchema.index({ verificationTokenHash: 1 });
+
 export const UserModel = model('User', userSchema);

@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import type {
   AuthLogger,
   EmailDeliveryResult,
@@ -76,6 +77,27 @@ function escapeHtml(value: string): string {
 }
 
 /**
+ * Opciones del transporte SMTP con timeouts explícitos (C5): un servidor que
+ * acepta el TCP y nunca responde queda, con los defaults de nodemailer, hasta
+ * dos minutos retomando la conexión — y ahí retiene el `201` del registro.
+ * Exportadas para que el test las fije sin abrir ninguna conexión.
+ */
+export function smtpTransportOptions(config: SmtpConfig): SMTPTransport.Options {
+  return {
+    // El tipo de nodemailer no acepta null: sin host la cadena es `undefined`.
+    host: config.host ?? undefined,
+    port: config.port,
+    secure: config.secure,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+    ...(config.user === null || config.user === ''
+      ? {}
+      : { auth: { user: config.user, pass: config.pass ?? '' } }),
+  };
+}
+
+/**
  * Adaptador de correo (D4). Sin `SMTP_HOST` el canal es `console`: imprime el
  * enlace en el log del backend — excepción declarada de S6, es la única forma
  * de probar el flujo en desarrollo y en el arranque de la VPS — y el registro
@@ -94,14 +116,7 @@ export function createEmailSender(config: SmtpConfig, logger: AuthLogger): Email
     };
   }
 
-  const transport = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    ...(config.user === null || config.user === ''
-      ? {}
-      : { auth: { user: config.user, pass: config.pass ?? '' } }),
-  });
+  const transport = nodemailer.createTransport(smtpTransportOptions(config));
 
   return {
     async sendVerificationEmail(message: VerificationEmailMessage): Promise<EmailDeliveryResult> {

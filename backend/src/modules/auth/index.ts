@@ -73,7 +73,7 @@ export { RequestEmailVerification } from './application/RequestEmailVerification
 export type { VerificationStorePort } from './application/RequestEmailVerification.ts';
 export { ConfirmEmail, INVALID_TOKEN_MESSAGE } from './application/ConfirmEmail.ts';
 export { ResendThrottle } from './application/ResendThrottle.ts';
-export { createEmailSender, describeEmailChannel } from './infrastructure/EmailSender.ts';
+export { createEmailSender, describeEmailChannel, smtpTransportOptions } from './infrastructure/EmailSender.ts';
 export type { SmtpConfig } from './infrastructure/EmailSender.ts';
 export type { AuthLogger, EmailSenderPort } from './application/EmailSenderPort.ts';
 export { BcryptPasswordHasher } from './infrastructure/BcryptPasswordHasher.ts';

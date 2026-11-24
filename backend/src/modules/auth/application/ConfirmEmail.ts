@@ -32,6 +32,18 @@ export class ConfirmEmail {
     if (record === null || !isVerificationTokenUsable(record, this.clock.now())) {
       throw new AppError(400, 'INVALID_TOKEN', INVALID_TOKEN_MESSAGE);
     }
-    return this.store.markEmailVerified(record.email, this.clock.now());
+    // C2: el canje es atómico y condicionado. Si el token dejó de estar vigente
+    // entre la búsqueda y la escritura — otro pedido lo gastó — la persistencia
+    // responde `null` y salta el mismo INVALID_TOKEN, sin distinguir motivos
+    // (D2, S3): dos canjes del mismo token no pueden dar dos 200.
+    const updated = await this.store.markEmailVerified(
+      record.email,
+      record.tokenHash,
+      this.clock.now(),
+    );
+    if (updated === null) {
+      throw new AppError(400, 'INVALID_TOKEN', INVALID_TOKEN_MESSAGE);
+    }
+    return updated;
   }
 }

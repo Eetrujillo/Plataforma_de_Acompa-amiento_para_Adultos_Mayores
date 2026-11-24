@@ -40,6 +40,23 @@ function readInt(source: Record<string, string | undefined>, key: string, fallba
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+/**
+ * Enteros positivos únicamente (C3): un límite de tasa no se puede desactivar
+ * por configuración accidental — vacío, `0`, negativo, decimal, prefijo
+ * numérico o malformado cae al default, igual que `TRUST_PROXY_HOPS`.
+ */
+function readPositiveInt(
+  source: Record<string, string | undefined>,
+  key: string,
+  fallback: number,
+): number {
+  const raw = source[key]?.trim();
+  if (raw === undefined || raw === '') return fallback;
+  if (!/^\d+$/.test(raw)) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return parsed <= 0 ? fallback : parsed;
+}
+
 /** Una cadena de proxies más larga que esto es configuración inválida, no un caso de uso. */
 const MAX_TRUSTED_PROXY_HOPS = 10;
 
@@ -104,8 +121,8 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     jwtSecret: resolveJwtSecret(source),
     appUrl: readString(source, 'APP_URL', 'http://localhost:3500'),
     emailVerificationTtlHours: readInt(source, 'EMAIL_VERIFICATION_TTL_HOURS', 24),
-    resendThrottleMax: readInt(source, 'RESEND_THROTTLE_MAX', 3),
-    resendThrottleWindowMinutes: readInt(source, 'RESEND_THROTTLE_WINDOW_MINUTES', 60),
+    resendThrottleMax: readPositiveInt(source, 'RESEND_THROTTLE_MAX', 3),
+    resendThrottleWindowMinutes: readPositiveInt(source, 'RESEND_THROTTLE_WINDOW_MINUTES', 60),
     smtp: {
       host: readOptionalString(source, 'SMTP_HOST'),
       port: readInt(source, 'SMTP_PORT', 587),

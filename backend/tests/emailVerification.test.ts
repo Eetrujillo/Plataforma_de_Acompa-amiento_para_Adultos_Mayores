@@ -273,6 +273,37 @@ test('S6 (canal console): sin SMTP_HOST el enlace se imprime en el log con la fr
   assert.ok(logged.includes('https://app.ejemplo.test/verify-email?token=abc'));
 });
 
+test('C2: dos canjes del mismo token no pueden dar dos 200: el perdedor responde INVALID_TOKEN', async () => {
+  const harness = makeHarness();
+  await withServer(harness, async (base) => {
+    const registered = await post(base, REGISTER, VALID_BODY);
+    assert.equal(registered.status, 201);
+    const raw = tokenFromLink(harness.sender.sent[0]!.link);
+
+    // Dos pedidos simultáneos del mismo token: ambos superan la búsqueda y sólo
+    // uno gana el canje atómico; el otro responde el INVALID_TOKEN único (S3).
+    const [first, second] = await Promise.all([
+      post(base, VERIFY, { token: raw }),
+      post(base, VERIFY, { token: raw }),
+    ]);
+    assert.deepEqual(
+      [first.status, second.status].sort(),
+      [200, 400],
+      `uno: ${first.text} · otro: ${second.text}`,
+    );
+    const winner = first.status === 200 ? first : second;
+    const body = winner.json as { user: { email: unknown; emailVerified: unknown } };
+    assert.equal(body.user.email, 'cuidador@example.com');
+    assert.equal(body.user.emailVerified, true);
+
+    // La cuenta queda verificada exactamente una vez, con el reloj del servidor.
+    assert.equal(
+      harness.repo.verifiedAt.get('cuidador@example.com')?.toISOString(),
+      FIXED_NOW.toISOString(),
+    );
+  });
+});
+
 test('S8: un reenvío válido invalida el token anterior; el nuevo funciona', async () => {
   const harness = makeHarness();
   await withServer(harness, async (base) => {
