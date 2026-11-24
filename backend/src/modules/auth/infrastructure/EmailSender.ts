@@ -4,6 +4,7 @@ import type {
   AuthLogger,
   EmailDeliveryResult,
   EmailSenderPort,
+  PasswordResetEmailMessage,
   VerificationEmailMessage,
 } from '../application/EmailSenderPort.ts';
 
@@ -68,6 +69,41 @@ function buildMessage(message: VerificationEmailMessage): MessageBody {
   return { subject, text, html };
 }
 
+/** Copy propio de HU-004 (skill email-adapter regla 5): frases cortas, vencimiento y un solo uso. */
+function buildResetMessage(message: PasswordResetEmailMessage): MessageBody {
+  const greeting =
+    message.fullName.trim() === '' ? 'Hola:' : `Hola ${message.fullName.trim()}:`;
+  const subject = 'Restablecé tu contraseña';
+  const text = [
+    greeting,
+    '',
+    'Recibimos un pedido para restablecer la contraseña de tu cuenta:',
+    '',
+    message.link,
+    '',
+    `Este enlace vence en ${message.expiresInMinutes} minutos y se puede usar una sola vez.`,
+    'Si no fuiste vos quien pidió el cambio, ignorá este mensaje: tu contraseña no se modifica.',
+    '',
+    'Plataforma de Acompañamiento para Adultos Mayores',
+  ].join('\n');
+  const html = [
+    '<p>',
+    escapeHtml(greeting),
+    '</p>',
+    '<p>Recibimos un pedido para restablecer la contraseña de tu cuenta:</p>',
+    '<p><a href="',
+    message.link,
+    '">Restablecer mi contraseña</a></p>',
+    '<p>O copiá este enlace en tu navegador:<br>',
+    escapeHtml(message.link),
+    '</p>',
+    '<p>Este enlace vence en ',
+    String(message.expiresInMinutes),
+    ' minutos y se puede usar una sola vez. Si no fuiste vos quien pidió el cambio, ignorá este mensaje: tu contraseña no se modifica.</p>',
+  ].join('');
+  return { subject, text, html };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -113,6 +149,14 @@ export function createEmailSender(config: SmtpConfig, logger: AuthLogger): Email
         );
         return { delivered: true, channel: 'console' };
       },
+      // HU-004: rama propia en el canal console (skill email-adapter regla 5).
+      async sendPasswordResetEmail(message: PasswordResetEmailMessage): Promise<EmailDeliveryResult> {
+        logger.info(
+          `[email delivery: console] Enlace de restablecimiento para ${message.to} ` +
+            `(vence en ${message.expiresInMinutes} minutos, de un solo uso): ${message.link}`,
+        );
+        return { delivered: true, channel: 'console' };
+      },
     };
   }
 
@@ -135,6 +179,29 @@ export function createEmailSender(config: SmtpConfig, logger: AuthLogger): Email
         // token: el enlace no entra en este log (S6).
         logger.warn(
           `[email delivery: smtp] el envío falló; el token quedó emitido y puede pedirse de nuevo: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return { delivered: false, channel: 'smtp' };
+      }
+    },
+    // HU-004: rama propia en el canal smtp, con el mismo cuidado de no loguear
+    // el enlace (S4): el mensaje del error de SMTP puede nombrar al
+    // destinatario, nunca al token.
+    async sendPasswordResetEmail(message: PasswordResetEmailMessage): Promise<EmailDeliveryResult> {
+      try {
+        const { subject, text, html } = buildResetMessage(message);
+        await transport.sendMail({
+          from: config.from,
+          to: message.to,
+          subject,
+          text,
+          html,
+        });
+        return { delivered: true, channel: 'smtp' };
+      } catch (error: unknown) {
+        logger.warn(
+          `[email delivery: smtp] el envío del correo de restablecimiento falló; el token quedó emitido y puede pedirse de nuevo: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );

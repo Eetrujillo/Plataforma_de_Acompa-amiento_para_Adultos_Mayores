@@ -23,9 +23,12 @@ import type { VerificationStorePort } from '../../src/modules/auth/application/R
 import type { VerificationTokenTarget } from '../../src/modules/auth/application/RequestEmailVerification.ts';
 import type {
   AuthLogger,
+  EmailDeliveryResult,
   EmailSenderPort,
+  PasswordResetEmailMessage,
   VerificationEmailMessage,
 } from '../../src/modules/auth/application/EmailSenderPort.ts';
+import type { PasswordResetStorePort } from '../../src/modules/auth/application/RequestPasswordReset.ts';
 
 export const TERMS_VERSION = '9.9-test';
 export const FIXED_NOW = new Date('2026-01-01T00:00:00.000Z');
@@ -48,7 +51,7 @@ export interface StoredLoginState {
  * verificación comparten estado, igual que el repositorio real de Mongoose.
  * `saveError` y `saveTokenError` permiten simular fallos del adaptador sin Mongo.
  */
-export class InMemoryUserRepository implements UserRepositoryPort, VerificationStorePort, LoginStorePort, SessionUserReaderPort {
+export class InMemoryUserRepository implements UserRepositoryPort, VerificationStorePort, LoginStorePort, SessionUserReaderPort, PasswordResetStorePort {
   readonly users = new Map<string, StoredUser>();
   readonly consents = new Map<string, ConsentEvidence>();
   readonly savedEntities: UserEntity[] = [];
@@ -71,6 +74,26 @@ export class InMemoryUserRepository implements UserRepositoryPort, VerificationS
   readonly lockoutStates = new Map<string, { failedLoginAttempts: number | null; lockedUntil: Date | null }>();
   saveError: Error | null = null;
   saveTokenError: Error | null = null;
+
+  // HU-004: colección propia de tokens de reset (D1), claveada por tokenHash
+  // con la misma disciplina de proyección del adaptador real: userId, email,
+  // expiresAt y usedAt, nunca el token en claro.
+  readonly passwordResetTokens = new Map<
+    string,
+    { userId: string; email: string; tokenHash: string; expiresAt: Date; usedAt: Date | null }
+  >();
+  saveResetTokenCalls = 0;
+  forgotStateLookups = 0;
+  resetConsumeCalls = 0;
+  resetPasswordWrites = 0;
+  /**
+   * S6: orden de las operaciones del flujo de reset. Pin del "consume antes
+   * de tocar la cuenta": en cada flujo completo el `consume` precede a
+   * cualquier escritura del documento User.
+   */
+  readonly resetCalls: string[] = [];
+  saveResetTokenError: Error | null = null;
+  resetPasswordError: Error | null = null;
 
   async findByEmail(email: string): Promise<StoredUser | null> {
     this.findByEmailCalls += 1;
@@ -95,6 +118,12 @@ export class InMemoryUserRepository implements UserRepositoryPort, VerificationS
       this.lockoutStates.set(user.email, { failedLoginAttempts: null, lockedUntil: null });
     }
     return stored;
+  }
+
+  /** Helper de test: cuenta sin contraseña (Google) para S1. */
+  addAccountWithoutPassword(email: string, fullName: string): void {
+    this.users.set(email, { id: randomUUID(), email, fullName, role: 'CAREGIVER' });
+    this.passwordHashes.set(email, null);
   }
 
   /** Helper de test: sube la versión de sesión (simula el reset de HU-004, S7). */
@@ -237,6 +266,82 @@ export class InMemoryUserRepository implements UserRepositoryPort, VerificationS
     }
     return null;
   }
+
+  // ─── HU-004: puerto PasswordResetStore (D1: colección propia) ───────────
+
+  /**
+   * S8: pedir otro enlace quema el anterior — toda entrada previa del correo
+   * desaparece y sólo el último token emitido queda guardado (S4: sólo el hash).
+   */
+  async savePasswordResetToken(
+    email: string,
+    token: { tokenHash: string; expiresAt: Date },
+  ): Promise<void> {
+    this.saveResetTokenCalls += 1;
+    if (this.saveResetTokenError !== null) throw this.saveResetTokenError;
+    for (const [hash, doc] of this.passwordResetTokens) {
+      if (doc.email === email) this.passwordResetTokens.delete(hash);
+    }
+    const user = this.users.get(email);
+    if (user === undefined) {
+      throw new Error(`savePasswordResetToken: sin cuenta para ${email} (bug del caller)`);
+    }
+    this.passwordResetTokens.set(token.tokenHash, {
+      userId: user.id,
+      email,
+      tokenHash: token.tokenHash,
+      expiresAt: token.expiresAt,
+      usedAt: null,
+    });
+  }
+
+  /** Estado mínimo para decidir si corresponde enviar (S1), sin exponer el hash. */
+  async findPasswordResetState(
+    email: string,
+  ): Promise<{ fullName: string; passwordHash: string | null } | null> {
+    this.forgotStateLookups += 1;
+    const user = this.users.get(email);
+    if (user === undefined) return null;
+    return { fullName: user.fullName, passwordHash: this.passwordHashes.get(email) ?? null };
+  }
+
+  /**
+   * S6/D3: consumo atómico y previo — una única escritura condicionada
+   * (`usedAt: null` + vencimiento vigente) que fija `usedAt`. Devuelve `null`
+   * cuando el token no matchea, ya está usado o venció: dos canjes del mismo
+   * token no pueden dar dos escrituras.
+   */
+  async consumePasswordResetToken(
+    tokenHash: string,
+    now: Date,
+  ): Promise<{ userId: string; email: string } | null> {
+    this.resetConsumeCalls += 1;
+    this.resetCalls.push('consume');
+    const doc = this.passwordResetTokens.get(tokenHash);
+    if (doc === undefined || doc.usedAt !== null || doc.expiresAt.getTime() <= now.getTime()) {
+      return null;
+    }
+    this.passwordResetTokens.set(tokenHash, { ...doc, usedAt: new Date(now.getTime()) });
+    return { userId: doc.userId, email: doc.email };
+  }
+
+  /**
+   * D4: una sola escritura — hash nuevo + racha limpiada + `$inc` de
+   * sessionVersion (null se lee como 0). El doble registra exactamente una
+   * llamada y aplica los tres efectos en esa única llamada. C4: reporta si
+   * matcheó una cuenta — la cuenta eliminada antes del canje responde `false`
+   * y el caso de uso contesta INVALID_TOKEN, no un 200 mentiroso.
+   */
+  async resetPassword(email: string, passwordHash: string): Promise<boolean> {
+    this.resetPasswordWrites += 1;
+    this.resetCalls.push('resetPassword');
+    if (this.resetPasswordError !== null) throw this.resetPasswordError;
+    if (!this.users.has(email)) return false;
+    this.passwordHashes.set(email, passwordHash);
+    this.lockoutStates.set(email, { failedLoginAttempts: 0, lockedUntil: null });
+    this.sessionVersions.set(email, (this.sessionVersions.get(email) ?? 0) + 1);
+    return true;
+  }
 }
 
 export class FakePasswordHasher implements PasswordHasherPort, PasswordComparerPort {
@@ -265,6 +370,22 @@ export class FakeEmailSender implements EmailSenderPort {
     this.sent.push(message);
     return { delivered: true, channel: 'smtp' };
   }
+
+  async sendPasswordResetEmail(
+    message: PasswordResetEmailMessage,
+  ): Promise<EmailDeliveryResult> {
+    if (this.explodeReset) throw new Error('smtp roto');
+    if (this.failNextReset) return { delivered: false, channel: 'smtp' };
+    this.passwordResets.push(message);
+    return { delivered: true, channel: 'smtp' };
+  }
+
+  // HU-004: rama de reset en el doble — acumula por separado. `failNextReset`
+  // simula un envío caído (delivered:false) y `explodeReset` una excepción;
+  // las dos comprobaciones de S10 (el 202 no se rompe y queda un warn).
+  readonly passwordResets: PasswordResetEmailMessage[] = [];
+  failNextReset = false;
+  explodeReset = false;
 }
 
 /** Logger capturado: permite afirmar sobre lo que el backend escribe (S6). */
@@ -307,6 +428,13 @@ export interface HarnessOptions {
   emailVerificationTtlHours?: number;
   resendThrottleMax?: number;
   resendThrottleWindowMinutes?: number;
+  /** HU-004: TTL del enlace de reset (PASSWORD_RESET_TTL_MINUTES, default 60). */
+  passwordResetTtlMinutes?: number;
+  /** HU-004: límite propio de forgot-password (separado del de reenvío, S9). */
+  forgotThrottleMax?: number;
+  forgotThrottleWindowMinutes?: number;
+  /** Error que rechaza `repo.savePasswordResetToken` (S10: no rompe el 202). */
+  saveResetTokenError?: Error;
   /** HU-003: configuración de sesión y bloqueo; defaults = los del contrato. */
   jwtSecret?: string;
   jwtExpiresIn?: string;
@@ -320,6 +448,9 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
   const repo = options.repository ?? new InMemoryUserRepository();
   if (options.saveError !== undefined) repo.saveError = options.saveError;
   if (options.saveTokenError !== undefined) repo.saveTokenError = options.saveTokenError;
+  if (options.saveResetTokenError !== undefined) {
+    repo.saveResetTokenError = options.saveResetTokenError;
+  }
   const hasher: PasswordHasherPort & PasswordComparerPort =
     options.hasher ?? new FakePasswordHasher();
   const sender = new FakeEmailSender();
@@ -340,6 +471,12 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
       emailVerificationTtlHours: options.emailVerificationTtlHours ?? 24,
       resendThrottleMax: options.resendThrottleMax ?? 3,
       resendThrottleWindowMinutes: options.resendThrottleWindowMinutes ?? 60,
+      // HU-004: restablecimiento de contraseña; el repositorio real satisface
+      // el puerto junto con los otros (colección propia, D1).
+      passwordResetStore: repo,
+      passwordResetTtlMinutes: options.passwordResetTtlMinutes ?? 60,
+      forgotThrottleMax: options.forgotThrottleMax ?? 3,
+      forgotThrottleWindowMinutes: options.forgotThrottleWindowMinutes ?? 60,
       // HU-003: sesión de test determinista y límites del contrato, salvo override.
       jwtSecret: options.jwtSecret ?? TEST_JWT_SECRET,
       jwtExpiresIn: options.jwtExpiresIn ?? '7d',

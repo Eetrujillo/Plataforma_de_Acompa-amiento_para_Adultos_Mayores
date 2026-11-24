@@ -1,5 +1,6 @@
 import { isValidObjectId } from 'mongoose';
 import { UserModel } from '../../../shared/models/User.ts';
+import { PasswordResetTokenModel } from '../../../shared/models/PasswordResetToken.ts';
 import { DuplicateEmailError } from '../application/RegisterCaregiver.ts';
 import type { NextLockoutState } from '../domain/loginLockout.ts';
 import type { StoredUser, UserRepositoryPort } from '../application/RegisterCaregiver.ts';
@@ -14,6 +15,7 @@ import type {
   VerificationStorePort,
   VerificationTokenTarget,
 } from '../application/RequestEmailVerification.ts';
+import type { PasswordResetStorePort } from '../application/RequestPasswordReset.ts';
 
 interface PersistedUser {
   _id: { toString(): string };
@@ -40,6 +42,11 @@ interface PersistedCredentials extends PersistedUser {
 /** Documento proyectado por `findSessionUserById` (authMiddleware, S7). */
 interface PersistedSessionUser extends PersistedUser {
   sessionVersion: number | null;
+}
+
+interface PersistedResetTarget {
+  userId: { toString(): string };
+  email: string;
 }
 
 /**
@@ -101,7 +108,8 @@ export function isDuplicateKeyError(error: unknown): boolean {
 export function createMongooseUserRepository(): UserRepositoryPort &
   VerificationStorePort &
   LoginStorePort &
-  SessionUserReaderPort {
+  SessionUserReaderPort &
+  PasswordResetStorePort {
   return {
     async findByEmail(email: string): Promise<StoredUser | null> {
       const doc = await UserModel.findOne({ email }).lean();
@@ -291,6 +299,98 @@ export function createMongooseUserRepository(): UserRepositoryPort &
         role: doc.role as UserRole,
         sessionVersion: doc.sessionVersion ?? null,
       };
+    },
+
+    // ─── HU-004: puerto PasswordResetStore (D1: colección propia) ─────────
+
+    /**
+     * S8/C2: pedir otro enlace quema el anterior — UNA SOLA escritura atómica.
+     * `findOneAndUpdate` con upsert pisando hash, vencimiento y `usedAt` (el
+     * enlace nuevo vive aunque el anterior ya esté canjeado), sobre el índice
+     * ÚNICO de `email`: dos pedidos simultáneos jamás dejan dos enlaces vivos.
+     * El `deleteMany` + `create` anterior perdía la carrera 5 de 5 veces. A la
+     * base sólo llega el SHA-256 (S4/​D5); el userId de la cuenta viaja en la
+     * búsqueda previa del estado.
+     */
+    async savePasswordResetToken(
+      email: string,
+      token: { tokenHash: string; expiresAt: Date },
+    ): Promise<void> {
+      const user = await UserModel.findOne({ email }).select('_id').lean<PersistedUser>();
+      if (user === null) return; // La cuenta desapareció: nada que guardar.
+      await PasswordResetTokenModel.findOneAndUpdate(
+        { email },
+        {
+          $set: {
+            tokenHash: token.tokenHash,
+            expiresAt: token.expiresAt,
+            usedAt: null,
+            userId: user._id,
+          },
+        },
+        { upsert: true },
+      );
+    },
+
+    /** Estado mínimo para decidir si corresponde enviar (S1), sin exponer el hash. */
+    async findPasswordResetState(
+      email: string,
+    ): Promise<{ fullName: string; passwordHash: string | null } | null> {
+      const doc = await UserModel.findOne({ email })
+        .select('fullName passwordHash')
+        .lean<PersistedCredentials>();
+      if (doc === null) return null;
+      return { fullName: doc.fullName, passwordHash: doc.passwordHash ?? null };
+    },
+
+    /**
+     * S6/D3: consumo atómico y previo — una única escritura condicionada.
+     * `findOneAndUpdate` fija `usedAt` con `usedAt: null` y vencimiento vivo
+     * en el filtro: dos canjes simultáneos del mismo token no pueden dar dos
+     * ganadores, y el perdedor obtiene `null` para el mismo INVALID_TOKEN.
+     * Proyección explícita (disciplina C1): sólo el _id de la cuenta y el
+     * correo; el hash jamás sale de la colección.
+     */
+    async consumePasswordResetToken(
+      tokenHash: string,
+      now: Date,
+    ): Promise<{ userId: string; email: string } | null> {
+      const doc = await PasswordResetTokenModel.findOneAndUpdate(
+        { tokenHash, usedAt: null, expiresAt: { $gt: now } },
+        { $set: { usedAt: now } },
+        { new: true, projection: 'userId email' },
+      )
+        .lean<PersistedResetTarget>();
+      if (doc === null) return null;
+      return { userId: doc.userId.toString(), email: doc.email };
+    },
+
+    /**
+     * D4: una sola escritura — un update pipeline con `$set` fija el hash
+     * nuevo, limpia `failedLoginAttempts` y `lockedUntil`, y sube
+     * `sessionVersion` con `$add`/`$ifNull` (null se lee como 0) en la MISMA
+     * operación: no existe ventana con contraseña nueva y sesiones viejas
+     * vivas. Con un fallo la cuenta queda intacta y el enlace quemado (D3).
+     *
+     * C1 (pin contra Mongo real): dentro de un pipeline un string que empieza
+     * con `$` es una RUTA DE CAMPO, y todo hash bcrypt empieza con `$2b$` —
+     * tal como estaba, el campo quedaba vacío y la cuenta quedaba
+     * irrecuperable. `$literal` entrega el string tal cual, sin interpretar.
+     * El resultado se reporta al puerto: matchear cero cuentas no es un reset
+     * (C4), y el caso de uso responde el mismo INVALID_TOKEN.
+     */
+    async resetPassword(email: string, passwordHash: string): Promise<boolean> {
+      const result = await UserModel.updateOne({ email }, [
+        {
+          $set: {
+            passwordHash: { $literal: passwordHash },
+            failedLoginAttempts: null,
+            lockedUntil: null,
+            sessionVersion: { $add: [{ $ifNull: ['$sessionVersion', 0] }, 1] },
+          },
+        },
+      ]);
+      return result.matchedCount > 0;
     },
   };
 }

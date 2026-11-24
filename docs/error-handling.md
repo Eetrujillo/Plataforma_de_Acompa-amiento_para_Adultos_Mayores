@@ -45,8 +45,12 @@ Cada request recibe un id antes de llegar a cualquier ruta:
 | `404` | `NOT_FOUND` | ruta o recurso inexistente |
 | `409` | `CONFLICT` | el estado actual impide la operación |
 | `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
-| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora) o el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) |
+| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora), el límite de pedidos de recuperación de contraseña (3 por hora, HU-004) o el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) |
 | `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) |
+| `400` | `WEAK_PASSWORD` | la contraseña no cumple la regla (mínimo 8 caracteres, con al menos una letra y un dígito) |
+| `400` | `INVALID_EMAIL` | el correo no tiene formato válido (registro, reenvío de verificación o recuperación de contraseña) |
+| `400` | `INVALID_BODY` | falta un campo del cuerpo o no es texto |
+| `400` | `INVALID_TOKEN` | el enlace de verificación de correo o de restablecimiento de contraseña no sirve: vencido, ya usado, inexistente o malformado (respuesta idéntica en los cuatro casos, sin `details`) |
 | `500` | `INTERNAL_ERROR` | error inesperado, o error de Mongoose o del driver sin traducción |
 | `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (las transacciones de Mongoose necesitan un replica set; `rs0` es solo el nombre que fija este compose) |
 | `503` | `DATABASE_UNAVAILABLE` | el driver no pudo contactar la base |

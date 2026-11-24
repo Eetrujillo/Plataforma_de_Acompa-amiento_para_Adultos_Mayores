@@ -6,6 +6,8 @@ import { RegisterCaregiver } from '../application/RegisterCaregiver.ts';
 import type { RegisterCaregiverCommand } from '../application/RegisterCaregiver.ts';
 import { ConfirmEmail } from '../application/ConfirmEmail.ts';
 import { RequestEmailVerification } from '../application/RequestEmailVerification.ts';
+import { RequestPasswordReset } from '../application/RequestPasswordReset.ts';
+import { ResetPassword } from '../application/ResetPassword.ts';
 import { Login } from '../application/Login.ts';
 
 /**
@@ -79,6 +81,9 @@ export interface AuthUseCases {
   requestEmailVerification: RequestEmailVerification;
   confirmEmail: ConfirmEmail;
   login: Login;
+  /** HU-004: pedido del enlace y canje del restablecimiento. */
+  requestPasswordReset: RequestPasswordReset;
+  resetPassword: ResetPassword;
 }
 
 /** Controlador HTTP del módulo auth (HU-001 y HU-002). */
@@ -184,6 +189,41 @@ export function createAuthController(useCases: AuthUseCases) {
         res.status(200).json({
           user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role },
         });
+      } catch (error: unknown) {
+        next(error);
+      }
+    },
+    async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const email = requiredString(req.body, 'email');
+        await useCases.requestPasswordReset.execute(email);
+        // Anti-oráculo (S1): idéntico exista, no exista o no tenga contraseña.
+        res.status(202).json({ accepted: true });
+      } catch (error: unknown) {
+        next(error);
+      }
+    },
+
+    /**
+     * HU-004: el cuerpo exige token y password textuales — un `INVALID_BODY`
+     * no toca el token (S7). El canje atómico y la subida de `sessionVersion`
+     * corren por dentro del caso de uso y del repositorio.
+     */
+    async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const raw = bodyObject(req.body);
+        const token = raw['token'];
+        const password = raw['password'];
+        if (typeof token !== 'string' || typeof password !== 'string') {
+          throw new AppError(
+            400,
+            'INVALID_BODY',
+            'El cuerpo del pedido no tiene el formato esperado',
+            { field: 'body' },
+          );
+        }
+        await useCases.resetPassword.execute({ token, password });
+        res.status(200).json({ reset: true });
       } catch (error: unknown) {
         next(error);
       }

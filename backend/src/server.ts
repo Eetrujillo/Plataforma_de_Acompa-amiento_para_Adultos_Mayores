@@ -59,6 +59,11 @@ async function main(): Promise<void> {
       emailVerificationTtlHours: env.emailVerificationTtlHours,
       resendThrottleMax: env.resendThrottleMax,
       resendThrottleWindowMinutes: env.resendThrottleWindowMinutes,
+      // HU-004: tokens de reset en su colección propia (D1), límite propio (S9).
+      passwordResetStore: userRepository,
+      passwordResetTtlMinutes: env.passwordResetTtlMinutes,
+      forgotThrottleMax: env.forgotThrottleMax,
+      forgotThrottleWindowMinutes: env.forgotThrottleWindowMinutes,
       // HU-003: la sesión comparte el repositorio; sin JWT_SECRET el router
       // falla al componerse (fail closed — en producción `loadEnv` ya lo exige).
       loginStore: userRepository,

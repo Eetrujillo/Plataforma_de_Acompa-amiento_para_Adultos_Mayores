@@ -60,6 +60,10 @@ export class DuplicateEmailError extends Error {
   }
 }
 
+/** Literal del contrato (docs/auth-api.md). La misma regla del alta — HU-001 y HU-004 (S7). */
+export const WEAK_PASSWORD_MESSAGE =
+  'La contraseña debe tener al menos 8 caracteres, con al menos una letra y un dígito';
+
 export interface RegisterCaregiverDeps {
   userRepository: UserRepositoryPort;
   passwordHasher: PasswordHasherPort;
@@ -119,12 +123,7 @@ export class RegisterCaregiver {
       throw new AppError(400, 'INVALID_EMAIL', 'El correo no es válido', { field: 'email' });
     }
     if (!isValidPassword(command.password)) {
-      throw new AppError(
-        400,
-        'WEAK_PASSWORD',
-        'La contraseña debe tener al menos 8 caracteres, con al menos una letra y un dígito',
-        { field: 'password' },
-      );
+      throw new AppError(400, 'WEAK_PASSWORD', WEAK_PASSWORD_MESSAGE, { field: 'password' });
     }
     if (!isValidFullName(command.fullName)) {
       throw new AppError(

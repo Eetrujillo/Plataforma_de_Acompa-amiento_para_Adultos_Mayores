@@ -98,7 +98,9 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
 - `POST /api/auth/resend-verification` — `{ email }`; `202` con `{ accepted: true }`, **3 intentos
   por hora y por correo**; el cuarto responde `429` (ver la sección siguiente).
 - `POST /api/auth/forgot-password` — `{ email }`; `202` con `{ accepted: true }` **exista o no la
-  cuenta**, mismo límite de 3 por hora por correo.
+  cuenta**; `400` `INVALID_EMAIL` (formato inválido, no consume cupo) o `INVALID_BODY`; mismo límite
+  de 3 por hora por correo (el propio de HU-004, no el del reenvío); el cuarto responde `429`
+  `TOO_MANY_REQUESTS` (abajo).
 - `POST /api/auth/reset-password` — `{ token, password }`; `200` con `{ reset: true }`, `400` si el
   enlace no sirve (ver la sección de restablecimiento).
 - `GET /api/auth/me` — requiere `Authorization: Bearer <jwt>`; `200` con
@@ -255,12 +257,16 @@ Detalles del enlace:
 - **Un solo uso y 60 minutos** de vigencia (`PASSWORD_RESET_TTL_MINUTES`, default `60`). Es una
   colección propia (`PasswordResetToken`): un enlace de verificación de correo no puede cambiar la
   contraseña.
-- Pedir un enlace nuevo **quema el anterior**: solo sirve el último que se envió.
-- **El consumo es atómico.** El token se marca usado con un `updateMany` condicionado a
+- Pedir un enlace nuevo **quema el anterior**: solo sirve el último que se envió. El guardado es
+  una **sola escritura atómica** (`findOneAndUpdate` con upsert sobre un índice único de `email`),
+  así que dos pedidos simultáneos jamás dejan dos enlaces vivos.
+- **El consumo es atómico.** El token se marca usado con un `findOneAndUpdate` condicionado a
   `usedAt: null` **antes** de tocar la cuenta: si dos pedidos llegan a la vez con el mismo enlace,
   uno solo gana y el otro recibe el mismo `400` genérico. El orden también hace que un fallo al
   escribir la contraseña deje la cuenta intacta y el enlace quemado (falla cerrado), en vez de
-  cambiar la contraseña y dejar el enlace vivo.
+  cambiar la contraseña y dejar el enlace vivo. Si el enlace sirve pero la cuenta ya no existe
+  (eliminada después de pedirlo), la escritura no matchea a nadie y la respuesta es el mismo `400
+  INVALID_TOKEN`, nunca un `200 { reset: true }` con la contraseña sin cambiar.
 - Deuda conocida: el envío del correo se espera dentro del request, así que el `202` tarda más con
   una cuenta real que con un correo desconocido. El cuerpo es idéntico (lo que pide el criterio),
   pero el tiempo distingue los dos casos.
@@ -281,4 +287,21 @@ Detalles del enlace:
 - **Cuentas creadas con Google no tienen contraseña que restablecer**: para ellas no se manda nada,
   con la misma respuesta `202`.
 - Límite: 3 pedidos por hora y por correo, contando también correos sin cuenta (instancia propia del
-  limitador, separada de la del reenvío de verificación).
+  limitador, separada de la del reenvío de verificación). El cuarto responde `429`:
+
+```json
+{
+  "error": {
+    "code": "TOO_MANY_REQUESTS",
+    "message": "Pediste demasiados enlaces de recuperación. Esperá unos minutos antes de pedir otro.",
+    "details": { "retryAfterSeconds": 3600 }
+  }
+}
+```
+
+- El contador corre antes de tocar la base y el intento rechazado no se registra; la clave es el
+  correo normalizado. Un formato inválido no consume cupo.
+- Configuración: `PASSWORD_RESET_TTL_MINUTES` (default `60`), `FORGOT_THROTTLE_MAX` (default `3`)
+  y `FORGOT_THROTTLE_WINDOW_MINUTES` (default `60`); un valor malformado cae al default. Sin
+  `SMTP_HOST` el canal del correo es `console` (excepción declarada de HU-002): el enlace queda en
+  los logs del servidor.

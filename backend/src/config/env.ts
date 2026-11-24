@@ -27,6 +27,10 @@ export interface AppEnv {
   /** RESEND_THROTTLE_MAX / RESEND_THROTTLE_WINDOW_MINUTES (S4). */
   resendThrottleMax: number;
   resendThrottleWindowMinutes: number;
+  /** HU-004: enlace de restablecimiento (S2) y límite propio de forgot-password (S9). */
+  passwordResetTtlMinutes: number;
+  forgotThrottleMax: number;
+  forgotThrottleWindowMinutes: number;
   /** JWT_EXPIRES_IN: vigencia del token de sesión (login). */
   jwtExpiresIn: string;
   /** HU-003: bloqueo de cuenta (S3) y límite por IP del login (S9). */
@@ -171,6 +175,10 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     emailVerificationTtlHours: readPositiveInt(source, 'EMAIL_VERIFICATION_TTL_HOURS', 24),
     resendThrottleMax: readPositiveInt(source, 'RESEND_THROTTLE_MAX', 3),
     resendThrottleWindowMinutes: readPositiveInt(source, 'RESEND_THROTTLE_WINDOW_MINUTES', 60),
+    // HU-004: el default del criterio de aceptación es 60 minutos (S2).
+    passwordResetTtlMinutes: readPositiveInt(source, 'PASSWORD_RESET_TTL_MINUTES', 60),
+    forgotThrottleMax: readPositiveInt(source, 'FORGOT_THROTTLE_MAX', 3),
+    forgotThrottleWindowMinutes: readPositiveInt(source, 'FORGOT_THROTTLE_WINDOW_MINUTES', 60),
     jwtExpiresIn: readJwtDuration(source, 'JWT_EXPIRES_IN'),
     lockoutMaxAttempts: readPositiveInt(source, 'LOCKOUT_MAX_ATTEMPTS', 5),
     lockoutMinutes: readPositiveInt(source, 'LOCKOUT_MINUTES', 15),

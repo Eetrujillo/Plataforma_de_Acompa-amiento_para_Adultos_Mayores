@@ -1,5 +1,7 @@
 import { RegisterCaregiver } from './application/RegisterCaregiver.ts';
 import { RequestEmailVerification } from './application/RequestEmailVerification.ts';
+import { RequestPasswordReset } from './application/RequestPasswordReset.ts';
+import { ResetPassword } from './application/ResetPassword.ts';
 import { ConfirmEmail } from './application/ConfirmEmail.ts';
 import { ResendThrottle } from './application/ResendThrottle.ts';
 import { Login } from './application/Login.ts';
@@ -9,6 +11,7 @@ import { createAuthRoutes } from './infrastructure/authRoutes.ts';
 import type { AuthUseCases } from './infrastructure/AuthController.ts';
 import type { PasswordHasherPort, UserRepositoryPort, Clock } from './application/RegisterCaregiver.ts';
 import type { VerificationStorePort } from './application/RequestEmailVerification.ts';
+import type { PasswordResetStorePort } from './application/RequestPasswordReset.ts';
 import type { AuthLogger, EmailSenderPort } from './application/EmailSenderPort.ts';
 import { JwtTokenService } from './infrastructure/JwtTokenService.ts';
 import { authMiddleware } from '../../shared/middlewares/authMiddleware.ts';
@@ -35,6 +38,13 @@ export interface AuthDependencies {
   resendThrottleMax: number;
   /** RESEND_THROTTLE_WINDOW_MINUTES. */
   resendThrottleWindowMinutes: number;
+  /** HU-004: el almacén de tokens de reset vive en una colección propia (D1). */
+  passwordResetStore: PasswordResetStorePort;
+  /** PASSWORD_RESET_TTL_MINUTES (S2). */
+  passwordResetTtlMinutes: number;
+  /** FORGOT_THROTTLE_MAX / FORGOT_THROTTLE_WINDOW_MINUTES: límite propio de forgot-password (S9/D2). */
+  forgotThrottleMax: number;
+  forgotThrottleWindowMinutes: number;
   /** HU-003: el almacén de credenciales/bloqueo vive en el mismo repositorio de User. */
   loginStore: LoginStorePort;
   /** Lector de sesión para el authMiddleware (S7). */
@@ -67,6 +77,25 @@ export function buildAuthRouter(deps: AuthDependencies): Router {
     logger: deps.logger,
     // Sólo el reenvío consume cupo: el registro pasa por `issue`, no por el throttle (S4/S7).
     resendThrottle: throttle,
+  });
+  // S9/D2: instancia PROPIA del limitador, separada de la del reenvío.
+  const forgotThrottle = new ResendThrottle(clock, {
+    max: deps.forgotThrottleMax,
+    windowMs: deps.forgotThrottleWindowMinutes * 60_000,
+  });
+  const requestPasswordReset = new RequestPasswordReset({
+    store: deps.passwordResetStore,
+    emailSender: deps.emailSender,
+    clock,
+    appUrl: deps.appUrl,
+    ttlMinutes: deps.passwordResetTtlMinutes,
+    logger: deps.logger,
+    forgotThrottle,
+  });
+  const resetPassword = new ResetPassword({
+    store: deps.passwordResetStore,
+    passwordHasher: deps.passwordHasher,
+    clock,
   });
   const registerCaregiver = new RegisterCaregiver({
     userRepository: deps.userRepository,
@@ -102,6 +131,8 @@ export function buildAuthRouter(deps: AuthDependencies): Router {
     requestEmailVerification,
     confirmEmail: new ConfirmEmail({ store: deps.verificationStore, clock }),
     login,
+    requestPasswordReset,
+    resetPassword,
   };
   return createAuthRoutes(useCases, requireSession);
 }
@@ -114,6 +145,9 @@ export type {
 } from './application/RegisterCaregiver.ts';
 export { RequestEmailVerification } from './application/RequestEmailVerification.ts';
 export type { VerificationStorePort } from './application/RequestEmailVerification.ts';
+export { RequestPasswordReset, FORGOT_LIMIT_MESSAGE } from './application/RequestPasswordReset.ts';
+export type { PasswordResetStorePort } from './application/RequestPasswordReset.ts';
+export { ResetPassword, RESET_INVALID_TOKEN_MESSAGE } from './application/ResetPassword.ts';
 export { ConfirmEmail, INVALID_TOKEN_MESSAGE } from './application/ConfirmEmail.ts';
 export { ResendThrottle } from './application/ResendThrottle.ts';
 export { createEmailSender, describeEmailChannel, smtpTransportOptions } from './infrastructure/EmailSender.ts';

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { createAuthController } from './AuthController.ts';
 import type { AuthUseCases } from './AuthController.ts';
 
-/** Rutas del módulo auth: registro (HU-001), verificación (HU-002) y sesión (HU-003). */
+/** Rutas del módulo auth: registro (HU-001), verificación (HU-002), sesión (HU-003) y restablecimiento (HU-004). */
 export function createAuthRoutes(useCases: AuthUseCases, requireSession: RequestHandler): Router {
   const controller = createAuthController(useCases);
   const router = Router();
@@ -11,6 +11,8 @@ export function createAuthRoutes(useCases: AuthUseCases, requireSession: Request
   router.post('/verify-email', controller.verifyEmail);
   router.post('/resend-verification', controller.resendVerification);
   router.post('/login', controller.login);
+  router.post('/forgot-password', controller.forgotPassword);
+  router.post('/reset-password', controller.resetPassword);
   router.get('/me', requireSession, controller.me);
   return router;
 }
