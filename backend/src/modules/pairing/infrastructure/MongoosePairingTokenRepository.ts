@@ -60,5 +60,29 @@ export function createMongoosePairingTokenRepository(): PairingTokenRepositoryPo
       });
       return mapToken(created.toObject() as PersistedToken);
     },
+
+    /**
+     * HU-009/D5: lectura por hash para resolver el perfil y desambiguar el
+     * fallo del reclamo (S14).
+     */
+    async findByTokenHash(tokenHash: string): Promise<PairingTokenRecord | null> {
+      const doc = await PairingTokenModel.findOne({ tokenHash }).lean<PersistedToken>();
+      return doc === null ? null : mapToken(doc);
+    },
+
+    /**
+     * S8/S16: una sola escritura condicional — `usedAt: null`,
+     * `invalidatedAt: null` y vigente en el mismo filtro; el ganador fija su
+     * `usedAt` con la hora del servidor y el perdedor recibe `null` sin
+     * escribir nada.
+     */
+    async claimUnused(tokenHash: string, now: Date): Promise<PairingTokenRecord | null> {
+      const doc = await PairingTokenModel.findOneAndUpdate(
+        { tokenHash, usedAt: null, invalidatedAt: null, expiresAt: { $gt: now } },
+        { $set: { usedAt: now } },
+        { new: true },
+      ).lean<PersistedToken>();
+      return doc === null ? null : mapToken(doc);
+    },
   };
 }

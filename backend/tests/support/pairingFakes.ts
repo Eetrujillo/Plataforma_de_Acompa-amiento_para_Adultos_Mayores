@@ -15,9 +15,17 @@ import type {
 import type { PairingQrEncoderPort } from '../../src/modules/pairing/application/PairingQrEncoderPort.ts';
 import type {
   PairingSeniorProfile,
+  RedeemProfileReaderPort,
+  RedeemSeniorProfile,
   SeniorProfileReaderPort,
 } from '../../src/modules/pairing/application/SeniorProfileReaderPort.ts';
+import type {
+  RedeemSeniorWriterPort,
+  SeniorConsentWrite,
+} from '../../src/modules/pairing/application/RedeemSeniorWriterPort.ts';
 import type { LinkStatus } from '../../src/modules/seniors/domain/seniorProfile.ts';
+import type { RegisterFailedLoginConfig } from '../../src/modules/auth/application/Login.ts';
+import type { LockoutState, NextLockoutState } from '../../src/modules/auth/domain/loginLockout.ts';
 import { PAIRING_QR_UNAVAILABLE_MESSAGE } from '../../src/modules/pairing/application/pairingMessages.ts';
 
 /**
@@ -63,6 +71,37 @@ export class InMemoryPairingTokenRepository implements PairingTokenRepositoryPor
     };
     this.tokens.set(token.tokenHash, record);
     return record;
+  }
+
+  // ─── HU-009: lectura y reclamo del canje (D5) ────────────────────────────
+
+  findByHashCalls = 0;
+  claimCalls = 0;
+
+  async findByTokenHash(tokenHash: string): Promise<PairingTokenRecord | null> {
+    this.findByHashCalls += 1;
+    return this.tokens.get(tokenHash) ?? null;
+  }
+
+  /**
+   * Espeja el `findOneAndUpdate` del adaptador real: una sola operación —
+   * matchea no usado + no invalidado + vigente, fija `usedAt` y devuelve el
+   * registro; el perdedor recibe `null` sin escribir nada.
+   */
+  async claimUnused(tokenHash: string, now: Date): Promise<PairingTokenRecord | null> {
+    this.claimCalls += 1;
+    const record = this.tokens.get(tokenHash);
+    if (
+      record === undefined ||
+      record.usedAt !== null ||
+      record.invalidatedAt !== null ||
+      record.expiresAt.getTime() <= now.getTime()
+    ) {
+      return null;
+    }
+    const claimed: PairingTokenRecord = { ...record, usedAt: new Date(now.getTime()) };
+    this.tokens.set(tokenHash, claimed);
+    return claimed;
   }
 }
 
@@ -123,5 +162,138 @@ export class StaticSeniorReader implements SeniorProfileReaderPort {
   ): Promise<PairingSeniorProfile | null> {
     if (!this.authorized.has(`${seniorId}::${caregiverId}`)) return null;
     return this.profiles.get(seniorId) ?? null;
+  }
+}
+
+/**
+ * HU-009 — doble del lector del canje (D6/D11): la MISMA semántica de
+ * propiedad que el emisor (S17): sólo perfiles SENIOR con vínculo activo con
+ * el dueño del token — lo ajeno, inexistente y CAREGIVER devuelven `null` y el
+ * caso de uso responde el 409 genérico de un token consumido.
+ */
+export class StaticRedeemReader implements RedeemProfileReaderPort {
+  readonly profiles = new Map<string, RedeemSeniorProfile>();
+  private readonly authorized = new Set<string>();
+
+  seed(profile: RedeemSeniorProfile, caregiverId = ''): void {
+    this.profiles.set(profile.id, { ...profile, createdAt: new Date(profile.createdAt.getTime()) });
+    this.authorized.add(`${profile.id}::${caregiverId}`);
+  }
+
+  asLinked(seniorId: string): void {
+    this.setLinkStatus(seniorId, 'LINKED');
+  }
+
+  asPending(seniorId: string): void {
+    this.setLinkStatus(seniorId, 'PENDING');
+  }
+
+  private setLinkStatus(seniorId: string, linkStatus: LinkStatus): void {
+    const record = this.profiles.get(seniorId);
+    if (record === undefined) throw new Error(`sin perfil ${seniorId} para marcar`);
+    this.profiles.set(seniorId, { ...record, linkStatus });
+  }
+
+  async findRedeemSeniorForCaregiver(
+    seniorId: string,
+    caregiverId: string,
+  ): Promise<RedeemSeniorProfile | null> {
+    if (!this.authorized.has(`${seniorId}::${caregiverId}`)) return null;
+    return this.profiles.get(seniorId) ?? null;
+  }
+}
+
+/** El estado de un perfil dentro del escritor del canje, observable en tests. */
+export interface RedeemSeniorWriterState {
+  linkStatus: LinkStatus;
+  acceptedTermsAt: Date | null;
+  termsVersion: string | null;
+  ipAddress: string | null;
+  redeemFailedAttempts: number | null;
+  redeemLockedUntil: Date | null;
+}
+
+/**
+ * HU-009 — doble del escritor del canje (D7/D8): la transición LINKED con la
+ * evidencia en una sola escritura condicional y la racha/bloqueo del canje
+ * espejando el pipeline del login (un bloqueo ya vencido reinicia la racha).
+ */
+export class InMemoryRedeemSeniorWriter implements RedeemSeniorWriterPort {
+  readonly seniors = new Map<string, RedeemSeniorWriterState>();
+  /** Las escrituras recibidas por `markLinkedWithConsent`, en orden. */
+  readonly consentWrites: SeniorConsentWrite[] = [];
+  consentWriteCalls = 0;
+  /** Rechaza `markLinkedWithConsent` con este error (S18: falla cerrado). */
+  markLinkedError: Error | null = null;
+
+  seed(
+    seniorId: string,
+    overrides: Partial<Pick<RedeemSeniorWriterState, 'linkStatus'>> = {},
+  ): void {
+    this.seniors.set(seniorId, {
+      linkStatus: overrides.linkStatus ?? 'PENDING',
+      acceptedTermsAt: null,
+      termsVersion: null,
+      ipAddress: null,
+      redeemFailedAttempts: null,
+      redeemLockedUntil: null,
+    });
+  }
+
+  async markLinkedWithConsent(write: SeniorConsentWrite): Promise<boolean> {
+    this.consentWriteCalls += 1;
+    this.consentWrites.push(write);
+    if (this.markLinkedError !== null) throw this.markLinkedError;
+    const senior = this.seniors.get(write.seniorId);
+    // El filtro condicional real matchea sólo `linkStatus: 'PENDING'`.
+    if (senior === undefined || senior.linkStatus !== 'PENDING') return false;
+    this.seniors.set(write.seniorId, {
+      ...senior,
+      linkStatus: 'LINKED',
+      acceptedTermsAt: new Date(write.acceptedTermsAt.getTime()),
+      termsVersion: write.termsVersion,
+      ...(write.ipAddress === undefined ? {} : { ipAddress: write.ipAddress }),
+    });
+    return true;
+  }
+
+  async redeemLockoutState(seniorId: string): Promise<LockoutState | null> {
+    const senior = this.seniors.get(seniorId);
+    if (senior === undefined) return null;
+    return {
+      failedLoginAttempts: senior.redeemFailedAttempts,
+      lockedUntil: senior.redeemLockedUntil,
+    };
+  }
+
+  async registerRedeemFailure(
+    seniorId: string,
+    config: RegisterFailedLoginConfig,
+  ): Promise<NextLockoutState | null> {
+    const senior = this.seniors.get(seniorId);
+    if (senior === undefined) return null;
+    // Espeja el pipeline del login (HU-003/D8): un bloqueo ya vencido
+    // reinicia la racha; el umbral fija lockedUntil en la misma escritura.
+    const expired =
+      senior.redeemLockedUntil !== null && senior.redeemLockedUntil.getTime() <= config.now.getTime();
+    const attempts = (expired ? 0 : (senior.redeemFailedAttempts ?? 0)) + 1;
+    const lockedUntil =
+      attempts >= config.maxAttempts ? new Date(config.now.getTime() + config.lockMs) : null;
+    this.seniors.set(seniorId, {
+      ...senior,
+      redeemFailedAttempts: attempts,
+      redeemLockedUntil: lockedUntil,
+    });
+    return { failedLoginAttempts: attempts, lockedUntil };
+  }
+
+  async clearRedeemFailures(seniorId: string): Promise<void> {
+    const senior = this.seniors.get(seniorId);
+    if (senior === undefined) return;
+    this.seniors.set(seniorId, {
+      ...senior,
+      redeemFailedAttempts: 0,
+      redeemLockedUntil: null,
+    });
   }
 }

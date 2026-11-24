@@ -42,3 +42,34 @@ export function hashPairingToken(token: string): string {
 export function buildPairingQrPayload(token: string): string {
   return JSON.stringify({ type: 'senior-pairing', token });
 }
+
+/**
+ * HU-009 — los cuatro estados que el canje distingue (D5). El `usedAt`
+ * («canjeado») manda sobre los otros dos: es el 409 genérico de S14; el
+ * `invalidatedAt` («reemplazado») y el vencimiento comparten el 400 genérico.
+ * Regla pura, sin E/S, con el reloj como parámetro (HU-008/T1).
+ */
+export type PairingTokenState = 'REDEEMABLE' | 'EXPIRED' | 'INVALIDATED' | 'USED';
+
+/** Lo que la persistencia recuerda del token: la huella y sus hechos. */
+export interface PairingTokenStateInput {
+  readonly expiresAt: Date;
+  readonly usedAt: Date | null;
+  readonly invalidatedAt: Date | null;
+}
+
+/**
+ * D5: la clasificación que desambigua el fallo del reclamo — sin documento →
+ * 404; `USED` → 409; `INVALIDATED` y `EXPIRED` → el mismo 400 genérico.
+ * El vencimiento cierra en el instante exacto: coincide con el filtro
+ * `expiresAt > now` de la escritura condicional.
+ */
+export function evaluatePairingTokenState(
+  token: PairingTokenStateInput,
+  now: Date,
+): PairingTokenState {
+  if (token.usedAt !== null) return 'USED';
+  if (token.invalidatedAt !== null) return 'INVALIDATED';
+  if (token.expiresAt.getTime() <= now.getTime()) return 'EXPIRED';
+  return 'REDEEMABLE';
+}

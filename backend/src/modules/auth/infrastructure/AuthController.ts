@@ -1,7 +1,7 @@
-import { isIP } from 'node:net';
 import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../../../shared/errors/AppError.ts';
 import { INVALID_SESSION_MESSAGE } from '../../../shared/middlewares/authMiddleware.ts';
+import { evidenceIp } from '../../../shared/domain/evidenceIp.ts';
 import { RegisterCaregiver } from '../application/RegisterCaregiver.ts';
 import type { RegisterCaregiverCommand } from '../application/RegisterCaregiver.ts';
 import { ConfirmEmail } from '../application/ConfirmEmail.ts';
@@ -13,13 +13,11 @@ import { Login } from '../application/Login.ts';
 /**
  * La evidencia de la Ley 1581 no puede guardar lo que el cliente escriba en un
  * header: con proxies confiables de más, `req.ip` puede traer texto arbitrario.
- * Sólo se registra cuando es una dirección IP válida.
+ * Sólo se registra cuando es una dirección IP válida. La implementación vive en
+ * `shared/domain/evidenceIp.ts`, compartida con el canje del QR (HU-009); se
+ * reexporta acá para no romper a quien la consuma desde auth.
  */
-function evidenceIp(raw: string | undefined): string | undefined {
-  const candidate = raw?.trim();
-  if (candidate === undefined || candidate === '') return undefined;
-  return isIP(candidate) === 0 ? undefined : candidate;
-}
+export { evidenceIp } from '../../../shared/domain/evidenceIp.ts';
 
 /**
  * Arma el comando desde el cuerpo crudo. Los campos que el cliente no puede

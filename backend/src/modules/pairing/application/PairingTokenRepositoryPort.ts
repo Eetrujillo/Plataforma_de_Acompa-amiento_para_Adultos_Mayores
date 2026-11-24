@@ -39,4 +39,18 @@ export interface PairingTokenRepositoryPort {
    * queda sin QR vivo (falla cerrado) y el familiar pide otro.
    */
   create(token: PairingTokenWrite): Promise<PairingTokenRecord>;
+
+  /**
+   * HU-009/D5: lectura por hash para resolver el perfil ANTES del reclamo
+   * (S17) y para desambiguar el fallo del reclamo (S14: 404 del desconocido,
+   * 409 del usado, 400 del vencido/invalidado).
+   */
+  findByTokenHash(tokenHash: string): Promise<PairingTokenRecord | null>;
+
+  /**
+   * S8/S16: escritura condicional de un solo uso — un solo pedido gana la
+   * carrera. Matchea `usedAt: null`, `invalidatedAt: null` y vigente, y fija
+   * `usedAt` con la hora recibida; el perdedor recibe `null` sin escribir nada.
+   */
+  claimUnused(tokenHash: string, now: Date): Promise<PairingTokenRecord | null>;
 }

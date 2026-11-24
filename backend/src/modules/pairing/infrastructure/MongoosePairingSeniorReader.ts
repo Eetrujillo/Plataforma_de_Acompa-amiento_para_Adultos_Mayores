@@ -14,9 +14,12 @@
  * el caso de uso responde como 409 `SENIOR_ALREADY_LINKED` (S18, falla cerrado).
  */
 import { UserModel } from '../../../shared/models/User.ts';
+import type { LinkStatus } from '../../seniors/domain/seniorProfile.ts';
 import type { SeniorRepositoryPort } from '../../seniors/application/SeniorRepositoryPort.ts';
 import type {
   PairingSeniorProfile,
+  RedeemProfileReaderPort,
+  RedeemSeniorProfile,
   SeniorProfileReaderPort,
 } from '../application/SeniorProfileReaderPort.ts';
 
@@ -26,9 +29,19 @@ export type SeniorProfileSourcePort = Pick<
   'findSeniorForCaregiver'
 >;
 
+/** Proyección del documento User para el canje (D10/D11). */
+interface RedeemUserProjection {
+  email: string;
+  /** `undefined` con `lean()` significa "el BSON no guarda el campo": legacy. */
+  linkStatus?: string;
+  phone?: string | null;
+  emailVerifiedAt?: Date | null;
+  sessionVersion?: number | null;
+}
+
 export function createMongoosePairingSeniorReader(
   seniorRepository: SeniorProfileSourcePort,
-): SeniorProfileReaderPort {
+): SeniorProfileReaderPort & RedeemProfileReaderPort {
   return {
     async findSeniorForCaregiver(
       seniorId: string,
@@ -46,6 +59,38 @@ export function createMongoosePairingSeniorReader(
         id: senior.id,
         fullName: senior.fullName,
         linkStatus: storesLinkStatus === null ? null : senior.linkStatus,
+        createdAt: senior.createdAt,
+      };
+    },
+
+    /**
+     * HU-009/D6/D11: la MISMA regla de propiedad delegada en seniors (vínculo
+     * activo = única fuente de verdad), más la proyección de la respuesta S13 y
+     * la `sessionVersion` de los claims (D10). El `linkStatus` se decide sobre
+     * el BSON crudo: `lean()` no hidrata el default del esquema, así que la
+     * ausencia del campo en el documento legacy se ve tal cual y se traduce a
+     * `null`, que el caso de uso cuenta como ya vinculado (S17 falla cerrado).
+     */
+    async findRedeemSeniorForCaregiver(
+      seniorId: string,
+      caregiverId: string,
+    ): Promise<RedeemSeniorProfile | null> {
+      const senior = await seniorRepository.findSeniorForCaregiver(seniorId, caregiverId);
+      if (senior === null) return null;
+      const doc = await UserModel.findById(senior.id)
+        .select('_id email linkStatus phone emailVerifiedAt sessionVersion')
+        .lean<RedeemUserProjection | null>();
+      if (doc === null) return null;
+      const rawLinkStatus = doc.linkStatus;
+      return {
+        id: senior.id,
+        email: doc.email,
+        fullName: senior.fullName,
+        linkStatus: rawLinkStatus === undefined ? null : (rawLinkStatus as LinkStatus),
+        emailVerifiedAt: doc.emailVerifiedAt ?? null,
+        phone: doc.phone ?? null,
+        timezone: senior.timezone,
+        sessionVersion: doc.sessionVersion ?? null,
         createdAt: senior.createdAt,
       };
     },

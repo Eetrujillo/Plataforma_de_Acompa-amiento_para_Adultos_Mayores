@@ -33,6 +33,11 @@ const userSchema = new Schema(
     lockedUntil: { type: Date, default: null },
     // HU-004: versión de sesión; null se lee como 0.
     sessionVersion: { type: Number, default: null },
+    // HU-009: bloqueo del canje del QR. Con la misma forma del bloqueo de
+    // login (HU-003, D8): contador y fecha sobre el propio documento, nullable
+    // a propósito — sin intentos fallidos o sin bloqueo activo queda en null.
+    redeemFailedAttempts: { type: Number, default: null },
+    redeemLockedUntil: { type: Date, default: null },
     // HU-005/HU-007: el perfil senior. No hay `caregiverId` ni `pinHash`: la
     // propiedad vive en la colección `seniorlinks` (D1) y el PIN se retiró del
     // alcance (L3 del backlog). `linkStatus` solo pasa a LINKED al canjear el QR.
