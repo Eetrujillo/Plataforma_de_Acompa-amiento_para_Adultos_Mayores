@@ -27,15 +27,14 @@ Campos que el cliente **no** puede fijar: `role`, `emailVerifiedAt`, `termsVersi
     "id": "665f...",
     "email": "cuidador@example.com",
     "fullName": "Esteban Trujillo",
-    "role": "CAREGIVER",
-    "phone": "+54 11 5555 1234",
-    "caregiverId": null,
-    "emailVerified": false,
-    "createdAt": "2026-01-01T00:00:00.000Z"
-  },
-  "verificationSent": true
+    "role": "CAREGIVER"
+  }
 }
 ```
+
+La respuesta de HU-001 lleva solo esos cuatro campos. `verificationSent` llega con HU-002, y
+`emailVerified`/`createdAt` se agregan cuando un consumidor los necesite: el contrato no promete
+campos que el código no devuelve.
 
 El registro **no** emite JWT: la cuenta nace sin verificar y el login se habilita
 cuando se confirma el correo (HU-002).
@@ -44,9 +43,14 @@ Errores:
 
 | Situación | Status | `error.code` | `error.message` |
 | --- | --- | --- | --- |
-| falta un campo o no cumple su regla | `400` | `VALIDATION_ERROR` | mensaje en español, listo para mostrar |
+| el cuerpo no es un objeto válido | `400` | `INVALID_BODY` | mensaje en español, listo para mostrar |
+| el correo no tiene formato válido | `400` | `INVALID_EMAIL` | indica el formato esperado, nunca el valor recibido |
+| la contraseña no cumple la regla | `400` | `WEAK_PASSWORD` | al menos 8 caracteres, con al menos una letra y un dígito |
+| falta o no es `true` la aceptación de términos | `400` | `TERMS_NOT_ACCEPTED` | exige aceptar términos y política de datos |
 | el correo ya tiene cuenta (sin distinguir mayúsculas) | `400` | `EMAIL_ALREADY_REGISTERED` | `Este correo ya tiene una cuenta` |
-| falta o no es `true` la aceptación de términos | `400` | `VALIDATION_ERROR` | exige aceptar términos y política de datos |
+
+Cada motivo tiene su código para que el cliente muestre el mensaje correcto y el test pueda
+distinguirlos. `VALIDATION_ERROR` queda como código genérico para lo que no esté enumerado acá.
 
 ## Evidencia de consentimiento (Ley 1581)
 
@@ -96,7 +100,7 @@ ventana móvil de una hora**. El cuarto devuelve `429`:
 - El contador corre **antes** de buscar la cuenta y cuenta **todo** intento, exista o no el correo y
   esté o no verificado. Eso es lo que impide que el `429` sirva para averiguar si una cuenta existe:
   el cuarto intento responde igual para un correo registrado que para uno inventado.
-- Un correo con formato inválido sigue siendo `400` (`VALIDATION_ERROR`) y no consume cupo.
+- Un correo con formato inválido sigue siendo `400` (`INVALID_EMAIL`) y no consume cupo.
 - El intento rechazado no se registra: insistir no alarga el bloqueo.
 - La clave es el correo normalizado (minúsculas, sin espacios); `Cuidador@Example.com` y
   `cuidador@example.com` comparten contador.
@@ -152,7 +156,7 @@ Dos endpoints, en ese orden:
 1. `POST /api/auth/forgot-password` con `{ email }` → **siempre** `202 { accepted: true }`. Si la
    cuenta existe y tiene contraseña, se manda un correo con un enlace; si no existe, no se manda
    nada y la respuesta es idéntica. Un correo con formato inválido sigue siendo `400`
-   (`VALIDATION_ERROR`) y no consume cupo del límite.
+   (`INVALID_EMAIL`) y no consume cupo del límite.
 2. `POST /api/auth/reset-password` con `{ token, password }` → `200 { reset: true }`.
 
 Detalles del enlace:
