@@ -141,3 +141,26 @@ dobles en memoria (el mismo escape que HU-002).
 - **L3.** El texto del `429` de `forgot-password` no está en el contrato; se define uno propio con
   `TOO_MANY_REQUESTS` (D2) en vez de reusar el mensaje del reenvío de verificación, porque el usuario
   pidió otra cosa.
+- **L4.** Implementación delegada (`Spec: odd/tasks/hu-004-recuperacion-password.md, T1-T5`) y
+  verificada por el padre: 121 tests + 4 salteados sin base, **125/125 con base**, `typecheck` y
+  `build` verdes, los 94 tests previos intactos.
+- **L5.** La verificación independiente encontró dos defectos que los dobles no podían ver, los dos
+  proveídos contra Mongo real:
+  **(CRITICAL)** el reset usaba un update pipeline y el hash bcrypt (que empieza con `$2b$`) se
+  interpretaba como **ruta de campo**: la contraseña quedaba vacía y la cuenta irrecuperable;
+  **(MAJOR)** guardar un enlace hacía `deleteMany` + `create`, así que dos pedidos simultáneos dejaban
+  **dos enlaces vivos** (15/15 intentos). Corregidos con `{ $literal }` y con un único upsert atómico
+  sobre un índice único en `email`.
+- **L6.** El escape de HU-002 se repitió por la misma razón (el doble aplica el hash directamente), así
+  que esta HU deja un arnés permanente: `backend/tests/passwordResetRepository.mongo.test.ts`, se
+  saltea sin `MONGO_URL`, se niega a correr contra una base que no empiece con `chk-` y pinea los dos
+  defectos. Es el primer test del repo que ejerce un adaptador contra MongoDB real.
+- **L7.** Revisión nativa `review-ef619131a55836e8` (lentes risk+reliability): **aprobada**, autoridad
+  quemada. Advisory diferidos con su razón: `forgot-password` sin tope por IP (sólo por destinatario,
+  trade-off estándar), oráculo por latencia del pedido (deuda ya documentada en el contrato), el
+  `try/catch` del caso de uso también traga errores de **base** (no sólo del envío) y convierte una
+  caída de Mongo en `202` — candidato claro para la próxima pasada —, `resetPassword` deja
+  `failedLoginAttempts` en `null` mientras el doble lo deja en `0`, y la regla pura
+  `isPasswordResetTokenUsable` no la usa ningún adaptador (drift posible).
+- **L8.** Estado: **4 HUs de autenticación cerradas** (registro, verificación, login, recuperación),
+  125 tests con base y 121 sin base, todo commiteado en `chore/deploy-mongoose` sin pushear.
