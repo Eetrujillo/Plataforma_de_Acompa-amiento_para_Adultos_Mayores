@@ -11,6 +11,7 @@ import type {
   StoredUser,
   UserRepositoryPort,
 } from '../../src/modules/auth/application/RegisterCaregiver.ts';
+import { InMemorySeniorRepository } from './seniorFakes.ts';
 import type {
   ConsentEvidence,
   UserEntity,
@@ -405,6 +406,8 @@ export class CapturingLogger implements AuthLogger {
 export interface Harness {
   app: Express;
   repo: InMemoryUserRepository;
+  /** HU-005/HU-007: doble del puerto de seniors, compartido con la app. */
+  seniorRepo: InMemorySeniorRepository;
   hasher: PasswordHasherPort;
   sender: FakeEmailSender;
   logger: CapturingLogger;
@@ -415,6 +418,8 @@ export interface Harness {
 export interface HarnessOptions {
   /** Opciones de la aplicación (saltos de proxy confiables). */
   app?: AppOptions;
+  /** HU-005/HU-007: repositorio de seniors compartido con la app (sembrar vínculos). */
+  seniorRepository?: InMemorySeniorRepository;
   /** Repositorio compartido: para probar el bloqueo a través de un "reinicio" (S4). */
   repository?: InMemoryUserRepository;
   /** Error que rechaza `repo.save`, para simular fallos del adaptador. */
@@ -456,6 +461,7 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
   const sender = new FakeEmailSender();
   const logger = new CapturingLogger();
   const clock = { now: FIXED_NOW };
+  const seniorRepository = options.seniorRepository ?? new InMemorySeniorRepository();
   const app = buildApp(
     {
       userRepository: repo,
@@ -484,10 +490,12 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
       lockoutMinutes: options.lockoutMinutes ?? 15,
       loginIpMaxAttempts: options.loginIpMaxAttempts ?? 20,
       loginIpWindowMinutes: options.loginIpWindowMinutes ?? 15,
+      // HU-005/HU-007: el mismo doble de seniors que exponen los tests.
+      seniorRepository,
     },
     options.app,
   );
-  return { app, repo, hasher, sender, logger, clock };
+  return { app, repo, seniorRepo: seniorRepository, hasher, sender, logger, clock };
 }
 
 export async function withServer(

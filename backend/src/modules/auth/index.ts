@@ -16,7 +16,7 @@ import type { AuthLogger, EmailSenderPort } from './application/EmailSenderPort.
 import { JwtTokenService } from './infrastructure/JwtTokenService.ts';
 import { authMiddleware } from '../../shared/middlewares/authMiddleware.ts';
 import type { SessionUserReaderPort } from '../../shared/middlewares/authMiddleware.ts';
-import type { Router } from 'express';
+import type { RequestHandler, Router } from 'express';
 
 export interface AuthDependencies {
   userRepository: UserRepositoryPort;
@@ -61,9 +61,28 @@ export interface AuthDependencies {
   loginIpWindowMinutes: number;
 }
 
+/**
+ * Guard de sesión del módulo: los routers privados de los demás slices lo
+ * reusan en vez de armar el authMiddleware a mano, para que la sesión tenga
+ * una sola implementación (S7). Sin JWT_SECRET el guard no se compone —
+ * fail closed igual que el login.
+ */
+export function buildSessionGuard(deps: AuthDependencies): RequestHandler {
+  if (deps.jwtSecret === null) {
+    throw new Error(
+      'JWT_SECRET es obligatorio para emitir sesiones: el login no queda disponible sin él.',
+    );
+  }
+  return authMiddleware({
+    verifier: new JwtTokenService(deps.jwtSecret, deps.jwtExpiresIn),
+    reader: deps.sessionUserReader,
+  });
+}
+
 /** Punto de montaje del módulo auth: compone los casos de uso y devuelve el router. */
 export function buildAuthRouter(deps: AuthDependencies): Router {
   const clock: Clock = { now: deps.clock };
+  const requireSession = buildSessionGuard(deps);
   const throttle = new ResendThrottle(clock, {
     max: deps.resendThrottleMax,
     windowMs: deps.resendThrottleWindowMinutes * 60_000,
@@ -111,7 +130,6 @@ export function buildAuthRouter(deps: AuthDependencies): Router {
     );
   }
   const sessionToken = new JwtTokenService(deps.jwtSecret, deps.jwtExpiresIn);
-  const requireSession = authMiddleware({ verifier: sessionToken, reader: deps.sessionUserReader });
   const login = new Login({
     store: deps.loginStore,
     passwordHasher: deps.passwordHasher,

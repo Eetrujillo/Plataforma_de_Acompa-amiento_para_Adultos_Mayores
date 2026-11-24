@@ -9,6 +9,7 @@ import {
   describeEmailChannel,
 } from './modules/auth/index.ts';
 import type { AuthLogger } from './modules/auth/index.ts';
+import { createMongooseSeniorRepository } from './modules/seniors/index.ts';
 
 /**
  * Describe un fallo de arranque para el log: el texto se scrubea porque el
@@ -46,6 +47,9 @@ async function main(): Promise<void> {
   console.log('[server]', `email delivery: ${describeEmailChannel(env.smtp)}`);
 
   const userRepository = createMongooseUserRepository();
+  // HU-005/HU-007: el slice seniors tiene su propio adaptador (D6): perfiles
+  // en `users` con la ficha médica y vínculos en `seniorlinks`.
+  const seniorRepository = createMongooseSeniorRepository();
   const app = buildApp(
     {
       userRepository,
@@ -74,6 +78,9 @@ async function main(): Promise<void> {
       lockoutMinutes: env.lockoutMinutes,
       loginIpMaxAttempts: env.loginIpMaxAttempts,
       loginIpWindowMinutes: env.loginIpWindowMinutes,
+      // HU-005/HU-007: los perfiles y sus vínculos comparten el reloj del
+      // servidor; la persistencia es el adaptador mongoose del slice.
+      seniorRepository,
     },
     { trustProxyHops: env.trustProxyHops },
   );
