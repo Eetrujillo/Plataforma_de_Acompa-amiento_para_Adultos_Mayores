@@ -2,12 +2,22 @@ import { UserModel } from '../../../shared/models/User.ts';
 import { DuplicateEmailError } from '../application/RegisterCaregiver.ts';
 import type { StoredUser, UserRepositoryPort } from '../application/RegisterCaregiver.ts';
 import type { UserEntity, UserRole } from '../domain/User.ts';
+import type {
+  VerificationStorePort,
+  VerificationTokenTarget,
+} from '../application/RequestEmailVerification.ts';
 
 interface PersistedUser {
   _id: { toString(): string };
   email: string;
   fullName: string;
   role: string;
+}
+
+interface PersistedTokenDoc extends PersistedUser {
+  verificationTokenHash: string | null;
+  verificationTokenExpiresAt: Date | null;
+  emailVerifiedAt: Date | null;
 }
 
 function toStored(doc: PersistedUser): StoredUser {
@@ -32,8 +42,12 @@ export function isDuplicateKeyError(error: unknown): boolean {
   );
 }
 
-/** Adaptador Mongoose del puerto UserRepository (MongoDB 7 vía MONGO_URL). */
-export function createMongooseUserRepository(): UserRepositoryPort {
+/**
+ * Adaptador Mongoose de los puertos UserRepository (HU-001) y
+ * VerificationStore (HU-002), sobre el mismo documento User (D3): MongoDB 7
+ * vía MONGO_URL. El mismo objeto satisface los dos puertos.
+ */
+export function createMongooseUserRepository(): UserRepositoryPort & VerificationStorePort {
   return {
     async findByEmail(email: string): Promise<StoredUser | null> {
       const doc = await UserModel.findOne({ email }).lean();
@@ -59,6 +73,65 @@ export function createMongooseUserRepository(): UserRepositoryPort {
         if (isDuplicateKeyError(error)) throw new DuplicateEmailError();
         throw error;
       }
+    },
+
+    // HU-002: el token se guarda pisando el anterior — el reenvío invalida el
+    // enlace viejo (S8). A la base sólo llega el SHA-256, jamás el token en
+    // claro (S6).
+    async saveVerificationToken(
+      email: string,
+      token: { tokenHash: string; expiresAt: Date },
+    ): Promise<void> {
+      await UserModel.updateOne(
+        { email },
+        {
+          verificationTokenHash: token.tokenHash,
+          verificationTokenExpiresAt: token.expiresAt,
+        },
+      );
+    },
+
+    async findEmailVerificationState(
+      email: string,
+    ): Promise<{ fullName: string; emailVerifiedAt: Date | null } | null> {
+      const doc = await UserModel.findOne({ email })
+        .select('fullName emailVerifiedAt')
+        .lean<PersistedTokenDoc>();
+      if (doc === null) return null;
+      return { fullName: doc.fullName, emailVerifiedAt: doc.emailVerifiedAt ?? null };
+    },
+
+    async findByVerificationTokenHash(tokenHash: string): Promise<VerificationTokenTarget | null> {
+      // select: false en el esquema: los campos del token se piden acá de
+      // forma explícita para que ninguna otra consulta los traiga por descuido.
+      const doc = await UserModel.findOne({ verificationTokenHash: tokenHash })
+        .select(
+          'fullName emailVerifiedAt verificationTokenHash verificationTokenExpiresAt',
+        )
+        .lean<PersistedTokenDoc>();
+      if (doc === null) return null;
+      return {
+        id: doc._id.toString(),
+        email: doc.email,
+        fullName: doc.fullName,
+        tokenHash: doc.verificationTokenHash ?? '',
+        expiresAt: doc.verificationTokenExpiresAt ?? null,
+        emailVerifiedAt: doc.emailVerifiedAt ?? null,
+      };
+    },
+
+    async markEmailVerified(email: string, verifiedAt: Date): Promise<StoredUser> {
+      await UserModel.updateOne(
+        { email },
+        {
+          emailVerifiedAt: verifiedAt,
+          verificationTokenHash: null,
+          verificationTokenExpiresAt: null,
+        },
+      );
+      const doc = await UserModel.findOne({ email }).lean<PersistedUser>();
+      if (doc === null) throw new Error('markEmailVerified: la cuenta no existe');
+      return toStored(doc);
     },
   };
 }

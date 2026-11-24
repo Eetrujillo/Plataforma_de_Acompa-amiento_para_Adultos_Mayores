@@ -24,7 +24,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
   if (err instanceof AppError) {
     // Los 4xx operativos no se loguean como error y no agregan requestId.
-    const body: { error: { code: string; message: string; details?: Record<string, string> } } = {
+    const body: {
+      error: { code: string; message: string; details?: Record<string, unknown> };
+    } = {
       error: { code: err.code, message: err.message },
     };
     if (err.details !== undefined) body.error.details = err.details;

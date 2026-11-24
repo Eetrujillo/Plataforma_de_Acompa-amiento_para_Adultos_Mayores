@@ -15,6 +15,22 @@ export interface AppEnv {
   trustProxyHops: number;
   /** Solo en producción: el backend no arranca sin JWT_SECRET (jwt-security). */
   jwtSecret: string | null;
+  /** APP_URL: base del enlace de verificación (S5). */
+  appUrl: string;
+  /** EMAIL_VERIFICATION_TTL_HOURS: vigencia del token de verificación (S1). */
+  emailVerificationTtlHours: number;
+  /** RESEND_THROTTLE_MAX / RESEND_THROTTLE_WINDOW_MINUTES (S4). */
+  resendThrottleMax: number;
+  resendThrottleWindowMinutes: number;
+  /** SMTP para el correo de verificación; sin host el canal es console (D4). */
+  smtp: {
+    host: string | null;
+    port: number;
+    secure: boolean;
+    user: string | null;
+    pass: string | null;
+    from: string;
+  };
 }
 
 function readInt(source: Record<string, string | undefined>, key: string, fallback: number): number {
@@ -61,6 +77,23 @@ export function resolveJwtSecret(source: Record<string, string | undefined>): st
   return secret === undefined || secret === '' ? null : secret;
 }
 
+function readBool(source: Record<string, string | undefined>, key: string, fallback: boolean): boolean {
+  const raw = source[key]?.trim().toLowerCase();
+  if (raw === undefined || raw === '') return fallback;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return fallback;
+}
+
+/** Valor opcional: vacío o ausente devuelve null (p. ej. SMTP_HOST sin configurar). */
+function readOptionalString(
+  source: Record<string, string | undefined>,
+  key: string,
+): string | null {
+  const raw = source[key]?.trim();
+  return raw === undefined || raw === '' ? null : raw;
+}
+
 export function loadEnv(source: Record<string, string | undefined> = process.env): AppEnv {
   return {
     nodeEnv: readString(source, 'NODE_ENV', 'development'),
@@ -69,5 +102,17 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     termsVersion: readString(source, 'TERMS_VERSION', '1.0'),
     trustProxyHops: readHopCount(source, 'TRUST_PROXY_HOPS'),
     jwtSecret: resolveJwtSecret(source),
+    appUrl: readString(source, 'APP_URL', 'http://localhost:3500'),
+    emailVerificationTtlHours: readInt(source, 'EMAIL_VERIFICATION_TTL_HOURS', 24),
+    resendThrottleMax: readInt(source, 'RESEND_THROTTLE_MAX', 3),
+    resendThrottleWindowMinutes: readInt(source, 'RESEND_THROTTLE_WINDOW_MINUTES', 60),
+    smtp: {
+      host: readOptionalString(source, 'SMTP_HOST'),
+      port: readInt(source, 'SMTP_PORT', 587),
+      secure: readBool(source, 'SMTP_SECURE', false),
+      user: readOptionalString(source, 'SMTP_USER'),
+      pass: readOptionalString(source, 'SMTP_PASS'),
+      from: readString(source, 'SMTP_FROM', 'Plataforma de Acompañamiento <no-reply@example.com>'),
+    },
   };
 }

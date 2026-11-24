@@ -4,8 +4,11 @@ import { loadEnv } from './config/env.ts';
 import { redactConnectionStrings, redactMongoUrl } from './config/redactMongoUrl.ts';
 import {
   BcryptPasswordHasher,
+  createEmailSender,
   createMongooseUserRepository,
+  describeEmailChannel,
 } from './modules/auth/index.ts';
+import type { AuthLogger } from './modules/auth/index.ts';
 
 /**
  * Describe un fallo de arranque para el log: el texto se scrubea porque el
@@ -30,12 +33,27 @@ async function main(): Promise<void> {
   // La URL puede llevar credenciales: sólo se loguea redactada.
   console.log('[server]', `MongoDB conectado (${redactMongoUrl(env.mongoUrl)})`);
 
+  const logger: AuthLogger = {
+    info: (message: string) => console.log('[email]', message),
+    warn: (message: string) => console.warn('[email]', message),
+  };
+  // La guía operativa lo busca: docker compose logs backend | grep "email delivery"
+  console.log('[server]', `email delivery: ${describeEmailChannel(env.smtp)}`);
+
+  const userRepository = createMongooseUserRepository();
   const app = buildApp(
     {
-      userRepository: createMongooseUserRepository(),
+      userRepository,
+      verificationStore: userRepository,
       passwordHasher: new BcryptPasswordHasher(),
       clock: () => new Date(),
       termsVersion: env.termsVersion,
+      emailSender: createEmailSender(env.smtp, logger),
+      logger,
+      appUrl: env.appUrl,
+      emailVerificationTtlHours: env.emailVerificationTtlHours,
+      resendThrottleMax: env.resendThrottleMax,
+      resendThrottleWindowMinutes: env.resendThrottleWindowMinutes,
     },
     { trustProxyHops: env.trustProxyHops },
   );

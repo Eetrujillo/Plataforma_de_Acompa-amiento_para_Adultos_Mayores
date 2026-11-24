@@ -175,13 +175,15 @@ curl -s -X POST "http://localhost:${PUERTO}/api/auth/register" \
   -d '{"email":"TU_CORREO_REAL@gmail.com","password":"secreto-largo","fullName":"Prueba SMTP"}'
 ```
 
-Respuesta esperada: `{"user":{...,"emailVerified":false},"verificationSent":true}`.
+Respuesta esperada: `{"user":{...},"verificationSent":true}` (el usuario lleva `id`, `email`,
+`fullName` y `role`; el booleano dice si el correo salió).
 
 Después:
 
 1. Abrí el correo (revisá spam la primera vez).
-2. Tocá el botón → te lleva a `/verify-email?token=...` y te deja logueado.
-3. Cerrá sesión y volvé a entrar: el login ya funciona porque la cuenta quedó verificada.
+2. Tocá el botón → te lleva a `/verify-email?token=...` y confirma el correo (la verificación no
+   deja sesión: iniciá sesión después).
+3. El login funciona porque la cuenta quedó verificada.
 
 Si querés probar **sin** SMTP (solo el flujo), el link se lee del log:
 

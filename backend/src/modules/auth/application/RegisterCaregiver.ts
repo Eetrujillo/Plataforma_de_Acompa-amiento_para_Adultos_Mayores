@@ -33,6 +33,15 @@ export interface PasswordHasherPort {
   hash(plainPassword: string): Promise<string>;
 }
 
+/**
+ * Emisión del correo de verificación (HU-002). La implementación es
+ * `RequestEmailVerification`; el tipo es local para no acoplar el registro al
+ * caso de uso concreto.
+ */
+export interface EmailVerificationIssuer {
+  issue(email: string): Promise<{ sent: boolean }>;
+}
+
 export interface Clock {
   now(): Date;
 }
@@ -57,6 +66,14 @@ export interface RegisterCaregiverDeps {
   clock: Clock;
   /** Versión de la política de tratamiento de datos (TERMS_VERSION). */
   termsVersion: string;
+  /** Emisión del correo de verificación (HU-002). */
+  emailVerification: EmailVerificationIssuer;
+}
+
+/** Resultado del registro: el usuario creado y si el correo de verificación salió (S1). */
+export interface RegistrationResult {
+  user: StoredUser;
+  verificationSent: boolean;
 }
 
 export interface RegisterCaregiverCommand {
@@ -75,19 +92,21 @@ export class RegisterCaregiver {
   private readonly passwordHasher: PasswordHasherPort;
   private readonly clock: Clock;
   private readonly termsVersion: string;
+  private readonly emailVerification: EmailVerificationIssuer;
 
   constructor(deps: RegisterCaregiverDeps) {
     this.userRepository = deps.userRepository;
     this.passwordHasher = deps.passwordHasher;
     this.clock = deps.clock;
     this.termsVersion = deps.termsVersion;
+    this.emailVerification = deps.emailVerification;
   }
 
   /**
    * Valida todo el pedido antes de tocar el repositorio: un error de formato
    * no consulta ni escribe nada. El chequeo de duplicidad es la única llamada.
    */
-  async execute(command: RegisterCaregiverCommand): Promise<StoredUser> {
+  async execute(command: RegisterCaregiverCommand): Promise<RegistrationResult> {
     if (command.acceptedTerms !== true) {
       throw new AppError(
         400,
@@ -132,7 +151,7 @@ export class RegisterCaregiver {
       acceptedTermsAt: this.clock.now(),
       ...(command.ipAddress === undefined ? {} : { ipAddress: command.ipAddress }),
     });
-    const user = User.create({
+    const entity = User.create({
       email,
       passwordHash,
       fullName: collapseSpaces(command.fullName),
@@ -142,7 +161,17 @@ export class RegisterCaregiver {
     // El chequeo previo no es atómico con la escritura: si otro pedido ganó la
     // carrera, el índice único rechaza el save y el resultado es el mismo 400.
     try {
-      return await this.userRepository.save(user);
+      const user = await this.userRepository.save(entity);
+      // S1: un envío o una persistencia del token que fallan no rompen el
+      // registro — el caso de uso ya devuelve `sent: false`, y este catch
+      // protege el registro de cualquier otro fallo de la emisión.
+      let verificationSent = false;
+      try {
+        verificationSent = (await this.emailVerification.issue(user.email)).sent;
+      } catch {
+        verificationSent = false;
+      }
+      return { user, verificationSent };
     } catch (error: unknown) {
       if (error instanceof DuplicateEmailError) {
         throw new AppError(400, 'EMAIL_ALREADY_REGISTERED', 'Este correo ya tiene una cuenta');

@@ -28,16 +28,20 @@ Campos que el cliente **no** puede fijar: `role`, `emailVerifiedAt`, `termsVersi
     "email": "cuidador@example.com",
     "fullName": "Esteban Trujillo",
     "role": "CAREGIVER"
-  }
+  },
+  "verificationSent": true
 }
 ```
 
-La respuesta de HU-001 lleva solo esos cuatro campos. `verificationSent` llega con HU-002, y
-`emailVerified`/`createdAt` se agregan cuando un consumidor los necesite: el contrato no promete
-campos que el código no devuelve.
+La respuesta lleva el usuario con esos cuatro campos y, desde HU-002, el booleano
+`verificationSent` (`docs/smtp-setup.md:143,158`): `true` cuando el correo de verificación salió,
+`false` cuando el envío o la persistencia del token fallaron — el registro nunca se rompe por el
+correo, y el enlace puede pedirse con `resend-verification`. `emailVerified`/`createdAt` se agregan
+cuando un consumidor los necesite: el contrato no promete campos que el código no devuelve.
 
 El registro **no** emite JWT: la cuenta nace sin verificar y el login se habilita
-cuando se confirma el correo (HU-002).
+cuando se confirma el correo (HU-002). Al cerrar el registro se emite el token de
+verificación de una sola uso (ver la sección siguiente).
 
 Errores:
 
@@ -82,8 +86,11 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
   `429` `ACCOUNT_LOCKED` si la cuenta está bloqueada por intentos fallidos (ver abajo). El contador
   incluye los correos sin cuenta: la respuesta es idéntica exista o no, para no revelar qué correos
   están registrados.
-- `POST /api/auth/verify-email` — `{ token }`; `200` con `{ token, user }`, `400` si el enlace
-  expiró o ya se usó.
+- `POST /api/auth/verify-email` — `{ token }`; `200` con `{ user: { id, email, fullName, role,
+  emailVerified: true } }`; `400` `INVALID_TOKEN` si el enlace venció, ya se usó, no existe o es
+  malformado (la respuesta es idéntica en los cuatro casos y no trae `details`); `400`
+  `INVALID_BODY` si falta `token` o no es texto. **No emite JWT**: el token de sesión es HU-003
+  (login).
 - `POST /api/auth/resend-verification` — `{ email }`; `202` con `{ accepted: true }`, **3 intentos
   por hora y por correo**; el cuarto responde `429` (ver la sección siguiente).
 - `POST /api/auth/forgot-password` — `{ email }`; `202` con `{ accepted: true }` **exista o no la
@@ -92,6 +99,19 @@ casillas premarcadas, el silencio o la inacción no son consentimiento.
   enlace no sirve (ver la sección de restablecimiento).
 - `GET /api/auth/me` — requiere `Authorization: Bearer <jwt>`.
 - El claim `sv` de los tokens de sesión se documenta en la sección de restablecimiento (abajo).
+
+## Token de verificación del correo (HU-002)
+
+- Al cerrar el registro (y en cada reenvío aceptado) se emite un token de **32 bytes aleatorios**,
+  vigente `EMAIL_VERIFICATION_TTL_HOURS` horas (default `24`) y de **un solo uso**.
+- En la base sólo se guarda `sha256(token)` (`verificationTokenHash`) y su vencimiento
+  (`verificationTokenExpiresAt`); el token en claro viaja únicamente dentro del enlace del correo y
+  nunca aparece en una respuesta HTTP. Excepción declarada: sin `SMTP_HOST` el canal `console`
+  imprime el enlace en el log del backend.
+- El enlace es `${APP_URL}/verify-email?token=<token en claro>`, armado con `APP_URL` de
+  configuración: un header `Host` o `X-Forwarded-Host` manipulado no cambia el destino.
+- Pedir un enlace nuevo **invalida el anterior**: sólo sirve el último emitido.
+- La verificación marca `emailVerifiedAt` con el reloj del servidor y **no emite sesión**.
 
 ## Límite del reenvío de verificación (HU-002)
 
@@ -110,7 +130,9 @@ ventana móvil de una hora**. El cuarto devuelve `429`:
 
 - El contador corre **antes** de buscar la cuenta y cuenta **todo** intento, exista o no el correo y
   esté o no verificado. Eso es lo que impide que el `429` sirva para averiguar si una cuenta existe:
-  el cuarto intento responde igual para un correo registrado que para uno inventado.
+  el cuarto intento responde igual para un correo registrado que para uno inventado, y el reenvío a
+  una cuenta ya verificada también consume cupo (respuesta `202 { accepted: true }` sin correo).
+- Un reenvío aceptado **invalida el enlace anterior**: sólo el último token emitido sirve.
 - Un correo con formato inválido sigue siendo `400` (`INVALID_EMAIL`) y no consume cupo.
 - El intento rechazado no se registra: insistir no alarga el bloqueo.
 - La clave es el correo normalizado (minúsculas, sin espacios); `Cuidador@Example.com` y
