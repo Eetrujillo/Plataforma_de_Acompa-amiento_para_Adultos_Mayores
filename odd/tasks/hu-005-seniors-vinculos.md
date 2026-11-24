@@ -127,3 +127,20 @@ pública y 404 para el no vinculado.»
   el vínculo es `User.caregiverId` escalar; el contrato de `docs/seniors-api.md` es de un solo
   familiar; no existe `requireRole` ni `createSenior` ni proyección de seniors.
 - **L4** — Decisiones D1-D8 arriba.
+- **L5** — Implementación (test-first) en cuatro commits: `b60bd2d` (T1: modelo y dominio), `7d2d50e`
+  (T2: persistencia + arnés de Mongo real), `67e12da` (T3-T4: aplicación + HTTP + guard de rol, la
+  unidad con el ítem de riesgo 2, sola en su commit), `9d738a0` (T5: contrato, tabla de errores y
+  skill). Tamaños: 780 / 351 / 729 / 216 líneas — la primera y la tercera pasan el slice de ~400
+  líneas; quedan registradas acá porque ya están commiteadas y la entrega se parte al publicar.
+- **L6** — Verificación independiente (`Risk: item 2`): PASS en S1-S22, sin bloqueantes. 6 hallazgos
+  no bloqueantes, todos cerrados o documentados: el doble comparaba ids con mayúsculas (arreglado),
+  un documento `SENIOR` sin ficha tumbaba la lista entera (ahora se omite en lista y da 404 en
+  detalle), re-agregar un vínculo `REVOKED` se devuelve tal cual (documentado en el puerto como
+  decisión de HU-012), el reloj no sella el `createdAt` del documento (comentario y pin corregidos),
+  y dos discrepancias doc/código (`INVALID_BLOOD_TYPE` vs `INVALID_BODY`, y `linkStatus` ausente)
+  alineadas en la documentación. Regresión de auth: 35 peticiones comparadas contra el commit base,
+  diff vacío.
+- **L7** — Checks: `typecheck` y `build` verdes; `npm test` 151 pass + 10 skipped sin base y
+  **161/161** con `MONGO_URL` (`chk-*` con `directConnection=true` en el Mongo local del 4301). El
+  archivo de pines de Mongo aísla su base (`…-seniors`) porque `node --test` corre los archivos en
+  paralelo y el de HU-004 dropea la suya.
