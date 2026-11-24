@@ -37,6 +37,20 @@ export interface Clock {
   now(): Date;
 }
 
+/**
+ * El repositorio rechaza `save` con este error cuando la escritura choca contra
+ * la restricción única del correo: la carrera entre dos altas simultáneas que
+ * pasaron las dos el chequeo `findByEmail`. El caso de uso lo traduce al mismo
+ * 400 que el duplicado detectado antes de escribir, así el cliente no puede
+ * distinguir una cosa de la otra y el fallo no se filtra como 500.
+ */
+export class DuplicateEmailError extends Error {
+  constructor() {
+    super('El correo ya existe en la persistencia');
+    this.name = 'DuplicateEmailError';
+  }
+}
+
 export interface RegisterCaregiverDeps {
   userRepository: UserRepositoryPort;
   passwordHasher: PasswordHasherPort;
@@ -125,6 +139,15 @@ export class RegisterCaregiver {
       ...(command.phone === undefined ? {} : { phone: command.phone }),
       consent,
     });
-    return this.userRepository.save(user);
+    // El chequeo previo no es atómico con la escritura: si otro pedido ganó la
+    // carrera, el índice único rechaza el save y el resultado es el mismo 400.
+    try {
+      return await this.userRepository.save(user);
+    } catch (error: unknown) {
+      if (error instanceof DuplicateEmailError) {
+        throw new AppError(400, 'EMAIL_ALREADY_REGISTERED', 'Este correo ya tiene una cuenta');
+      }
+      throw error;
+    }
   }
 }

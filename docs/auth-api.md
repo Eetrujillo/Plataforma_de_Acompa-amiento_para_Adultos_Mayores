@@ -49,6 +49,10 @@ Errores:
 | falta o no es `true` la aceptación de términos | `400` | `TERMS_NOT_ACCEPTED` | exige aceptar términos y política de datos |
 | el correo ya tiene cuenta (sin distinguir mayúsculas) | `400` | `EMAIL_ALREADY_REGISTERED` | `Este correo ya tiene una cuenta` |
 
+El duplicado se cobra igual cuando lo detecta la restricción única de la base y no el chequeo
+previo (dos registros simultáneos con el mismo correo): la respuesta es el mismo `400`
+`EMAIL_ALREADY_REGISTERED`, nunca un `500`.
+
 Cada motivo tiene su código para que el cliente muestre el mensaje correcto y el test pueda
 distinguirlos. `VALIDATION_ERROR` queda como código genérico para lo que no esté enumerado acá.
 
@@ -58,8 +62,15 @@ Cada cuenta guarda, en el documento `User`:
 
 - `acceptedTermsAt` — instante exacto de la aceptación.
 - `termsVersion` — versión de la política aceptada, tomada de `TERMS_VERSION` (default `1.0`).
-- `ipAddress` — IP del transporte (`req.ip`). Detrás de nginx hay que confiar en el proxy
-  para que sea la IP real del usuario y no la del contenedor.
+- `ipAddress` — IP del transporte (`req.ip`), acotada a los proxies que la configuración declara.
+  El backend **no confía en ningún proxy por defecto**: con `TRUST_PROXY_HOPS=0` (default) el header
+  `X-Forwarded-For` de un cliente directo se ignora y la evidencia guarda la IP del socket. En
+  producción se declara el número real de proxies delante (`TRUST_PROXY_HOPS=2` con Cloudflare y el
+  nginx del host). Sólo se aceptan dígitos entre `0` y `10`: un valor vacío, negativo, decimal, con
+  prefijo numérico (`10abc`, `1e2`) o fuera de rango cae a `0`. La IP se registra únicamente si es
+  una dirección válida; si `req.ip` trae otra cosa, el campo no se escribe. Preferimos una IP del
+  proxy antes que una IP elegida por el cliente: la evidencia de la Ley 1581 no puede ser inventada
+  por quien se registra.
 
 La casilla de la pantalla de registro arranca **desmarcada**: la SIC considera que las
 casillas premarcadas, el silencio o la inacción no son consentimiento.

@@ -249,6 +249,8 @@ test('S7: se persiste solo el hash bcrypt (costo 10); el texto plano no se guard
 test('S8: evidencia de consentimiento Ley 1581: acceptedTermsAt, termsVersion e ipAddress', async () => {
   const harness = makeHarness();
   await withServer(harness, async (base) => {
+    // El header no elige la IP: sin saltos de proxy confiables se ignora
+    // (odd/tasks/hu-001-advisory-hardening.md, S1). La evidencia usa el socket.
     const withIp = await post(
       base,
       { ...VALID_BODY, email: 'con-ip@example.com' },
@@ -265,7 +267,7 @@ test('S8: evidencia de consentimiento Ley 1581: acceptedTermsAt, termsVersion e 
     assert.ok(savedWithoutIp);
     assert.equal(savedWithIp.acceptedTermsAt.toISOString(), FIXED_NOW.toISOString());
     assert.equal(savedWithIp.termsVersion, TERMS_VERSION);
-    assert.equal(savedWithIp.ipAddress, '203.0.113.9');
+    assert.equal(savedWithIp.ipAddress, '127.0.0.1');
     assert.equal(savedWithoutIp.acceptedTermsAt.toISOString(), FIXED_NOW.toISOString());
     assert.equal(savedWithoutIp.termsVersion, TERMS_VERSION);
     // Sin proxy, la IP del transporte es la del socket: el pedido siempre trae

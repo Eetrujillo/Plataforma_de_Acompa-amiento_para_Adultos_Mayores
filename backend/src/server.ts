@@ -1,6 +1,7 @@
 import { buildApp } from './app.ts';
 import { connectDatabase, disconnectDatabase } from './config/database.ts';
 import { loadEnv } from './config/env.ts';
+import { redactConnectionStrings, redactMongoUrl } from './config/redactMongoUrl.ts';
 import {
   BcryptPasswordHasher,
   createMongooseUserRepository,
@@ -10,14 +11,18 @@ async function main(): Promise<void> {
   const env = loadEnv();
 
   await connectDatabase(env.mongoUrl);
-  console.log('[server]', `MongoDB conectado (${env.mongoUrl})`);
+  // La URL puede llevar credenciales: sólo se loguea redactada.
+  console.log('[server]', `MongoDB conectado (${redactMongoUrl(env.mongoUrl)})`);
 
-  const app = buildApp({
-    userRepository: createMongooseUserRepository(),
-    passwordHasher: new BcryptPasswordHasher(),
-    clock: () => new Date(),
-    termsVersion: env.termsVersion,
-  });
+  const app = buildApp(
+    {
+      userRepository: createMongooseUserRepository(),
+      passwordHasher: new BcryptPasswordHasher(),
+      clock: () => new Date(),
+      termsVersion: env.termsVersion,
+    },
+    { trustProxyHops: env.trustProxyHops },
+  );
 
   const server = app.listen(env.port, () => {
     console.log('[server]', `backend escuchando en el puerto ${env.port}`);
@@ -34,6 +39,12 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  console.error('[server]', 'no se pudo arrancar el backend', error);
+  // Los errores del driver repiten la URI de conexión con credenciales: el
+  // mensaje se scrubea antes de imprimirse.
+  const detail =
+    error instanceof Error
+      ? `${error.name}: ${redactConnectionStrings(error.message)}`
+      : redactConnectionStrings(String(error));
+  console.error('[server]', 'no se pudo arrancar el backend:', detail);
   process.exit(1);
 });

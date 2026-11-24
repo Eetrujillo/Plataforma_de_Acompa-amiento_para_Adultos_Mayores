@@ -1,7 +1,19 @@
+import { isIP } from 'node:net';
 import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../../../shared/errors/AppError.ts';
 import { RegisterCaregiver } from '../application/RegisterCaregiver.ts';
 import type { RegisterCaregiverCommand } from '../application/RegisterCaregiver.ts';
+
+/**
+ * La evidencia de la Ley 1581 no puede guardar lo que el cliente escriba en un
+ * header: con proxies confiables de más, `req.ip` puede traer texto arbitrario.
+ * Sólo se registra cuando es una dirección IP válida.
+ */
+function evidenceIp(raw: string | undefined): string | undefined {
+  const candidate = raw?.trim();
+  if (candidate === undefined || candidate === '') return undefined;
+  return isIP(candidate) === 0 ? undefined : candidate;
+}
 
 /**
  * Arma el comando desde el cuerpo crudo. Los campos que el cliente no puede
@@ -46,7 +58,7 @@ export function createAuthController(registerCaregiver: RegisterCaregiver) {
     // delegan al errorHandler explícitamente.
     async register(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const command = buildCommand(req.body, req.ip);
+        const command = buildCommand(req.body, evidenceIp(req.ip));
         const user = await registerCaregiver.execute(command);
         // La respuesta no expone passwordHash ni campos de sesión (S9).
         res.status(201).json({
