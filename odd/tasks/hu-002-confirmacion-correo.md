@@ -111,6 +111,34 @@ Texto entre comillas = criterio literal de `docs/backlog.md` (HU-002).
 - **`docs/smtp-setup.md` es la guía operativa**: el log del canal `console` incluye la frase
   `Enlace de verificación` para que el `grep` de la guía siga funcionando.
 
+## Corrections after independent verification
+
+La verificación independiente encontró un defecto **CRITICAL** y cuatro hallazgos menores en el
+adaptador real (ninguno lo veía el doble en memoria). Estas correcciones son parte de la misma HU.
+
+- **C1 (S2, CRITICAL).** `findByVerificationTokenHash` filtra la proyección a `fullName
+  emailVerifiedAt verificationTokenHash verificationTokenExpiresAt`: `email` queda afuera y llega
+  `undefined`, así que la cadena real termina en `markEmailVerified(undefined, …)` →
+  `updateOne({}, …)` marca **la primera cuenta de la colección** y devuelve sus datos. La proyección
+  debe incluir **todos** los campos que el puerto devuelve, publicada como constante
+  (`VERIFICATION_TOKEN_FIELDS`) y con un test que falle si falta uno.
+- **C2 (S2, concurrencia).** Marcar el correo verificado debe ser **atómico**:
+  `markEmailVerified(email, tokenHash, verifiedAt)` con
+  `findOneAndUpdate({ email, verificationTokenHash: tokenHash, emailVerifiedAt: null }, …, { new: true })`
+  y `StoredUser | null`. `ConfirmEmail` traduce `null` a `INVALID_TOKEN`. Dos canjes simultáneos del
+  mismo token no pueden dar dos `200` ni marcar dos cuentas.
+- **C3 (S4/S7).** `RESEND_THROTTLE_MAX` y `RESEND_THROTTLE_WINDOW_MINUTES` aceptan sólo enteros
+  positivos; vacío, `0`, negativo o malformado cae al default (`3` / `60`). Un límite no se puede
+  desactivar por configuración accidental.
+- **C4.** `verificationTokenHash` lleva índice: `verify-email` es un endpoint público y hoy escanea la
+  colección completa.
+- **C5.** El transporte SMTP define timeouts explícitos (`connectionTimeout` y `greetingTimeout`
+  10 s, `socketTimeout` 20 s): un SMTP colgado no puede retener el `201` del registro.
+
+Diferido, requiere decisión del humano en el deploy: con `NODE_ENV=production` y `SMTP_HOST` vacío
+el canal `console` imprime los enlaces con token en el log del contenedor. Fallar cerrado en
+producción cambia el arranque del deploy, así que no se decide acá.
+
 ## Log
 
 - **L1.** Pedido del humano, literal: *"retomá la plataforma, seguimos con HU-002"*.
