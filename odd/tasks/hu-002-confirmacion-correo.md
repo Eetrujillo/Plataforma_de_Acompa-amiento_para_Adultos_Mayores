@@ -166,3 +166,28 @@ producción cambia el arranque del deploy, así que no se decide acá.
 - **L8.** Slice de review: es un commit de ~700 líneas autoradas, por encima de la guía de ~400.
   Es una sola conducta (emisión y confirmación del token) y no se parte sin dejar un commit que no
   compile; se publica como un único slice de PR.
+- **L9.** Revisión nativa `review-172231dad156b7f6` (tier alto por escalado del ítem 2, lentes
+  risk+resilience+reliability): **aprobada**, autoridad quemada, 9 hallazgos advisory. Cerrados en
+  esta misma unidad por su valor (fallaban en silencio): `EMAIL_VERIFICATION_TTL_HOURS` sólo acepta
+  enteros positivos (un `0` o un negativo emitía tokens ya vencidos y el flujo entero no hacía nada
+  con `201 verificationSent: true`), `SMTP_SECURE` entiende `1/yes/on/0/no/off` (un `1` dejaba el
+  transporte sin TLS sin aviso) y el vencimiento entra en el filtro atómico del canje (un token que
+  cruzaba el borde entre el chequeo y la escritura se canjeaba igual). Tests: 50/50.
+- **L10.** Advisory diferidos, cada uno con su razón: canal `console` con `NODE_ENV=production` y  `SMTP_HOST` vacío imprime los enlaces con token en el log del contenedor (**requiere decisión del
+  humano en el deploy**: fallar cerrado cambia el arranque); la evicción por tope de claves del
+  throttle permite, con ~10.000 correos distintos, resetear el cupo de una víctima (volumen alto);
+  el throttle es por proceso (un reinicio lo resetea; documentado en `docs/auth-api.md`); el envío
+  SMTP es inline en el registro y el reenvío (necesita cola asincrónica, cambio de diseño); el
+  índice de `verificationTokenHash` no se verificó contra una base real en producción; el oráculo
+  por latencia del reenvío es redundante con el `EMAIL_ALREADY_REGISTERED` documentado del registro.
+- **L11.** Segunda revisión nativa `review-7e2bb24ca2604e24` (lentes risk+reliability) sobre el
+  rango completo con las tres correcciones: **aprobada**, autoridad quemada. Repitió el advisory del
+  canal `console` en producción (sigue siendo la decisión de deploy del humano) y agregó dos
+  diferidos: el TTL no tiene tope superior (un valor absurdo produce `Invalid Date` y un enlace
+  inutilizable) y el envío SMTP inline. El advisory `R1-lock-engines-divergence` / `R3-001` es
+  **incorrecto**: se verificó que `backend/package.json` y la entrada raíz de `package-lock.json`
+  declaran los dos `node >=22.18.0`.
+- **L12.** Estado final de la unidad: 4 commits (`e3d38b2`, `04ceea8`, `c5f9f42`, `9f55763`),
+  **50/50 tests**, `typecheck` y `build` verdes, dos revisiones nativas aprobadas y una verificación
+  independiente con un CRITICAL real corregido (C1). Nada pusheado: el deploy sigue siendo decisión
+  del humano.
