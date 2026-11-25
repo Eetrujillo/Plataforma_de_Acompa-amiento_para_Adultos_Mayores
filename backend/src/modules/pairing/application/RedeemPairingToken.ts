@@ -12,7 +12,9 @@
  *      SIN quemar el QR.
  *   6. Bloqueo por perfil (D8): un intento bloqueado no quema el token ni cuenta.
  *   7. RECLAMO atómico de un solo uso (S8/S16): el perdedor recibe el mismo 409
- *      genérico, desambiguado con una lectura posterior (D5).
+ *      genérico, desambiguado con una lectura posterior (D5). Uno ya usado no
+ *      cuenta como fallo del perfil (D14.2): sólo la credencial inservible por
+ *      vencimiento o invalidación acumula.
  *   8. Escritura del vínculo con la evidencia (D4/D7). Si falla, el token ya
  *      quedó quemado: falla cerrado (S18) y el error sube como 500.
  *   9. Contador limpio y sesión de SENIOR firmada por el módulo auth (D10).
@@ -167,8 +169,10 @@ export class RedeemPairingToken {
     }
 
     // S8/S16: reclamo condicional de un solo uso. El perdedor de la carrera
-    // desambigua con una lectura posterior y registra el fallo del perfil (D8):
-    // `handleLostClaim` siempre lanza.
+    // desambigua con una lectura posterior (D5) y — D14.2 — sólo la credencial
+    // inservible por vencimiento o invalidación registra el fallo del perfil
+    // (D8): `handleLostClaim` siempre lanza, pero el 409 del token ya usado no
+    // mueve el contador del perfil.
     const claimed = await this.tokenRepository.claimUnused(tokenHash, now);
     if (claimed === null) {
       await this.handleLostClaim(tokenHash, profile.id, now, ip);
@@ -207,9 +211,13 @@ export class RedeemPairingToken {
   }
 
   /**
-   * D5/S14: el reclamo se perdió. Primero el fallo del perfil (D8 — puede
-   * disparar el bloqueo y responder 429), después la desambiguación con una
-   * lectura posterior: sin documento → 404; usado → 409; lo demás → 400.
+   * D5/S14: el reclamo se perdió. Primero la desambiguación con una lectura
+   * posterior: sin documento → 404; usado → el mismo 409 genérico; lo demás →
+   * 400. D14.2: sólo la credencial inservible por vencimiento o invalidación
+   * registra el fallo del perfil (D8 — puede disparar el bloqueo y responder
+   * 429); el token ya canjeado no mueve ninguna racha — un doble toque o un QR
+   * viejo no puede dejar al adulto mayor sin poder vincularse. El límite por
+   * IP sí cuenta el intento siempre (D9), como hoy.
    */
   private async handleLostClaim(
     tokenHash: string,
@@ -217,25 +225,33 @@ export class RedeemPairingToken {
     now: Date,
     ip: string,
   ): Promise<never> {
-    const persisted = await this.seniorWriter.registerRedeemFailure(seniorId, {
-      maxAttempts: this.lockout.maxAttempts,
-      lockMs: this.lockout.lockMs,
-      now,
-    });
-    this.ipThrottle.recordFailure(ip);
-    if (persisted !== null && persisted.lockedUntil !== null) {
-      // El intento que dispara el bloqueo ya responde 429, como en el login.
-      throw new AppError(429, 'ACCOUNT_LOCKED', ACCOUNT_LOCKED_MESSAGE, {
-        retryAfterSeconds: lockoutRetrySeconds(this.lockout),
-      });
-    }
     const loser = await this.tokenRepository.findByTokenHash(tokenHash);
     if (loser === null) {
+      // S14: el desconocido sólo delata su propia falta.
+      this.ipThrottle.recordFailure(ip);
       throw new AppError(404, 'NOT_FOUND', PAIRING_TOKEN_NOT_FOUND_MESSAGE);
     }
     const state = evaluatePairingTokenState(loser, now);
     if (state === 'USED') {
+      // D14.2: ya canjeado → el mismo 409 de siempre, sin contar fallo del perfil.
+      this.ipThrottle.recordFailure(ip);
       throw new AppError(409, 'CONFLICT', PAIRING_TOKEN_ALREADY_USED_MESSAGE);
+    }
+    this.ipThrottle.recordFailure(ip);
+    if (state === 'EXPIRED' || state === 'INVALIDATED') {
+      // D8: credencial inservible por vencimiento o invalidación — ésta sí
+      // cuenta como fallo del perfil (D14.2).
+      const persisted = await this.seniorWriter.registerRedeemFailure(seniorId, {
+        maxAttempts: this.lockout.maxAttempts,
+        lockMs: this.lockout.lockMs,
+        now,
+      });
+      if (persisted !== null && persisted.lockedUntil !== null) {
+        // El intento que dispara el bloqueo ya responde 429, como en el login.
+        throw new AppError(429, 'ACCOUNT_LOCKED', ACCOUNT_LOCKED_MESSAGE, {
+          retryAfterSeconds: lockoutRetrySeconds(this.lockout),
+        });
+      }
     }
     throw new AppError(400, 'VALIDATION_ERROR', PAIRING_TOKEN_INVALID_MESSAGE);
   }

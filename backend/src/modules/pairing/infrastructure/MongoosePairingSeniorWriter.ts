@@ -114,7 +114,8 @@ export function createMongooseRedeemSeniorWriter(): RedeemSeniorWriterPort {
       };
     },
 
-    /** S7: el canje exitoso deja la racha en 0 y `lockedUntil` en null. */
+    /** S7/D14.1: el canje exitoso y la emisión de un QR nuevo dejan la racha en 0
+     * y `lockedUntil` en null — la emisión es el escape documentado del bloqueo. */
     async clearRedeemFailures(seniorId: string): Promise<void> {
       await UserModel.updateOne(
         { _id: seniorId },

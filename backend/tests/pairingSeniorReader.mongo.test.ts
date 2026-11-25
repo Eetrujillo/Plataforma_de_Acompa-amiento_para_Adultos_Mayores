@@ -20,7 +20,11 @@ import { createMongoosePairingSeniorReader } from '../src/modules/pairing/index.
 import { GeneratePairingQr } from '../src/modules/pairing/application/GeneratePairingQr.ts';
 import { UserModel } from '../src/shared/models/User.ts';
 import { SeniorLinkModel } from '../src/shared/models/SeniorLink.ts';
-import { InMemoryPairingTokenRepository, RecordingQrEncoder } from './support/pairingFakes.ts';
+import {
+  InMemoryPairingTokenRepository,
+  InMemoryRedeemSeniorWriter,
+  RecordingQrEncoder,
+} from './support/pairingFakes.ts';
 
 const MONGO_URL = process.env.MONGO_URL ?? '';
 const NOW = new Date('2026-01-01T00:00:00.000Z');
@@ -124,6 +128,8 @@ function emission(reader: ReturnType<typeof createMongoosePairingSeniorReader>) 
   const useCase = new GeneratePairingQr({
     seniorReader: reader,
     pairingTokenRepository: tokens,
+    // D14.1: emitir reinicia el bloqueo del canje de ese perfil.
+    seniorWriter: new InMemoryRedeemSeniorWriter(),
     qrEncoder: encoder,
     clock: () => NOW,
     ttlMinutes: TTL_MINUTES,

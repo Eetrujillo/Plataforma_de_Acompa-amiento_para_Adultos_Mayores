@@ -77,7 +77,11 @@ export interface PairingDependencies {
    * dobles distintos porque la emisión y el canje leen distinto.
    */
   redeemProfileReader: RedeemProfileReaderPort;
-  /** Escritor del vínculo y del bloqueo por perfil (D7/D8), mongoose o doble. */
+  /**
+   * Escritor del vínculo y del bloqueo por perfil (D7/D8), mongoose o doble.
+   * D14.1: la emisión lo comparte — al emitir un QR nuevo reinicia la racha y
+   * el bloqueo de canje del perfil con el mismo `clearRedeemFailures`.
+   */
   redeemSeniorWriter: RedeemSeniorWriterPort;
   /** `TERMS_VERSION` de la config (D4): la evidencia del consentimiento. */
   termsVersion: string;
@@ -123,6 +127,9 @@ export function buildPairingRouter(
       seniorReader: deps.pairingSeniorReader,
       pairingTokenRepository: deps.pairingTokenRepository,
       qrEncoder: deps.qrEncoder,
+      // D14.1: la emisión comparte el escritor del canje — el MISMO que usa el
+      // bloqueo por perfil — para reiniciar la racha al emitir un QR nuevo.
+      seniorWriter: deps.redeemSeniorWriter,
       clock: deps.clock,
       ttlMinutes: deps.pairingTtlMinutes ?? PAIRING_TOKEN_TTL_MINUTES,
     }),

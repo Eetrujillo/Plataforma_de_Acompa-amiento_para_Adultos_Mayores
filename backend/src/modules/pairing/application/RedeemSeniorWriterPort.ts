@@ -43,6 +43,10 @@ export interface RedeemSeniorWriterPort {
     config: RegisterFailedLoginConfig,
   ): Promise<NextLockoutState | null>;
 
-  /** S7: el canje exitoso deja la racha en 0 y `lockedUntil` en `null`. */
+  /**
+   * S7/D14.1: el canje exitoso deja la racha en 0 y `lockedUntil` en `null`;
+   * la emisión de un QR nuevo la usa para el mismo reinicio — el escape
+   * documentado del bloqueo de canje («el familiar emite otro QR»).
+   */
   clearRedeemFailures(seniorId: string): Promise<void>;
 }

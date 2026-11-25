@@ -125,8 +125,11 @@ se registra con los campos que fija esa skill, y el cuerpo del canje no los inve
   (`usedAt: null`, `invalidatedAt: null`, `expiresAt` futuro) fija `usedAt`. Si no reclama, se
   distingue con una lectura posterior: sin documento → `404 NOT_FOUND`; `usedAt` presente →
   `409 CONFLICT`; `invalidatedAt` o vencido → `400 VALIDATION_ERROR` genérico. Si reclama y después
-  la escritura del perfil falla, responde `500` y el token queda quemado: falla cerrada, el familiar
-  emite otro QR.
+  la escritura del perfil **lanza**, responde `500` y el token queda quemado: falla cerrada, el
+  familiar emite otro QR. Si la escritura no lanza pero no matchea la condición (el perfil se borró
+  entre el reclamo y el vínculo, o otro pedido vinculó primero), responde el mismo `409 CONFLICT`
+  genérico de S16: no fue un error del servidor, fue la carrera perdida. En los tres casos el token
+  queda usado (S18).
 - **D6 — Validación previa al reclamo (S17)**: el perfil se resuelve con el repositorio de seniors
   (`findSeniorForCaregiver(seniorId, token.caregiverId)`), así participa la única fuente de verdad de
   vínculos. Perfil inexistente o ajeno → `409 CONFLICT` genérico, idéntico al de un token ya
@@ -158,6 +161,24 @@ se registra con los campos que fija esa skill, y el cuerpo del canje no los inve
   `REDEEM_IP_WINDOW_MINUTES` por `readPositiveInt`, con sus defaults; `TERMS_VERSION` ya existe en
   `env.ts` y se reusa. Se declaran en `backend/env.sample` y en el `env.sample` de la raíz.
 
+- **D14 — El bloqueo del canje no puede convertirse en una negación de servicio sobre el adulto
+  mayor** (hallazgo de la verificación independiente, L6). Con el contador contando cualquier
+  credencial inservible, quien tenga un QR ya usado o vencido —una foto, un chat, una captura—
+  bloqueaba 15 minutos la vinculación de ese perfil sin ninguna credencial, y repitiéndolo cada 15
+  minutos la negaba indefinidamente, mientras el QR nuevo del familiar respondía 429 sin quemarse.
+  Dos correcciones, ninguna afloja S7:
+  1. **Emitir un QR nuevo reinicia el bloqueo de ese perfil.** Emitir es el acto deliberado del
+     familiar que ya estaba documentado como la salida («el familiar emite otro QR»): si lo hace, la
+     racha y el `lockedUntil` se limpian en la misma operación de emisión. El camino legítimo
+     siempre existe y no depende de esperar 15 minutos.
+  2. **Un token ya canjeado no cuenta como fallo**, sólo los inservibles por vencimiento o
+     invalidación: un doble toque en el botón de escanear no puede dejar al adulto mayor sin poder
+     vincularse. El 409 de un token usado sigue siendo el mismo 409 genérico.
+  El límite por IP sigue siendo el freno de fondo, y el bloqueo por perfil conserva su umbral y su
+  ventana (S7). Se pinea con tests propios y con los cuatro pines de regresión que dejó la
+  verificación (carrera de 8 reclamaciones, carrera de 8 vínculos, indistinguibilidad usado/ajeno y
+  bloqueo con limpieza posterior).
+
 ## Tasks
 
 - **T1** · S14-S17, S22 · inline · dominio: mensajes del canje y las reglas de estado del token
@@ -181,3 +202,41 @@ se registra con los campos que fija esa skill, y el cuerpo del canje no los inve
 
 - **L1** — Pedido del humano, textual: «dale con la siguiente HU y te doy todos lo permisos y al
   final dame las cosa que tengo que rprobar y configurar yo tanto en local como en prod».
+- **L2** — Mapa de evidencia (explorador, read-only): no existe `toPublicUser` en el rewrite (el
+  objeto de S13 se arma desde el documento del perfil más el token); ningún método de
+  `SeniorRepositoryPort` escribe `linkStatus`; el bloqueo de login se cuenta en el adaptador con un
+  pipeline atómico (`MongooseUserRepository.ts:238-284`) y las reglas puras viven en
+  `domain/loginLockout.ts`; la sesión la firma `JwtTokenService` con `sessionClaims`; los throttles
+  son `Map` en memoria por proceso; `evidenceIp` valida con `node:net`; la skill `ley-1581` §4 exige
+  `400` cuando falta la bandera de aceptación; el único `package.json` es el del backend, así que no
+  hay app React Native.
+- **L3** — Consulta y decisión sobre el consentimiento: se pidió recomendación y se ejecutó la opción
+  B (`{ token, acceptedTerms }` con `400 TERMS_NOT_ACCEPTED`). Razones registradas: la skill
+  `ley-1581` §4 la exige para la vinculación, sin bandera el servidor fabricaría evidencia de una
+  aceptación que nadie afirmó, el registro del familiar ya la exige (misma asimetría al revés), y es
+  más barata porque reusa campo, código, mensaje y helper de IP. El «el cuerpo sólo lleva `token`»
+  se corrigió en el contrato, la skill `pairing-generator` §5 y el doc de feature: su sujeto era
+  «no acepta datos de la ficha».
+- **L4** — Implementación (test-first, delegada) en dos unidades: `d09df8f` (dominio del estado del
+  token, puertos, reclamación condicional, escritura de `LINKED` + evidencia, bloqueo por perfil,
+  traslado de `evidenceIp` a `shared/domain`, campos del modelo y pines contra Mongo: 948 líneas) y
+  `8b4581a` (caso de uso `RedeemPairingToken`, ruta pública, composición de la sesión, config
+  `REDEEM_*`, contrato, catálogo de errores, `seniors-api`, skills y los dos `env.sample`: 1677
+  líneas). Ambos pasan el slice de ~400 líneas; se registran acá y la entrega se decide al publicar.
+- **L5** — Rojo→verde observado: los dos archivos de test nuevos fallaron primero por módulo
+  inexistente (197 tests, 2 fail) y quedaron en verde sin tocar ningún test previo. Checks del
+  padre: `typecheck` y `build` verdes; `npm test` **205 pass + 27 skipped** sin base y **232/232**
+  con Mongo real. Diferencial contra el commit base en la copia temporal: registro, `trustProxy`,
+  `seniorsApi` y los pines de Mongo sin cambios de comportamiento.
+- **L6** — Verificación independiente (`Risk: items 1 y 2`), segunda corrida: la primera se colgó 30
+  minutos en un `bash` y no produjo reporte; se relanzó con sondas acotadas por `timeout`. Resultado:
+  **PASS en S4, S5, S7, S8, S11-S23**, con S1-S3, S6, S9 y S10 fuera de alcance por ser de la app.
+  Evidencia fuerte: 8 reclamaciones simultáneas contra Mongo real → un solo ganador; 8 vínculos
+  simultáneos → un solo `LINKED` con la evidencia escrita una vez; evidencia inyectada desde el
+  cuerpo ignorada (se guardan reloj, `TERMS_VERSION` e IP reales); token usado y perfil ajeno con
+  respuesta byte-idéntica; bloqueo 429 en el quinto fallo con `retryAfterSeconds=900`, otro perfil
+  intacto y limpieza tras el éxito; token quemado en los tres modos de falla posterior al reclamo.
+  Sin CRITICAL ni MAJOR. Cuatro NOTEs: el 409 de una condición no cumplida en vez del 500 de D5 (se
+  ajustó la redacción), la carrera perdida contaba como fallo del perfil y el bloqueo no tenía
+  escape por emisión (los dos juntos permitían negar la vinculación de un adulto mayor a quien
+  tuviera un QR usado: **D14**), y que un cliente que reintente un 400 puede autobloquearse.

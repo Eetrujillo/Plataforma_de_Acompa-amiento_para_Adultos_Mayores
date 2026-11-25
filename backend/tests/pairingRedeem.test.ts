@@ -558,6 +558,56 @@ test('S7: el bloqueo es por perfil y no afecta a otro perfil', async () => {
   assert.equal(result.senior.caregiverId, CAREGIVER_ID);
 });
 
+// ─── D14.2: un token ya usado no cuenta como fallo del perfil ───────────────
+
+test('D14.2: el token ya usado repite el mismo 409 genérico y no mueve ningún contador', async () => {
+  const { useCase, deps } = makeUseCase();
+  const token = 'd'.repeat(43);
+  await seedToken(deps, token);
+  seedProfile(deps);
+  await useCase.execute(command({ token }));
+  const attemptsBefore = deps.writer.seniors.get(SENIOR_ID)?.redeemFailedAttempts ?? null;
+
+  await rejectsApp(useCase.execute(command({ token })), {
+    statusCode: 409,
+    code: 'CONFLICT',
+    message: ALREADY_USED_MESSAGE,
+  });
+
+  const profile = deps.writer.seniors.get(SENIOR_ID);
+  assert.ok(profile !== undefined);
+  assert.equal(
+    profile.redeemFailedAttempts,
+    attemptsBefore,
+    'un doble toque no acumula fallo del perfil',
+  );
+  assert.equal(profile.redeemLockedUntil, null);
+});
+
+test('D14.2: el perdedor del doble toque simultáneo no cuenta fallo del perfil', async () => {
+  const { useCase, deps } = makeUseCase();
+  const token = 't'.repeat(43);
+  await seedToken(deps, token);
+  seedProfile(deps);
+
+  const settled = await Promise.allSettled([
+    useCase.execute(command({ token })),
+    useCase.execute(command({ token })),
+  ]);
+  const fulfilled = settled.filter((entry) => entry.status === 'fulfilled');
+  assert.equal(fulfilled.length, 1, 'una sola reclamación gana la carrera');
+  const loser = settled.find((entry) => entry.status === 'rejected');
+  assert.ok(loser !== undefined && loser.status === 'rejected');
+  const reason = loser.reason as { statusCode?: number; code?: string };
+  assert.equal(reason.statusCode, 409);
+  assert.equal(reason.code, 'CONFLICT', 'el perdedor recibe el mismo 409 genérico');
+
+  const profile = deps.writer.seniors.get(SENIOR_ID);
+  assert.ok(profile !== undefined);
+  assert.equal(profile.redeemFailedAttempts, 0, 'la carrera perdida del token usado no cuenta');
+  assert.equal(profile.redeemLockedUntil, null);
+});
+
 // ─── D9: throttle por IP ────────────────────────────────────────────────────
 
 test('D9: la ventana por IP responde 429 TOO_MANY_REQUESTS y también cuenta tokens desconocidos', async () => {
@@ -613,6 +663,8 @@ test('D9: el intento bloqueado no se registra y la ventana es móvil', async () 
 
 interface RedeemableSession {
   token: string;
+  /** El id del familiar dueño: los pines de D14 siembran tokens con su caregiverId. */
+  userId: string;
   seniorId: string;
   qrToken: string;
 }
@@ -667,7 +719,7 @@ async function seedRedeemable(harness: Harness, base: string, email: string): Pr
     userId,
   );
   harness.redeemWriter.seed(seniorId, { linkStatus: 'PENDING' });
-  return { token, seniorId, qrToken };
+  return { token, userId, seniorId, qrToken };
 }
 
 test('S11/S13 (HTTP): el canje público responde 201 con exactamente { token, senior }', async () => {
@@ -896,5 +948,143 @@ test('D9 (HTTP): el límite por IP responde 429 TOO_MANY_REQUESTS con retryAfter
       { 'x-forwarded-for': IP_B },
     );
     assert.equal(otherIp.status, 404);
+  });
+});
+
+// ─── Pines de regresión de la verificación independiente (D14) ──────────────
+
+test('pin (HTTP): el token ya usado y el token ajeno responden con el mismo cuerpo byte-idéntico', async () => {
+  const harness = makeHarness({ qrEncoder: new RecordingQrEncoder() });
+  await withServer(harness, async (base) => {
+    const session = await seedRedeemable(harness, base, 'identico@example.com');
+    const used = await post(base, REDEEM, { token: session.qrToken, acceptedTerms: true });
+    assert.equal(used.status, 201, `cuerpo: ${used.text}`);
+
+    // Un token PENDIENTE cuyo caregiverId ya no tiene el vínculo del perfil:
+    // ajeno → el mismo 409 genérico de un token consumido (S17), sin detalles.
+    const foreign = 'fffff'.padEnd(43, 'f');
+    await harness.pairingRepo.create({
+      seniorId: session.seniorId,
+      caregiverId: '507f1f77bcf86cd7994390cc',
+      tokenHash: hashPairingToken(foreign),
+      expiresAt: new Date(FIXED_NOW.getTime() + 24 * 60 * 60_000),
+    });
+
+    const asUsed = await post(base, REDEEM, { token: session.qrToken, acceptedTerms: true });
+    const asForeign = await post(base, REDEEM, { token: foreign, acceptedTerms: true });
+    const usedEnvelope = errorEnvelope(asUsed.json);
+    const foreignEnvelope = errorEnvelope(asForeign.json);
+    assert.equal(asUsed.status, 409);
+    assert.equal(asForeign.status, asUsed.status);
+    assert.equal(foreignEnvelope.code, usedEnvelope.code);
+    assert.equal(foreignEnvelope.code, 'CONFLICT');
+    assert.equal(foreignEnvelope.message, usedEnvelope.message);
+    assert.equal(foreignEnvelope.details, undefined);
+    assert.equal(
+      asForeign.text,
+      asUsed.text,
+      'la respuesta entera es byte-idéntica: el 409 no confirma ningún id',
+    );
+  });
+});
+
+test('pin (HTTP): cinco tokens inservibles bloquean el perfil; el vencimiento del bloqueo libera y la racha vuelve a 0', async () => {
+  const harness = makeHarness({
+    qrEncoder: new RecordingQrEncoder(),
+    // La ventana configurada (no el default) para pinar el retryAfterSeconds.
+    redeemLockoutMinutes: 2,
+  });
+  await withServer(harness, async (base) => {
+    const session = await seedRedeemable(harness, base, 'ventana@example.com');
+    // D14.2: el ya usado no cuenta, así que el pin usa un token VENCIDO del
+    // mismo perfil (inservible por vencimiento: único fallo que acumula).
+    const dead = 'dead0'.padEnd(43, '0');
+    await harness.pairingRepo.create({
+      seniorId: session.seniorId,
+      caregiverId: session.userId,
+      tokenHash: hashPairingToken(dead),
+      expiresAt: new Date(FIXED_NOW.getTime() - 60_000),
+    });
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const failed = await post(base, REDEEM, { token: dead, acceptedTerms: true });
+      assert.equal(failed.status, 400, `intento ${attempt + 1}: ${failed.text}`);
+      assert.equal(errorEnvelope(failed.json).code, 'VALIDATION_ERROR');
+    }
+    const locked = await post(base, REDEEM, { token: dead, acceptedTerms: true });
+    assert.equal(locked.status, 429, `cuerpo: ${locked.text}`);
+    const envelope = errorEnvelope(locked.json);
+    assert.equal(envelope.code, 'ACCOUNT_LOCKED');
+    assert.deepEqual(envelope.details, { retryAfterSeconds: 120 }, 'la ventana es la configurada');
+
+    // Un segundo perfil no se entera del bloqueo.
+    const other = await seedRedeemable(harness, base, 'ventana2@example.com');
+    const okOther = await post(base, REDEEM, { token: other.qrToken, acceptedTerms: true });
+    assert.equal(okOther.status, 201, `cuerpo: ${okOther.text}`);
+
+    // El reloj pasa la ventana del bloqueo: el canje válido del primer perfil
+    // ahora sí entra y deja la racha en 0.
+    harness.clock.now = new Date(FIXED_NOW.getTime() + 3 * 60_000);
+    const ok = await post(base, REDEEM, { token: session.qrToken, acceptedTerms: true });
+    assert.equal(ok.status, 201, `cuerpo: ${ok.text}`);
+    const profile = harness.redeemWriter.seniors.get(session.seniorId);
+    assert.ok(profile !== undefined);
+    assert.equal(profile.redeemFailedAttempts, 0, 'el canje feliz limpia la racha');
+    assert.equal(profile.redeemLockedUntil, null);
+  });
+});
+
+test('pin D14.1 (HTTP): emitir un QR nuevo desbloquea al instante — el QR nuevo se canjea y el re-canje no mueve el contador', async () => {
+  const harness = makeHarness({ qrEncoder: new RecordingQrEncoder() });
+  await withServer(harness, async (base) => {
+    const session = await seedRedeemable(harness, base, 'escape@example.com');
+    const dead = 'deade'.padEnd(43, '0');
+    await harness.pairingRepo.create({
+      seniorId: session.seniorId,
+      caregiverId: session.userId,
+      tokenHash: hashPairingToken(dead),
+      expiresAt: new Date(FIXED_NOW.getTime() - 60_000),
+    });
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const failed = await post(base, REDEEM, { token: dead, acceptedTerms: true });
+      assert.equal(failed.status, 400);
+    }
+    const locked = await post(base, REDEEM, { token: dead, acceptedTerms: true });
+    assert.equal(locked.status, 429, `cuerpo: ${locked.text}`);
+
+    // El familiar emite otro QR: la emisión limpia la racha (D14.1).
+    const reemit = await post(
+      base,
+      `${PAIRING}/qr`,
+      { seniorId: session.seniorId },
+      auth(session.token),
+    );
+    assert.equal(reemit.status, 201, `cuerpo: ${reemit.text}`);
+    const payloads = (harness.qrEncoder as RecordingQrEncoder).payloads;
+    const newPayload = payloads[payloads.length - 1];
+    assert.ok(newPayload !== undefined);
+    const newToken = (JSON.parse(newPayload) as { token: string }).token;
+    assert.notEqual(newToken, session.qrToken);
+
+    // El QR nuevo se canjea SIN esperar la ventana del bloqueo.
+    const ok = await post(base, REDEEM, { token: newToken, acceptedTerms: true });
+    assert.equal(ok.status, 201, `cuerpo: ${ok.text}`);
+    const profile = harness.redeemWriter.seniors.get(session.seniorId);
+    assert.ok(profile !== undefined);
+    assert.equal(profile.redeemFailedAttempts, 0, 'el bloqueo quedó reiniciado');
+    assert.equal(profile.redeemLockedUntil, null);
+
+    // El doble canje del mismo QR: 409 genérico, contador intacto y el perfil
+    // sigue consistente (una sola escritura de consentimiento, sin bloqueo).
+    const second = await post(base, REDEEM, { token: newToken, acceptedTerms: true });
+    assert.equal(second.status, 409, `cuerpo: ${second.text}`);
+    assert.equal(errorEnvelope(second.json).code, 'CONFLICT');
+    assert.equal(
+      harness.redeemWriter.seniors.get(session.seniorId)?.redeemFailedAttempts,
+      0,
+      'el re-canje del mismo token no acumula fallos',
+    );
+    assert.equal(harness.redeemWriter.consentWriteCalls, 1, 'una sola escritura de consentimiento');
+    assert.equal(harness.redeemWriter.seniors.get(session.seniorId)?.linkStatus, 'LINKED');
   });
 });

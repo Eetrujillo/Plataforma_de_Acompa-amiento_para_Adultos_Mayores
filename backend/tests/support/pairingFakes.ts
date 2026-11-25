@@ -287,6 +287,10 @@ export class InMemoryRedeemSeniorWriter implements RedeemSeniorWriterPort {
     return { failedLoginAttempts: attempts, lockedUntil };
   }
 
+  /**
+   * S7/D14.1: el canje exitoso deja la racha en 0 y `lockedUntil` en null; la
+   * emisión de un QR nuevo llama al mismo método para reiniciar el bloqueo.
+   */
   async clearRedeemFailures(seniorId: string): Promise<void> {
     const senior = this.seniors.get(seniorId);
     if (senior === undefined) return;

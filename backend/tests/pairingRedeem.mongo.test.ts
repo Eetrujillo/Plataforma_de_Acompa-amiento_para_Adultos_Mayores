@@ -281,6 +281,57 @@ mongoTest('S17/D7: un documento legacy sin linkStatus (ya tenía dispositivo) no
   assert.equal(doc['linkStatus'], undefined);
 });
 
+mongoTest('D14: carrera de 8 reclamaciones del mismo token — un solo ganador, usedAt fijo, invalidatedAt intacto', async () => {
+  await clean();
+  const repo = createMongoosePairingTokenRepository();
+  await seedToken({ tokenHash: HASH_A, seniorId: SENIOR_ID });
+
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () => repo.claimUnused(HASH_A, NOW)),
+  );
+  const winners = results.filter((entry) => entry !== null);
+  assert.equal(winners.length, 1, 'exactamente una reclamación ganó la carrera');
+  const winner = winners[0];
+  assert.ok(winner !== undefined);
+  assert.ok(winner.usedAt !== null);
+  assert.equal(winner.usedAt.getTime(), NOW.getTime());
+  assert.equal(winner.invalidatedAt, null);
+
+  const doc = await PairingTokenModel.findOne({ tokenHash: HASH_A }).lean();
+  assert.ok(doc !== null);
+  assert.equal((doc['usedAt'] as Date).getTime(), NOW.getTime(), 'usedAt quedó guardado');
+  assert.equal(doc['invalidatedAt'], null, 'invalidatedAt no se tocó');
+});
+
+mongoTest('D14: carrera de 8 vínculos sobre un perfil PENDING — un LINKED y la evidencia escrita una vez', async () => {
+  await clean();
+  const writer = createMongooseRedeemSeniorWriter();
+  await seedSenior({ seniorId: SENIOR_ID, caregiverId: CAREGIVER_ID });
+  const acceptedTermsAt = new Date(NOW.getTime() + 42_000);
+
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      writer.markLinkedWithConsent({
+        seniorId: SENIOR_ID,
+        acceptedTermsAt,
+        termsVersion: '1.0-test',
+        ipAddress: '203.0.113.9',
+      }),
+    ),
+  );
+  assert.equal(
+    results.filter((entry) => entry === true).length,
+    1,
+    'exactamente una escritura ganó el filtro condicional',
+  );
+  const doc = await UserModel.findById(SENIOR_ID).lean();
+  assert.ok(doc !== null);
+  assert.equal(doc['linkStatus'], 'LINKED');
+  assert.equal((doc['acceptedTermsAt'] as Date).getTime(), acceptedTermsAt.getTime());
+  assert.equal(doc['termsVersion'], '1.0-test');
+  assert.equal(doc['ipAddress'], '203.0.113.9');
+});
+
 // ─── T2/D8: bloqueo por perfil con la forma del login ───────────────────────
 
 mongoTest('D8: registerRedeemFailure cuenta una escritura atómica y fija redeemLockedUntil al llegar al umbral', async () => {

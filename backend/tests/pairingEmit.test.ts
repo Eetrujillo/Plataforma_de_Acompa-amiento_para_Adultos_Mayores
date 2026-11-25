@@ -29,6 +29,7 @@ import { hashPairingToken } from '../src/modules/pairing/domain/pairingToken.ts'
 import {
   FailingQrEncoder,
   InMemoryPairingTokenRepository,
+  InMemoryRedeemSeniorWriter,
   RecordingQrEncoder,
   StaticSeniorReader,
 } from './support/pairingFakes.ts';
@@ -44,6 +45,8 @@ const STRANGER_ID = '507f1f77bcf86cd7994390bb';
 interface Deps {
   reader: StaticSeniorReader;
   tokens: InMemoryPairingTokenRepository;
+  /** D14.1: la emisión comparte el escritor del canje para reiniciar el bloqueo. */
+  writer: InMemoryRedeemSeniorWriter;
   encoder: RecordingQrEncoder | FailingQrEncoder | PairingQrEncoderPort;
   clock: () => Date;
   ttlMinutes: number;
@@ -55,16 +58,18 @@ function makeUseCase(overrides: Partial<Deps> = {}): {
 } {
   const reader = overrides.reader ?? new StaticSeniorReader();
   const tokens = overrides.tokens ?? new InMemoryPairingTokenRepository();
+  const writer = overrides.writer ?? new InMemoryRedeemSeniorWriter();
   const encoder = overrides.encoder ?? new RecordingQrEncoder();
   const clock = overrides.clock ?? (() => new Date(NOW.getTime()));
   const useCase = new GeneratePairingQr({
     seniorReader: reader,
     pairingTokenRepository: tokens,
+    seniorWriter: writer,
     qrEncoder: encoder,
     clock,
     ttlMinutes: overrides.ttlMinutes ?? 1440,
   });
-  return { useCase, deps: { reader, tokens, encoder, clock, ttlMinutes: overrides.ttlMinutes ?? 1440 } };
+  return { useCase, deps: { reader, tokens, writer, encoder, clock, ttlMinutes: overrides.ttlMinutes ?? 1440 } };
 }
 
 function seedPendingProfile(reader: StaticSeniorReader, caregiverId = CAREGIVER_ID): void {
@@ -303,6 +308,57 @@ test('S15: si la escritura del token nuevo falla, el anterior YA quedó inválid
     previous.invalidatedAt !== null,
     'nadie queda con el QR viejo vivo: la emisión fallida lo quemó',
   );
+});
+
+/** Deja el perfil del escritor del canje BLOQUEADO: cinco fallos del pipeline. */
+async function seedLockedProfile(writer: InMemoryRedeemSeniorWriter): Promise<void> {
+  writer.seed(SENIOR_ID);
+  const config = { maxAttempts: 5, lockMs: 15 * 60_000, now: NOW };
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await writer.registerRedeemFailure(SENIOR_ID, config);
+  }
+  const locked = writer.seniors.get(SENIOR_ID);
+  assert.ok(locked !== undefined);
+  assert.equal(locked.redeemFailedAttempts, 5);
+  assert.ok(locked.redeemLockedUntil !== null, 'el doble quedó bloqueado antes de la emisión');
+}
+
+// ─── D14.1: emitir un QR nuevo reinicia el bloqueo del canje ────────────────
+
+test('D14.1: emitir un QR nuevo deja la racha en 0 y quita el bloqueo de canje del perfil', async () => {
+  const { useCase, deps } = makeUseCase();
+  seedPendingProfile(deps.reader);
+  await seedLockedProfile(deps.writer);
+
+  const result = await useCase.execute({ seniorId: SENIOR_ID, caregiverId: CAREGIVER_ID });
+  assert.equal(result.seniorId, SENIOR_ID);
+
+  const senior = deps.writer.seniors.get(SENIOR_ID);
+  assert.ok(senior !== undefined);
+  assert.equal(senior.redeemFailedAttempts, 0, 'la emisión reinicia la racha (D14.1)');
+  assert.equal(senior.redeemLockedUntil, null, 'la emisión levanta el bloqueo');
+  assert.equal(senior.linkStatus, 'PENDING', 'la emisión no toca el vínculo');
+  assert.equal(deps.writer.consentWriteCalls, 0, 'la emisión no escribe consentimiento');
+});
+
+test('D14.1/S13: la emisión con codificador caído (503) no toca el bloqueo del canje', async () => {
+  const { useCase, deps } = makeUseCase({ encoder: new FailingQrEncoder() });
+  seedPendingProfile(deps.reader);
+  await seedLockedProfile(deps.writer);
+
+  await assert.rejects(
+    useCase.execute({ seniorId: SENIOR_ID, caregiverId: CAREGIVER_ID }),
+    (error: unknown) => {
+      const appError = error as { statusCode?: number; code?: string };
+      assert.equal(appError.statusCode, 503);
+      assert.equal(appError.code, 'PAIRING_QR_UNAVAILABLE');
+      return true;
+    },
+  );
+  const senior = deps.writer.seniors.get(SENIOR_ID);
+  assert.ok(senior !== undefined);
+  assert.equal(senior.redeemFailedAttempts, 5, 'un 503 no toca nada del bloqueo');
+  assert.ok(senior.redeemLockedUntil !== null);
 });
 
 // ─── T5: HTTP ────────────────────────────────────────────────────────────────
