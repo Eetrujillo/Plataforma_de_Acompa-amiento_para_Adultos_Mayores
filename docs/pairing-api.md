@@ -135,6 +135,16 @@ condicional: `acceptedTermsAt` (reloj del servidor), `termsVersion` (`TERMS_VERS
 queda vinculado con evidencia, o no queda nada. Quién escribe `LINKED` vive en los detalles de
 `docs/seniors-api.md`.
 
+## Reintento del canje tras una respuesta perdida (REDEEM_RECOVERY_MINUTES)
+
+Si la respuesta `201` nunca llegó al teléfono —conexión caída, app cerrada—, el reintento con el
+MISMO token vuelve a responder `201` con una sesión nueva de `SENIOR` mientras el perfil esté
+`LINKED`, siga del mismo familiar y el reintento llegue dentro de `REDEEM_RECOVERY_MINUTES`
+(default 15) desde `usedAt`. Es el replay de la recuperación (D15.3): no crea vínculo, no escribe
+evidencia, no toca contadores — el token ya estaba quemado y así queda, y el reintento pasa por
+el mismo límite por IP y el mismo bloqueo por perfil (un perfil bloqueado responde `429` aunque el
+token sea recuperable); fuera de la ventana recibe el `409` de siempre.
+
 ## Límite de intentos del canje
 
 Con un token de 32 bytes el espacio de búsqueda deja de ser el problema —el viejo código de 6
