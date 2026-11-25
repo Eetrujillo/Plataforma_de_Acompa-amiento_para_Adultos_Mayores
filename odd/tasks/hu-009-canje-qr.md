@@ -179,24 +179,6 @@ se registra con los campos que fija esa skill, y el cuerpo del canje no los inve
   verificación (carrera de 8 reclamaciones, carrera de 8 vínculos, indistinguibilidad usado/ajeno y
   bloqueo con limpieza posterior).
 
-- **D15 — Un canje completado no puede dejar al perfil sin salida** (corrección pedida por la
-  revisión nativa sobre el hallazgo `R4-1`, CRITICAL e introducido por D14.1). Si el vínculo se
-  escribió y la respuesta no llegó —conexión caída, app cerrada, o el fallo de `clearRedeemFailures`
-  justo después de la escritura irreversible—, el reintento del teléfono recibía el 409 genérico, el
-  perfil quedaba `LINKED` sin sesión y la emisión de un QR nuevo no puede servir porque sólo atiende
-  perfiles `PENDING`: recuperarlo exigía tocar la base a mano. Tres cambios, ninguno afloja el uso
-  único:
-  1. La sesión se firma **antes** de la escritura irreversible (es pura, no puede fallar después).
-  2. Limpiar la racha tras un canje exitoso es **best-effort**: su fallo no convierte un canje
-     completado en error.
-  3. **Replay de recuperación acotado**: un token ya usado, cuyo perfil está `LINKED` y sigue siendo
-     del mismo familiar, dentro de `REDEEM_RECOVERY_MINUTES` (15) desde `usedAt`, vuelve a responder
-     `201` con una sesión nueva. No crea vínculo, no escribe evidencia, no toca contadores: sólo
-     vuelve a firmar lo que el titular ya ganó. Fuera de la ventana se mantiene el `409` genérico, y
-     el throttle por IP y el bloqueo por perfil siguen aplicando al reintento.
-  La ventana acota la exposición: quien fotografió el QR ya podía canjearlo primero, y ahora puede
-  repetirlo durante 15 minutos; pasado ese plazo, no.
-
 ## Tasks
 
 - **T1** · S14-S17, S22 · inline · dominio: mensajes del canje y las reglas de estado del token
