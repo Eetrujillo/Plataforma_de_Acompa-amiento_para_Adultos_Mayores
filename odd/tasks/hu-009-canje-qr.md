@@ -258,3 +258,22 @@ se registra con los campos que fija esa skill, y el cuerpo del canje no los inve
   ajustó la redacción), la carrera perdida contaba como fallo del perfil y el bloqueo no tenía
   escape por emisión (los dos juntos permitían negar la vinculación de un adulto mayor a quien
   tuviera un QR usado: **D14**), y que un cliente que reintente un 400 puede autobloquearse.
+- **L7** — Revisión nativa en dos candidatos encadenados, porque el rango completo (3101 líneas) fue
+  rechazado por el proveedor con `lens_context_budget_exceeded` (sin crear autoridad, `retry_safe`).
+  - `review-2e89e638dbc7f0b9` sobre `d08928a..d09df8f` (956 líneas, la mitad de persistencia), en un
+    worktree temporal: **aprobada y quemada**. Dos advisories no bloqueantes: `R4-lock-extension-per-attempt`
+    (SUGGESTION: cada fallo por encima del umbral empuja el vencimiento del bloqueo, y el comentario
+    dice que preserva la fecha; sólo afecta la disponibilidad del canje) y
+    `R4-token-burn-on-postclaim-failure` (WARNING: una falla entre el reclamo y el vínculo deja el
+    token quemado sin vínculo; falla cerrado y se recupera emitiendo otro QR).
+  - `review-6e029ce7c3be6cf2` sobre `d09df8f..HEAD` (2149 líneas, caso de uso, ruta, config, fix
+    D14): lentes `risk` + `resilience`, **refutador sosteniendo un CRITICAL** (`R4-1`, el varado que
+    motivó D15), corrección acotada de 188 líneas aceptada y **validación aprobada**, autoridad
+    quemada. Cuatro advisories no bloqueantes: `R1-ip-bucket-empty-string` (SUGGESTION),
+    `R1-lockout-dos-expired-qr` (WARNING, el residual de D14 acotado por D14.1/D14.2),
+    `R1-lost-write-no-ip-failure` (SUGGESTION) y `R4-2` (SUGGESTION: el reinicio del bloqueo de D14.1
+    acopla la emisión a la colección del adulto mayor).
+- **L8** — La documentación de D15 entró y salió de la corrección por el presupuesto del proveedor
+  (medía el delta completo: 225 > 200) y volvió restaurada después del cierre con `72efdf3`. Los dos
+  advisories que valen trabajo posterior quedan anotados: el empuje del vencimiento del bloqueo en
+  `MongoosePairingSeniorWriter` y el orden del reinicio del bloqueo en la emisión.
