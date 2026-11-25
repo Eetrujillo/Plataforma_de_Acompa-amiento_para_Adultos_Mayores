@@ -28,4 +28,6 @@ jobs:
             git fetch
             git checkout ${{ secrets.PROD_BRANCH}}
             git pull --ff-only
-            docker compose up -d --build
+            # --remove-orphans: a service removed from the compose file (the web
+            # container, for instance) must not keep running after a deploy.
+            docker compose up -d --build --remove-orphans

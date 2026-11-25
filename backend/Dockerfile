@@ -1,23 +1,18 @@
-FROM node:20-alpine
-
-# Prisma's query engine links against OpenSSL; Alpine images do not ship it.
-RUN apk add --no-cache openssl
+FROM node:22-alpine
 
 WORKDIR /usr/src/app
 
-# Prisma needs the schema before install so the client can be generated.
+# Dependencies first, so the layer cache survives source edits.
 COPY package*.json ./
-COPY prisma ./prisma
+RUN npm ci
 
-RUN npm install --omit=dev
-
-# Generation only resolves the datasource URL, it does not connect.
-ENV DATABASE_URL="mongodb://mongo:27017/mearn_db"
-RUN npx prisma generate
-
-COPY . .
+# TypeScript: compile to dist/ and drop the dev dependencies from the image.
+COPY tsconfig*.json ./
+COPY src ./src
+RUN npm run build
+RUN npm prune --omit=dev
 
 ENV NODE_ENV=production
 EXPOSE 3500
 
-CMD ["npm", "start"]
+CMD ["node", "dist/server.js"]

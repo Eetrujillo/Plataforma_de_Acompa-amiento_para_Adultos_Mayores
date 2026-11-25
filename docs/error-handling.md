@@ -1,0 +1,114 @@
+# Manejo de errores — contrato del backend
+
+Qué devuelve el backend cuando algo falla, qué se loguea del lado servidor y cómo usar el id de
+request para encontrar la causa. Código: `backend/src/shared/middlewares/errorHandler.js`,
+`backend/src/shared/middlewares/requestContext.js`, `backend/src/app.js` y `backend/src/server.js`.
+
+## Forma de la respuesta
+
+Todo error responde con este cuerpo:
+
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "El correo no es válido" } }
+```
+
+`details` aparece **solo** cuando un error operativo lo trae cargado (por ejemplo, una validación
+campo por campo). Nunca se agrega a los errores enmascarados.
+
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "...", "details": { "email": "..." } } }
+```
+
+## Id de correlación (`X-Request-Id`)
+
+Cada request recibe un id antes de llegar a cualquier ruta:
+
+- Si el cliente manda `X-Request-Id` y cumple `^[A-Za-z0-9._-]{8,64}$`, se respeta tal cual.
+- Si no lo manda o no cumple el patrón, se genera uno (`randomUUID`).
+- El id **siempre** vuelve en el header `X-Request-Id` de la respuesta.
+- En los `5xx`, el cuerpo agrega `error.requestId`. En los `4xx` **no**: el cuerpo mantiene su forma
+  habitual.
+
+```json
+{ "error": { "code": "INTERNAL_ERROR", "message": "Unexpected server error", "requestId": "3f2b..." } }
+```
+
+## Tabla de status y código
+
+| Status | `error.code` | Cuándo |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | falta un campo o no cumple su regla; en el canje del QR, un token de vinculación malformado, vencido o invalidado (el mismo mensaje genérico en los tres casos) |
+| `400` | `EMAIL_ALREADY_REGISTERED` | el correo ya tiene cuenta |
+| `400` | `INVALID_JSON` | el cuerpo no es JSON válido (`entity.parse.failed`) |
+| `400` | `SENIOR_ID_REQUIRED` | falta `seniorId` en la emisión del QR de vinculación o no tiene forma de id de Mongo (24 hex) |
+| `401` | `UNAUTHORIZED` | falta o no sirve el token de sesión, o credenciales inválidas en el login |
+| `403` | `EMAIL_NOT_VERIFIED` | la cuenta existe pero no confirmó el correo |
+| `403` | `FORBIDDEN` | el rol de la sesión no tiene permiso sobre la ruta (guard `requireRole`) |
+| `404` | `NOT_FOUND` | ruta o recurso inexistente; en el canje del QR, un token bien formado que la base no conoce (*pairing token not found*) |
+| `404` | `SENIOR_NOT_FOUND` | perfil inexistente, ajeno, mal formado o de otro rol: respuesta idéntica en los cuatro casos |
+| `409` | `CONFLICT` | el estado actual impide la operación; en el canje del QR, el token ya fue canjeado o el perfil del token ya no es del mismo familiar (*pairing token already used*: la respuesta jamás confirma que el id exista) |
+| `409` | `SENIOR_ALREADY_LINKED` | el perfil ya figura vinculado (o es anterior a HU-005, sin `linkStatus`): no se emite un QR nuevo y el canje llega sin quemarlo |
+| `413` | `PAYLOAD_TOO_LARGE` | el cuerpo supera los `100kb` (`entity.too.large`) |
+| `429` | `TOO_MANY_REQUESTS` | se superó el límite de reenvíos de verificación (3 por hora), el límite de pedidos de recuperación de contraseña (3 por hora, HU-004), el límite de fallos de login por IP (`LOGIN_IP_MAX_ATTEMPTS` por ventana) o el límite de intentos del canje por IP (`REDEEM_IP_MAX_ATTEMPTS`, default 20, por ventana de `REDEEM_IP_WINDOW_MINUTES`, default 15; HU-009) |
+| `429` | `ACCOUNT_LOCKED` | la cuenta está bloqueada por intentos fallidos de login (5, 15 minutos) o el perfil del canje está bloqueado por intentos fallidos del QR (`REDEEM_MAX_ATTEMPTS`, default 5; `REDEEM_LOCKOUT_MINUTES`, default 15; HU-009). En los dos casos `details.retryAfterSeconds` trae los segundos restantes y el intento bloqueado no se cuenta |
+| `400` | `WEAK_PASSWORD` | la contraseña no cumple la regla (mínimo 8 caracteres, con al menos una letra y un dígito) |
+| `400` | `TERMS_NOT_ACCEPTED` | la bandera de consentimiento `acceptedTerms` falta o no es `true` (registro del familiar y canje del QR del adulto mayor; Ley 1581) |
+| `400` | `INVALID_EMAIL` | el correo no tiene formato válido (registro, reenvío de verificación o recuperación de contraseña) |
+| `400` | `INVALID_BODY` | falta un campo del cuerpo, no es texto o no es del tipo esperado (en el alta de seniors, `details.field` marca el campo) |
+| `400` | `INVALID_NAME` | el nombre del perfil senior falta, no es texto o queda con menos de 3 caracteres tras normalizar (máximo 120) |
+| `400` | `INVALID_TIMEZONE` | la zona horaria no es una zona IANA válida |
+| `400` | `INVALID_BLOOD_TYPE` | el grupo sanguíneo no está en la enumeración cerrada (`A+ A- B+ B- AB+ AB- O+ O-`); si el campo falta o no es texto, la respuesta es `INVALID_BODY` con `details.field` |
+| `400` | `INVALID_ALLERGIES` | las alergias tienen más de 20 ítems, o un ítem queda vacío o con más de 80 caracteres |
+| `400` | `INVALID_CONDITIONS` | ídem para las condiciones |
+| `400` | `INVALID_MEDICATIONS` | ídem para la medicación |
+| `400` | `INVALID_EMERGENCY_CONTACT` | el contacto de emergencia necesita nombre de 3 a 120 caracteres y teléfono de 6 a 20 con `+`, dígitos, espacios o guiones |
+| `400` | `INVALID_TOKEN` | el enlace de verificación de correo o de restablecimiento de contraseña no sirve: vencido, ya usado, inexistente o malformado (respuesta idéntica en los cuatro casos, sin `details`) |
+| `500` | `INTERNAL_ERROR` | error inesperado, o error de Mongoose o del driver sin traducción |
+| `503` | `DATABASE_NOT_READY` | la base no acepta escrituras: replica set sin iniciar (las transacciones de Mongoose necesitan un replica set; `rs0` es solo el nombre que fija este compose) |
+| `503` | `DATABASE_UNAVAILABLE` | el driver no pudo contactar la base |
+| `503` | `PAIRING_QR_UNAVAILABLE` | no se pudo codificar la imagen del QR de vinculación: no se creó ninguna credencial y el QR anterior sigue vigente |
+
+Un JSON inválido y un cuerpo demasiado grande se traducen a `400`/`413` antes de caer en el `500`
+enmascarado. Las fallas de Mongoose o del driver que no están en la tabla se responden como `500 INTERNAL_ERROR`.
+
+## Lo que nunca llega al cliente
+
+El cliente **no** recibe stack, rutas de archivo, query, ni mensajes internos de Mongoose o del driver.
+Un error no operativo se enmascara como `500 INTERNAL_ERROR` con el mensaje genérico
+`Unexpected server error`.
+
+Del lado servidor se loguea, **solo para los `5xx`**:
+
+```js
+logger.error('[error]', {
+  requestId, method, url, status, code, durationMs,
+  error // el error completo, con stack
+})
+```
+
+Los `4xx` operativos no se loguean como error.
+
+## Caídas del proceso
+
+`unhandledRejection` y `uncaughtException` se manejan igual:
+
+1. Se loguea el nombre, el mensaje y el stack del error.
+2. Se ejecuta el mismo apagado ordenado que con `SIGINT`/`SIGTERM`: cerrar Socket.IO, cerrar el
+   servidor HTTP y desconectar Mongoose.
+3. El proceso sale con código `1`.
+4. Un watchdog de `5s` fuerza la salida con `1` si el apagado no termina; una segunda caída durante
+   el apagado también sale de inmediato con `1`.
+
+Así el proceso no queda vivo en un estado indeterminado y la caída deja rastro.
+
+## Cómo lo usa quien opera
+
+1. La persona usuaria reporta el incidente con el `error.requestId` que vio en pantalla.
+2. Se busca ese id en los logs del backend:
+
+```bash
+docker compose logs backend | grep <id>
+```
+
+La línea `[error]` trae método, ruta, status, código, duración y el error completo con stack, que es
+lo que permite ubicar la causa sin adivinar.
