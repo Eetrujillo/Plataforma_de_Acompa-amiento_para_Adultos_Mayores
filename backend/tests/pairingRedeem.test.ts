@@ -107,6 +107,7 @@ function makeUseCase(options: UseCaseOptions = {}): { useCase: RedeemPairingToke
     sessionToken,
     ipThrottle: throttle,
     lockout: { maxAttempts: 5, lockMs: 15 * 60_000 },
+    recoveryMs: 15 * 60_000,
     clock: { now: () => now },
     termsVersion: options.termsVersion ?? '1.0-test',
   });
@@ -606,6 +607,86 @@ test('D14.2: el perdedor del doble toque simultáneo no cuenta fallo del perfil'
   assert.ok(profile !== undefined);
   assert.equal(profile.redeemFailedAttempts, 0, 'la carrera perdida del token usado no cuenta');
   assert.equal(profile.redeemLockedUntil, null);
+});
+
+// ─── D15: un canje completado no deja al perfil sin salida ─────────────────
+
+test('D15.2: el fallo del contador no toca la respuesta y la firma va antes del vínculo', async () => {
+  const { useCase, deps } = makeUseCase();
+  const token = 'p'.repeat(43);
+  await seedToken(deps, token);
+  seedProfile(deps);
+  deps.writer.clearRedeemFailures = async () => {
+    throw new Error('la escritura del contador falló');
+  };
+  // El canje completado responde 201 aunque la limpieza de la racha falle.
+  const result = await useCase.execute(command({ token }));
+  assert.equal((jwt.verify(result.token, TEST_JWT_SECRET) as Record<string, unknown>)['role'], 'SENIOR');
+
+  // La firma es pura y va antes del vínculo: si revienta, nada se escribe.
+  deps.sessionToken.sign = () => {
+    throw new Error('la firma revienta');
+  };
+  const fresh = 'q'.repeat(43);
+  await seedToken(deps, fresh);
+  await assert.rejects(useCase.execute(command({ token: fresh })), /la firma revienta/);
+  assert.equal(deps.writer.consentWriteCalls, 1, 'con la firma rota no se escribió vínculo');
+});
+
+test('D15.3: el reintento dentro de la ventana recupera la respuesta sin reescribir nada', async () => {
+  const { useCase, deps } = makeUseCase();
+  const token = 'n'.repeat(43);
+  await seedToken(deps, token);
+  seedProfile(deps);
+  await useCase.execute(command({ token }));
+  deps.reader.asLinked(SENIOR_ID);
+  const tokenSnapshot = JSON.stringify(deps.tokens.tokens.get(hashPairingToken(token)));
+  const profileSnapshot = JSON.stringify(deps.writer.seniors.get(SENIOR_ID));
+  deps.advance(60); // un minuto: dentro de la ventana de 15 minutos
+  const replay = await useCase.execute(command({ token }));
+  const claims = jwt.verify(replay.token, TEST_JWT_SECRET) as Record<string, unknown>;
+  assert.equal(claims['role'], 'SENIOR');
+  assert.equal(JSON.stringify(deps.tokens.tokens.get(hashPairingToken(token))), tokenSnapshot,
+    'el token queda byte-idéntico: ni un nuevo usedAt');
+  assert.equal(JSON.stringify(deps.writer.seniors.get(SENIOR_ID)), profileSnapshot,
+    'el perfil no cambia: ni evidencia nueva ni contador movido');
+  assert.equal(deps.writer.consentWriteCalls, 1, 'el replay no vuelve a escribir el vínculo');
+});
+
+test('D15.3: fuera de la ventana vuelve el 409 de siempre; sin el perfil LINKED no hay replay', async () => {
+  const { useCase, deps } = makeUseCase();
+  const token = 'w'.repeat(43);
+  await seedToken(deps, token);
+  seedProfile(deps);
+  await useCase.execute(command({ token }));
+  deps.reader.asLinked(SENIOR_ID);
+  deps.advance(15 * 60 + 1); // un segundo después de la ventana
+  await rejectsApp(useCase.execute(command({ token })),
+    { statusCode: 409, code: 'SENIOR_ALREADY_LINKED', message: LINKED_MESSAGE });
+
+  // Token YA usado con el perfil todavía PENDING: el replay exige LINKED.
+  seedProfile(deps, { seniorId: OTHER_SENIOR_ID });
+  const pending = 'v'.repeat(43);
+  await seedToken(deps, pending, { seniorId: OTHER_SENIOR_ID });
+  const record = deps.tokens.tokens.get(hashPairingToken(pending))!;
+  deps.tokens.tokens.set(hashPairingToken(pending), { ...record, usedAt: NOW });
+  await rejectsApp(useCase.execute(command({ token: pending })),
+    { statusCode: 409, code: 'CONFLICT', message: ALREADY_USED_MESSAGE });
+});
+
+test('D15.3: el bloqueo por perfil también frena el replay — 429 con token recuperable', async () => {
+  const { useCase, deps } = makeUseCase();
+  const token = 'k'.repeat(43);
+  await seedToken(deps, token);
+  seedProfile(deps);
+  await useCase.execute(command({ token }));
+  deps.reader.asLinked(SENIOR_ID);
+  // El bloqueo aparece después del canje: cinco fallos sembrados por el puerto.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await deps.writer.registerRedeemFailure(SENIOR_ID, { maxAttempts: 5, lockMs: 15 * 60_000, now: NOW });
+  }
+  await rejectsApp(useCase.execute(command({ token })),
+    { statusCode: 429, code: 'ACCOUNT_LOCKED', details: { retryAfterSeconds: 900 } });
 });
 
 // ─── D9: throttle por IP ────────────────────────────────────────────────────

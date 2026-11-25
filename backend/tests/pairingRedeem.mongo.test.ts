@@ -18,6 +18,11 @@ import { createMongoosePairingTokenRepository } from '../src/modules/pairing/inf
 import { createMongoosePairingSeniorReader } from '../src/modules/pairing/infrastructure/MongoosePairingSeniorReader.ts';
 import { createMongooseRedeemSeniorWriter } from '../src/modules/pairing/infrastructure/MongoosePairingSeniorWriter.ts';
 import { createMongooseSeniorRepository } from '../src/modules/seniors/index.ts';
+import { RedeemPairingToken } from '../src/modules/pairing/application/RedeemPairingToken.ts';
+import { hashPairingToken } from '../src/modules/pairing/domain/pairingToken.ts';
+import { LoginIpThrottle } from '../src/modules/auth/application/LoginIpThrottle.ts';
+import { JwtTokenService } from '../src/modules/auth/infrastructure/JwtTokenService.ts';
+import jwt from 'jsonwebtoken';
 import { PairingTokenModel } from '../src/shared/models/PairingToken.ts';
 import { UserModel } from '../src/shared/models/User.ts';
 import { SeniorLinkModel } from '../src/shared/models/SeniorLink.ts';
@@ -464,4 +469,41 @@ mongoTest('S17/D6: el lector del canje responde null para el ajeno, el CAREGIVER
   const legacy = await reader.findRedeemSeniorForCaregiver(OTHER_SENIOR_ID, CAREGIVER_ID);
   assert.ok(legacy !== null);
   assert.equal(legacy.linkStatus, null);
+});
+
+// ─── D15: el replay de recuperación contra los adaptadores reales ───────────
+
+mongoTest('D15: el replay del canje con los adaptadores reales responde 201 y no reescribe nada', async () => {
+  await clean();
+  let now = new Date(NOW.getTime());
+  const raw = 'a'.repeat(43);
+  const hash = hashPairingToken(raw);
+  const repo = createMongoosePairingTokenRepository();
+  const useCase = new RedeemPairingToken({
+    tokenRepository: repo,
+    seniorReader: createMongoosePairingSeniorReader(createMongooseSeniorRepository()),
+    seniorWriter: createMongooseRedeemSeniorWriter(),
+    sessionToken: new JwtTokenService('secreto-de-los-pines-de-mongo', '7d'),
+    ipThrottle: new LoginIpThrottle({ now: () => now }, { max: 20, windowMs: 15 * 60_000 }),
+    lockout: { maxAttempts: 5, lockMs: 15 * 60_000 },
+    recoveryMs: 15 * 60_000,
+    clock: { now: () => now },
+    termsVersion: '1.0-test',
+  });
+  await repo.create({ seniorId: SENIOR_ID, caregiverId: CAREGIVER_ID, tokenHash: hash,
+    expiresAt: new Date(NOW.getTime() + 24 * 60 * 60_000) });
+  await seedSenior({ seniorId: SENIOR_ID, caregiverId: CAREGIVER_ID });
+  const redeem = () => useCase.execute({ token: raw, acceptedTerms: true, ipAddress: '203.0.113.9' });
+
+  assert.equal((await redeem()).senior.id, SENIOR_ID);
+  const tokenSnapshot = JSON.stringify(await PairingTokenModel.findOne({ tokenHash: hash }).lean());
+  const userSnapshot = JSON.stringify(await UserModel.findById(SENIOR_ID).lean());
+  now = new Date(now.getTime() + 60_000); // un minuto después: dentro de la ventana
+
+  const replay = await redeem();
+  assert.equal((jwt.verify(replay.token, 'secreto-de-los-pines-de-mongo') as { role?: string }).role, 'SENIOR');
+  assert.equal(JSON.stringify(await PairingTokenModel.findOne({ tokenHash: hash }).lean()),
+    tokenSnapshot, 'ni un nuevo usedAt en el token');
+  assert.equal(JSON.stringify(await UserModel.findById(SENIOR_ID).lean()),
+    userSnapshot, 'ni evidencia nueva ni contador movido en el perfil');
 });

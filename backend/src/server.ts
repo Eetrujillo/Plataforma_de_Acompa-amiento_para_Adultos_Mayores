@@ -111,6 +111,7 @@ async function main(): Promise<void> {
       redeemLockoutMinutes: env.redeemLockoutMinutes,
       redeemIpMaxAttempts: env.redeemIpMaxAttempts,
       redeemIpWindowMinutes: env.redeemIpWindowMinutes,
+      redeemRecoveryMinutes: env.redeemRecoveryMinutes,
     },
     { trustProxyHops: env.trustProxyHops },
   );

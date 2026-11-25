@@ -45,6 +45,8 @@ export interface AppEnv {
   redeemLockoutMinutes: number;
   redeemIpMaxAttempts: number;
   redeemIpWindowMinutes: number;
+  /** D15.3: ventana del replay de recuperación (`REDEEM_RECOVERY_MINUTES`). */
+  redeemRecoveryMinutes: number;
   /** SMTP para el correo de verificación; sin host el canal es console (D4). */
   smtp: {
     host: string | null;
@@ -199,6 +201,8 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     redeemLockoutMinutes: readPositiveInt(source, 'REDEEM_LOCKOUT_MINUTES', 15),
     redeemIpMaxAttempts: readPositiveInt(source, 'REDEEM_IP_MAX_ATTEMPTS', 20),
     redeemIpWindowMinutes: readPositiveInt(source, 'REDEEM_IP_WINDOW_MINUTES', 15),
+    // D15.3: el reintento que recupera una respuesta perdida tiene 15 minutos.
+    redeemRecoveryMinutes: readPositiveInt(source, 'REDEEM_RECOVERY_MINUTES', 15),
     smtp: {
       host: readOptionalString(source, 'SMTP_HOST'),
       port: readInt(source, 'SMTP_PORT', 587),

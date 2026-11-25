@@ -15,9 +15,11 @@
  *      genérico, desambiguado con una lectura posterior (D5). Uno ya usado no
  *      cuenta como fallo del perfil (D14.2): sólo la credencial inservible por
  *      vencimiento o invalidación acumula.
- *   8. Escritura del vínculo con la evidencia (D4/D7). Si falla, el token ya
+ *   8. Sesión de SENIOR firmada por el módulo auth (D10): es pura y va ANTES
+ *      de la escritura irreversible (D15.2) — nada puede fallar después.
+ *   9. Escritura del vínculo con la evidencia (D4/D7). Si falla, el token ya
  *      quedó quemado: falla cerrado (S18) y el error sube como 500.
- *   9. Contador limpio y sesión de SENIOR firmada por el módulo auth (D10).
+ *  10. Contador limpio best-effort (D15.2): su fallo no toca la respuesta.
  */
 import { AppError } from '../../../shared/errors/AppError.ts';
 import { ACCOUNT_LOCKED_MESSAGE, LOGIN_IP_LIMIT_MESSAGE } from '../../auth/application/Login.ts';
@@ -80,6 +82,8 @@ export interface RedeemPairingTokenDeps {
   ipThrottle: LoginIpLimitPort;
   /** D8: `REDEEM_MAX_ATTEMPTS` (5) / `REDEEM_LOCKOUT_MINUTES` (15). */
   lockout: LockoutConfig;
+  /** D15.3: ventana del replay en ms (`REDEEM_RECOVERY_MINUTES` × 60 000). */
+  recoveryMs: number;
   clock: Clock;
   /** `TERMS_VERSION` de la config (D4). */
   termsVersion: string;
@@ -94,6 +98,7 @@ export class RedeemPairingToken {
   private readonly sessionToken: SessionTokenPort;
   private readonly ipThrottle: LoginIpLimitPort;
   private readonly lockout: LockoutConfig;
+  private readonly recoveryMs: number;
   private readonly clock: Clock;
   private readonly termsVersion: string;
 
@@ -104,8 +109,16 @@ export class RedeemPairingToken {
     this.sessionToken = deps.sessionToken;
     this.ipThrottle = deps.ipThrottle;
     this.lockout = deps.lockout;
+    this.recoveryMs = deps.recoveryMs;
     this.clock = deps.clock;
     this.termsVersion = deps.termsVersion;
+  }
+
+  /** D10: los claims de la sesión del titular, firmados en un único lugar. */
+  private signSeniorSession(profile: RedeemSeniorProfile): string {
+    return this.sessionToken.sign(
+      sessionClaims({ id: profile.id, email: profile.email, role: 'SENIOR', sessionVersion: profile.sessionVersion }),
+    );
   }
 
   async execute(command: RedeemPairingTokenCommand): Promise<RedeemPairingTokenResult> {
@@ -154,6 +167,26 @@ export class RedeemPairingToken {
     }
     if (profile.linkStatus !== 'PENDING') {
       // El `null` del legacy ya tenía dispositivo: también va por acá.
+      // D15.3: replay de recuperación — el reintento de una respuesta que nunca
+      // llegó: token YA usado, perfil LINKED del dueño, dentro de la ventana;
+      // mismo throttle por IP y mismo bloqueo. No escribe NADA: re-firma.
+      const usedAt = record.usedAt;
+      if (
+        profile.linkStatus === 'LINKED' && usedAt !== null &&
+        now.getTime() - usedAt.getTime() <= this.recoveryMs
+      ) {
+        const lockState = (await this.seniorWriter.redeemLockoutState(profile.id)) ?? LOCKED_OUT_STATE;
+        const verdict = evaluateLockout(lockState, now);
+        if (verdict.locked) {
+          throw new AppError(429, 'ACCOUNT_LOCKED', ACCOUNT_LOCKED_MESSAGE, {
+            retryAfterSeconds: verdict.retryAfterSeconds,
+          });
+        }
+        return {
+          token: this.signSeniorSession(profile),
+          senior: buildResponseSenior(profile, record),
+        };
+      }
       this.ipThrottle.recordFailure(ip);
       throw new AppError(409, 'SENIOR_ALREADY_LINKED', SENIOR_ALREADY_LINKED_MESSAGE);
     }
@@ -181,6 +214,8 @@ export class RedeemPairingToken {
     // D4/D7: LINKED + evidencia en LA MISMA escritura condicional. Si falla
     // acá, el token ya está quemado (S18: falla cerrado) y el error sube — el
     // errorHandler lo enmascara como 500 y el familiar emite otro QR.
+    // D15.2: la sesión es pura — se firma ANTES de la escritura irreversible.
+    const session = this.signSeniorSession(profile);
     const linked = await this.seniorWriter.markLinkedWithConsent({
       seniorId: profile.id,
       acceptedTermsAt: now,
@@ -193,17 +228,13 @@ export class RedeemPairingToken {
       throw new AppError(409, 'CONFLICT', PAIRING_TOKEN_ALREADY_USED_MESSAGE);
     }
 
-    // S7: el canje exitoso deja la racha en 0.
-    await this.seniorWriter.clearRedeemFailures(profile.id);
-
-    const session = this.sessionToken.sign(
-      sessionClaims({
-        id: profile.id,
-        email: profile.email,
-        role: 'SENIOR',
-        sessionVersion: profile.sessionVersion,
-      }),
-    );
+    // S7/D15.2: limpiar la racha es best-effort — un canje completado no se
+    // convierte en error por el contador (cosmético tras el éxito).
+    try {
+      await this.seniorWriter.clearRedeemFailures(profile.id);
+    } catch {
+      // la racha se limpia en la próxima oportunidad (otro éxito o emisión)
+    }
     return {
       token: session,
       senior: buildResponseSenior(profile, record),

@@ -93,6 +93,8 @@ export interface PairingDependencies {
   redeemIpMaxAttempts: number;
   /** `REDEEM_IP_WINDOW_MINUTES` (D9, default 15). */
   redeemIpWindowMinutes: number;
+  /** D15.3: ventana del replay de recuperación (REDEEM_RECOVERY_MINUTES, default 15); opcional. */
+  redeemRecoveryMinutes?: number;
   /**
    * Límite por IP del canje (D9, instancia propia). Opcional para que un test
    * inyecte el suyo: si falta, el montaje construye el in-memory de auth con
@@ -148,6 +150,7 @@ export function buildPairingRouter(
         maxAttempts: deps.redeemMaxAttempts,
         lockMs: deps.redeemLockoutMinutes * 60_000,
       },
+      recoveryMs: (deps.redeemRecoveryMinutes ?? 15) * 60_000,
       clock,
       termsVersion: deps.termsVersion,
     }),
