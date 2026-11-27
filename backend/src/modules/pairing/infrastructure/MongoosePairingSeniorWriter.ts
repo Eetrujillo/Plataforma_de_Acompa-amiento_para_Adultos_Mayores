@@ -1,16 +1,26 @@
 /**
- * HU-009 / D7-D8 — adaptador Mongoose del escritor del perfil del canje, sobre
- * el MISMO documento `User` del adulto mayor que el resto de la plataforma.
+ * HU-009 / D7-D8 — adaptadores Mongoose del canje, sobre el MISMO documento
+ * `User` del adulto mayor que el resto de la plataforma. Dos fábricas, dos
+ * puertos, un mismo documento:
  *
- * - `markLinkedWithConsent`: la transición `PENDING → LINKED` con la evidencia
- *   de la Ley 1581 en LA MISMA escritura condicional (D4). El filtro
+ * - `createMongooseRedeemSeniorWriter` — el VÍNCULO (D7):
+ *   `markLinkedWithConsent` hace la transición `PENDING → LINKED` con la
+ *   evidencia de la Ley 1581 en LA MISMA escritura condicional (D4). El filtro
  *   `linkStatus: 'PENDING'` es lo que evita el doble vínculo aunque dos canjes
  *   ganen carreras distintas; un documento legacy sin el campo no matchea
  *   (falla cerrado — el lector del canje ya lo cuenta como vinculado).
- * - Racha y bloqueo del canje (D8) espejan el pipeline atómico de
- *   `registerFailedLogin` (HU-003): cada llamada cuenta exactamente un fallo,
- *   un bloqueo ya vencido reinicia la racha y la MISMA operación fija
- *   `lockedUntil` al llegar al umbral.
+ * - `createMongoosePairingLockout` — la RACHA y el BLOQUEO (D8), espejando el
+ *   pipeline atómico de `registerFailedLogin` (HU-003): cada llamada cuenta
+ *   exactamente un fallo, un bloqueo ya vencido reinicia la racha y la MISMA
+ *   operación fija `lockedUntil` al llegar al umbral.
+ *   Un bloqueo YA activo conserva su vencimiento: un fallo más allá del umbral
+ *   (la carrera de un pedido que ya estaba en vuelo) cuenta en la racha pero no
+ *   corre la fecha. Si la corriera, reintentar extendería el bloqueo de quince
+ *   minutos sin límite y el adulto mayor no podría canjear ni con un QR nuevo
+ *   hasta dejar de reintentar (advisory `R4-lock-extension-per-attempt`).
+ *
+ * La separación de fábricas es del advisory `R4-2`: emitir el QR sólo necesita
+ * reiniciar la racha, no el escritor del vínculo.
  */
 import { UserModel } from '../../../shared/models/User.ts';
 import type { RegisterFailedLoginConfig } from '../../auth/application/Login.ts';
@@ -19,6 +29,7 @@ import type {
   RedeemSeniorWriterPort,
   SeniorConsentWrite,
 } from '../application/RedeemSeniorWriterPort.ts';
+import type { PairingLockoutPort } from '../application/PairingLockoutPort.ts';
 
 /** Proyección de la racha del canje (HU-009/D8). */
 interface RedeemLockoutProjection {
@@ -31,6 +42,7 @@ interface PersistedLockedDoc extends RedeemLockoutProjection {
   redeemLockedUntil: Date | null;
 }
 
+/** D7: la transición con evidencia, sin el bloqueo. */
 export function createMongooseRedeemSeniorWriter(): RedeemSeniorWriterPort {
   return {
     async markLinkedWithConsent(write: SeniorConsentWrite): Promise<boolean> {
@@ -50,7 +62,12 @@ export function createMongooseRedeemSeniorWriter(): RedeemSeniorWriterPort {
       ).lean<unknown>();
       return stored !== null;
     },
+  };
+}
 
+/** D8: la racha y el bloqueo del canje por perfil. */
+export function createMongoosePairingLockout(): PairingLockoutPort {
+  return {
     async redeemLockoutState(seniorId: string): Promise<LockoutState | null> {
       const doc = await UserModel.findById(seniorId)
         .select('redeemFailedAttempts redeemLockedUntil')
@@ -95,7 +112,20 @@ export function createMongooseRedeemSeniorWriter(): RedeemSeniorWriterPort {
             redeemLockedUntil: {
               $cond: [
                 { $gte: [{ $add: ['$__streak', 1] }, config.maxAttempts] },
-                { $add: [config.now, config.lockMs] },
+                {
+                  // Bloqueo ya activo → se conserva la fecha del umbral; sólo
+                  // se arma una fecha nueva cuando el umbral se alcanza ahora.
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ['$redeemLockedUntil', null] },
+                        { $gt: ['$redeemLockedUntil', config.now] },
+                      ],
+                    },
+                    '$redeemLockedUntil',
+                    { $add: [config.now, config.lockMs] },
+                  ],
+                },
                 null,
               ],
             },

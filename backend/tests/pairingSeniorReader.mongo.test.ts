@@ -129,7 +129,7 @@ function emission(reader: ReturnType<typeof createMongoosePairingSeniorReader>) 
     seniorReader: reader,
     pairingTokenRepository: tokens,
     // D14.1: emitir reinicia el bloqueo del canje de ese perfil.
-    seniorWriter: new InMemoryRedeemSeniorWriter(),
+    lockout: new InMemoryRedeemSeniorWriter(),
     qrEncoder: encoder,
     clock: () => NOW,
     ttlMinutes: TTL_MINUTES,

@@ -14,7 +14,7 @@ import {
   SENIOR_ID_REQUIRED_MESSAGE,
 } from './pairingMessages.ts';
 import type { SeniorProfileReaderPort } from './SeniorProfileReaderPort.ts';
-import type { RedeemSeniorWriterPort } from './RedeemSeniorWriterPort.ts';
+import type { PairingLockoutPort } from './PairingLockoutPort.ts';
 import type {
   PairingTokenRepositoryPort,
 } from './PairingTokenRepositoryPort.ts';
@@ -49,13 +49,17 @@ export interface GeneratePairingQrCommand {
  * documentado del bloqueo de canje (D14.1): el mismo flujo de emisión
  * reinicia la racha y el `lockedUntil` del perfil, y lo hace DESPUÉS de
  * codificar el QR, así que un 503 no toca nada del bloqueo.
+ *
+ * Por el advisory `R4-2` la emisión depende de `PairingLockoutPort`, no del
+ * escritor del vínculo del canje: reiniciar una racha es lo único que necesita
+ * del documento del adulto mayor.
  */
 export class GeneratePairingQr {
   private readonly seniorReader: SeniorProfileReaderPort;
   private readonly pairingTokenRepository: PairingTokenRepositoryPort;
   private readonly qrEncoder: PairingQrEncoderPort;
-  /** D14.1: el MISMO escritor del slice que administra la racha del canje. */
-  private readonly seniorWriter: RedeemSeniorWriterPort;
+  /** D14.1: el puerto del bloqueo del canje, no el escritor del vínculo. */
+  private readonly lockout: PairingLockoutPort;
   private readonly clock: () => Date;
   private readonly ttlMinutes: number;
 
@@ -63,8 +67,8 @@ export class GeneratePairingQr {
     seniorReader: SeniorProfileReaderPort;
     pairingTokenRepository: PairingTokenRepositoryPort;
     qrEncoder: PairingQrEncoderPort;
-    /** D14.1: escritor del canje (el de `redeemSeniorWriter`), no uno nuevo. */
-    seniorWriter: RedeemSeniorWriterPort;
+    /** D14.1: el puerto del bloqueo del canje del slice (D8), no uno nuevo. */
+    lockout: PairingLockoutPort;
     clock: () => Date;
     /** TTL del token en minutos: la config (`PAIRING_TTL_MINUTES`), no un valor fijo. */
     ttlMinutes: number;
@@ -72,7 +76,7 @@ export class GeneratePairingQr {
     this.seniorReader = deps.seniorReader;
     this.pairingTokenRepository = deps.pairingTokenRepository;
     this.qrEncoder = deps.qrEncoder;
-    this.seniorWriter = deps.seniorWriter;
+    this.lockout = deps.lockout;
     this.clock = deps.clock;
     this.ttlMinutes = deps.ttlMinutes;
   }
@@ -113,8 +117,8 @@ export class GeneratePairingQr {
     // documentada («el familiar emite otro QR»): la MISMA emisión reinicia la
     // racha y el bloqueo de canje de ese perfil, para que el QR nuevo no
     // conteste 429. Va después del QR codificado (S13: el 503 de un codificador
-    // caído no tocó nada) y reusa `clearRedeemFailures` del escritor del canje.
-    await this.seniorWriter.clearRedeemFailures(command.seniorId);
+    // caído no tocó nada) y reusa `clearRedeemFailures` del puerto del bloqueo.
+    await this.lockout.clearRedeemFailures(command.seniorId);
     // 6. Se persiste el HASH con el vencimiento (S5). Si falla acá, los
     // anteriores ya quedaron inválidos: falla cerrado, sin QR vivo.
     await this.pairingTokenRepository.create({

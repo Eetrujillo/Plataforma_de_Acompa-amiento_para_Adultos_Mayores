@@ -13,6 +13,7 @@ import { createMongooseSeniorRepository } from './modules/seniors/index.ts';
 import {
   createMongoosePairingSeniorReader,
   createMongoosePairingTokenRepository,
+  createMongoosePairingLockout,
   createMongooseRedeemSeniorWriter,
   createPairingQrEncoder,
 } from './modules/pairing/index.ts';
@@ -61,9 +62,11 @@ async function main(): Promise<void> {
   // instancia del repositorio de seniors (D4): una sola fuente de verdad.
   const pairingTokenRepository = createMongoosePairingTokenRepository();
   const pairingSeniorReader = createMongoosePairingSeniorReader(seniorRepository);
-  // HU-009: el escritor del canje administra la transición LINKED + evidencia
-  // y el bloqueo por perfil (D7/D8) sobre el propio documento del senior.
+  // HU-009: dos puertos, el mismo documento del senior — el escritor del canje
+  // hace la transición LINKED + evidencia (D7) y el del bloqueo administra la
+  // racha por perfil (D8), que la emisión del QR también reinicia (D14.1).
   const redeemSeniorWriter = createMongooseRedeemSeniorWriter();
+  const pairingLockout = createMongoosePairingLockout();
   const app = buildApp(
     {
       userRepository,
@@ -107,6 +110,7 @@ async function main(): Promise<void> {
       // la arma buildApp con el puerto del módulo auth (D10).
       redeemProfileReader: pairingSeniorReader,
       redeemSeniorWriter,
+      pairingLockout,
       redeemMaxAttempts: env.redeemMaxAttempts,
       redeemLockoutMinutes: env.redeemLockoutMinutes,
       redeemIpMaxAttempts: env.redeemIpMaxAttempts,

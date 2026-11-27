@@ -16,7 +16,10 @@ import { connect, disconnect, Types, type Mongoose } from 'mongoose';
 
 import { createMongoosePairingTokenRepository } from '../src/modules/pairing/infrastructure/MongoosePairingTokenRepository.ts';
 import { createMongoosePairingSeniorReader } from '../src/modules/pairing/infrastructure/MongoosePairingSeniorReader.ts';
-import { createMongooseRedeemSeniorWriter } from '../src/modules/pairing/infrastructure/MongoosePairingSeniorWriter.ts';
+import {
+  createMongoosePairingLockout,
+  createMongooseRedeemSeniorWriter,
+} from '../src/modules/pairing/infrastructure/MongoosePairingSeniorWriter.ts';
 import { createMongooseSeniorRepository } from '../src/modules/seniors/index.ts';
 import { RedeemPairingToken } from '../src/modules/pairing/application/RedeemPairingToken.ts';
 import { hashPairingToken } from '../src/modules/pairing/domain/pairingToken.ts';
@@ -341,7 +344,7 @@ mongoTest('D14: carrera de 8 vínculos sobre un perfil PENDING — un LINKED y l
 
 mongoTest('D8: registerRedeemFailure cuenta una escritura atómica y fija redeemLockedUntil al llegar al umbral', async () => {
   await clean();
-  const writer = createMongooseRedeemSeniorWriter();
+  const lockout = createMongoosePairingLockout();
   const senior = await UserModel.create({
     email: 'bloqueo@seniors.local',
     fullName: 'Rosa Pérez',
@@ -352,15 +355,15 @@ mongoTest('D8: registerRedeemFailure cuenta una escritura atómica y fija redeem
   const lockedUntilExpected = new Date(NOW.getTime() + 15 * 60_000);
 
   for (let attempt = 1; attempt <= 10; attempt += 1) {
-    const last = await writer.registerRedeemFailure(seniorId, config);
+    const last = await lockout.registerRedeemFailure(seniorId, config);
     assert.ok(last !== null);
     if (attempt < 5) {
       assert.equal(last.failedLoginAttempts, attempt);
       assert.equal(last.lockedUntil, null);
     } else {
       // El quinto dispara el bloqueo; los siguientes siguen contando por
-      // encima del umbral y conservan (re-fijan) el mismo lockedUntil, tal
-      // como el pipeline del login de HU-003.
+      // encima del umbral y conservan el lockedUntil del umbral. Con `now` fijo
+      // este pin no distingue «conservar» de «re-fijar»; el pin siguiente sí.
       assert.equal(last.failedLoginAttempts, attempt);
       assert.ok(last.lockedUntil !== null);
       assert.equal(last.lockedUntil.getTime(), lockedUntilExpected.getTime());
@@ -372,9 +375,51 @@ mongoTest('D8: registerRedeemFailure cuenta una escritura atómica y fija redeem
   assert.equal((doc['redeemLockedUntil'] as Date).getTime(), lockedUntilExpected.getTime());
 });
 
+mongoTest('D8: un fallo por encima del umbral NO corre el vencimiento de un bloqueo ya activo', async () => {
+  await clean();
+  const lockout = createMongoosePairingLockout();
+  const senior = await UserModel.create({
+    email: 'corre@seniors.local',
+    fullName: 'Rosa Pérez',
+    role: 'SENIOR',
+  });
+  const seniorId = senior._id.toString();
+
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    await lockout.registerRedeemFailure(seniorId, {
+      maxAttempts: 5,
+      lockMs: 15 * 60_000,
+      now: NOW,
+    });
+  }
+  const lockedUntilThreshold = new Date(NOW.getTime() + 15 * 60_000);
+  assert.deepEqual(await lockout.redeemLockoutState(seniorId), {
+    failedLoginAttempts: 5,
+    lockedUntil: lockedUntilThreshold,
+  });
+
+  // Cinco minutos DESPUÉS del umbral entra otro fallo: la carrera del cliente
+  // que ya tenía el pedido en vuelo cuando el 429 lo frenó. Cuenta en la racha,
+  // pero NO mueve la fecha: el bloqueo dura 15 minutos desde el quinto fallo,
+  // no desde el último intento (si lo corriera, reintentar lo haría eterno).
+  const later = await lockout.registerRedeemFailure(seniorId, {
+    maxAttempts: 5,
+    lockMs: 15 * 60_000,
+    now: new Date(NOW.getTime() + 5 * 60_000),
+  });
+  assert.ok(later !== null);
+  assert.equal(later.failedLoginAttempts, 6);
+  assert.ok(later.lockedUntil !== null);
+  assert.equal(
+    later.lockedUntil.getTime(),
+    lockedUntilThreshold.getTime(),
+    'el bloqueo activo conserva su vencimiento: un intento más no lo corre cinco minutos',
+  );
+});
+
 mongoTest('D8: un bloqueo ya vencido reinicia la racha y redeemLockoutState la lee', async () => {
   await clean();
-  const writer = createMongooseRedeemSeniorWriter();
+  const lockout = createMongoosePairingLockout();
   const senior = await UserModel.create({
     email: 'racha@seniors.local',
     fullName: 'Rosa Pérez',
@@ -383,22 +428,22 @@ mongoTest('D8: un bloqueo ya vencido reinicia la racha y redeemLockoutState la l
   const seniorId = senior._id.toString();
   const config = { maxAttempts: 5, lockMs: 15 * 60_000, now: NOW };
 
-  assert.deepEqual(await writer.redeemLockoutState(seniorId), {
+  assert.deepEqual(await lockout.redeemLockoutState(seniorId), {
     failedLoginAttempts: null,
     lockedUntil: null,
   });
 
   for (let attempt = 1; attempt <= 5; attempt += 1) {
-    await writer.registerRedeemFailure(seniorId, config);
+    await lockout.registerRedeemFailure(seniorId, config);
   }
-  const locked = await writer.redeemLockoutState(seniorId);
+  const locked = await lockout.redeemLockoutState(seniorId);
   assert.ok(locked !== null);
   assert.equal(locked.failedLoginAttempts, 5);
   assert.ok(locked.lockedUntil !== null);
 
   // El reloj avanza más allá del bloqueo: el siguiente fallo reinicia la
   // racha (fallos consecutivos) y deja el bloqueo en null.
-  const after = await writer.registerRedeemFailure(seniorId, {
+  const after = await lockout.registerRedeemFailure(seniorId, {
     maxAttempts: 5,
     lockMs: 15 * 60_000,
     now: new Date(NOW.getTime() + 16 * 60_000),
@@ -410,7 +455,7 @@ mongoTest('D8: un bloqueo ya vencido reinicia la racha y redeemLockoutState la l
 
 mongoTest('D8/S7: clearRedeemFailures deja la racha en 0 y lockedUntil en null; senior inexistente no revienta', async () => {
   await clean();
-  const writer = createMongooseRedeemSeniorWriter();
+  const lockout = createMongoosePairingLockout();
   const senior = await UserModel.create({
     email: 'limpia@seniors.local',
     fullName: 'Rosa Pérez',
@@ -418,18 +463,18 @@ mongoTest('D8/S7: clearRedeemFailures deja la racha en 0 y lockedUntil en null; 
   });
   const seniorId = senior._id.toString();
   const config = { maxAttempts: 5, lockMs: 15 * 60_000, now: NOW };
-  await writer.registerRedeemFailure(seniorId, config);
-  await writer.registerRedeemFailure(seniorId, config);
+  await lockout.registerRedeemFailure(seniorId, config);
+  await lockout.registerRedeemFailure(seniorId, config);
 
-  await writer.clearRedeemFailures(seniorId);
-  const state = await writer.redeemLockoutState(seniorId);
+  await lockout.clearRedeemFailures(seniorId);
+  const state = await lockout.redeemLockoutState(seniorId);
   assert.ok(state !== null);
   assert.equal(state.failedLoginAttempts, 0);
   assert.equal(state.lockedUntil, null);
 
   // Sin el documento que limpiar, la escritura matchea cero y no revienta
   // (id válido pero inexistente).
-  await writer.clearRedeemFailures('507f1f77bcf86cd799439099');
+  await lockout.clearRedeemFailures('507f1f77bcf86cd799439099');
 });
 
 // ─── T2/D11: el lector del canje trae los campos de la respuesta S13 ───────
@@ -483,9 +528,10 @@ mongoTest('D15: el replay del canje con los adaptadores reales responde 201 y no
     tokenRepository: repo,
     seniorReader: createMongoosePairingSeniorReader(createMongooseSeniorRepository()),
     seniorWriter: createMongooseRedeemSeniorWriter(),
+    lockout: createMongoosePairingLockout(),
     sessionToken: new JwtTokenService('secreto-de-los-pines-de-mongo', '7d'),
     ipThrottle: new LoginIpThrottle({ now: () => now }, { max: 20, windowMs: 15 * 60_000 }),
-    lockout: { maxAttempts: 5, lockMs: 15 * 60_000 },
+    lockoutConfig: { maxAttempts: 5, lockMs: 15 * 60_000 },
     recoveryMs: 15 * 60_000,
     clock: { now: () => now },
     termsVersion: '1.0-test',

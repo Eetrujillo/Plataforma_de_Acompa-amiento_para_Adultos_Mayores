@@ -104,9 +104,10 @@ function makeUseCase(options: UseCaseOptions = {}): { useCase: RedeemPairingToke
     tokenRepository: tokens,
     seniorReader: reader,
     seniorWriter: writer,
+    lockout: writer,
     sessionToken,
     ipThrottle: throttle,
-    lockout: { maxAttempts: 5, lockMs: 15 * 60_000 },
+    lockoutConfig: { maxAttempts: 5, lockMs: 15 * 60_000 },
     recoveryMs: 15 * 60_000,
     clock: { now: () => now },
     termsVersion: options.termsVersion ?? '1.0-test',
@@ -919,6 +920,14 @@ test('S14 (HTTP): desconocido → 404; malformado → 400; vencido → 400; inva
     const invalidated = await post(base, REDEEM, { token: session.qrToken, acceptedTerms: true });
     assert.equal(invalidated.status, 400);
     assert.equal(errorEnvelope(invalidated.json).message, INVALID_MESSAGE);
+    // HU-010/S14 (criterio 2): reemplazado y vencido son indistinguibles. No
+    // alcanza con que el mensaje coincida: la respuesta ENTERA va byte a byte,
+    // porque un `code`, un `details` o un campo extra delataría cuál fue.
+    assert.equal(
+      invalidated.text,
+      expired.text,
+      'un token reemplazado responde byte-idéntico a uno vencido: no se distingue cuál fue',
+    );
     // Y el nuevo sí canjea.
     const ok = await post(base, REDEEM, { token: newToken, acceptedTerms: true });
     assert.equal(ok.status, 201, `cuerpo: ${ok.text}`);

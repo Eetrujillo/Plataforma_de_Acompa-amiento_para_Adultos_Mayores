@@ -277,3 +277,32 @@ se registra con los campos que fija esa skill, y el cuerpo del canje no los inve
   (medía el delta completo: 225 > 200) y volvió restaurada después del cierre con `72efdf3`. Los dos
   advisories que valen trabajo posterior quedan anotados: el empuje del vencimiento del bloqueo en
   `MongoosePairingSeniorWriter` y el orden del reinicio del bloqueo en la emisión.
+- **L9** — Cierre de los dos advisories no bloqueantes de L7, por pedido del humano («hardening
+  primero»), en la rama `fix/pairing-lockout-advisories`.
+  - `R4-lock-extension-per-attempt`: el pipeline de `registerRedeemFailure` re-armaba
+    `redeemLockedUntil = now + lockMs` en cada intento **en o por encima** del umbral, así que un
+    cliente que reintentaba después del 429 corría el bloqueo de quince minutos sin límite. Ahora un
+    bloqueo ya activo **conserva** la fecha que se fijó al alcanzar el umbral y sólo se arma una
+    ventana nueva cuando el bloqueo anterior ya venció. El pin que existía no podía verlo: usaba
+    `now` fijo en los diez intentos, así que «re-fijar» y «conservar» daban el mismo valor. El pin
+    nuevo (Rojo observado antes del cambio: `el bloqueo activo conserva su vencimiento`) mueve el
+    reloj cinco minutos y exige la fecha del umbral.
+  - `R4-2`: se extrajo `PairingLockoutPort` (`application/PairingLockoutPort.ts`) con la racha, el
+    fallo y el reinicio. `RedeemSeniorWriterPort` queda con un solo deber —`markLinkedWithConsent`—
+    y `GeneratePairingQr` pide el puerto del bloqueo en vez del escritor del vínculo: emitir ya no
+    depende del slice del canje. `RedeemPairingToken` recibe los dos puertos y su campo de
+    configuración pasó a `lockoutConfig` para no colisionar con el puerto. Que el contador siga en
+    el documento del adulto mayor es decisión de D8, no acoplamiento: el adaptador Mongoose tiene
+    dos fábricas, `createMongooseRedeemSeniorWriter` y `createMongoosePairingLockout`, sobre el
+    mismo modelo.
+  - Hallazgo colateral registrado, **no** corregido: el bloqueo de login de HU-003
+    (`MongooseUserRepository.registerFailedLogin`) re-arma la fecha con el mismo patrón. No se tocó
+    porque HU-003 está aprobada y su 429 frena el intento antes de contarlo, así que la extensión
+    sólo es alcanzable por la misma carrera. Si se corrige, que sea con su propio pin y su propio
+    round.
+  - `R1-lockout-dos-expired-qr` (WARNING) sigue en pie tal como se acotó en D14.1/D14.2: el residual
+    es un bloqueo de perfil por parte de quien tenga un QR usado, con la emisión como escape.
+  - Checks del padre: `typecheck` y `build` verdes; `npm test` **247/247** con replica set real y
+    **216 pass + 31 skipped** sin base. Sin cambio de contrato HTTP ni de comportamiento del login,
+    así que no se corrió diferencial.
+  - `Risk: none`.
