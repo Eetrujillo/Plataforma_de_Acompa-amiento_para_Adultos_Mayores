@@ -8,6 +8,7 @@ import type {
   SeniorProfileReaderPort,
 } from './application/SeniorProfileReaderPort.ts';
 import type { RedeemSeniorWriterPort } from './application/RedeemSeniorWriterPort.ts';
+import type { PairingLockoutPort } from './application/PairingLockoutPort.ts';
 import type { Clock } from '../auth/application/RegisterCaregiver.ts';
 import type { LoginIpLimitPort, SessionTokenPort } from '../auth/application/Login.ts';
 import { LoginIpThrottle } from '../auth/application/LoginIpThrottle.ts';
@@ -16,13 +17,17 @@ import { createPairingRoutes } from './infrastructure/pairingRoutes.ts';
 import type { PairingUseCases } from './infrastructure/PairingController.ts';
 import { createMongoosePairingTokenRepository } from './infrastructure/MongoosePairingTokenRepository.ts';
 import { createMongoosePairingSeniorReader } from './infrastructure/MongoosePairingSeniorReader.ts';
-import { createMongooseRedeemSeniorWriter } from './infrastructure/MongoosePairingSeniorWriter.ts';
+import {
+  createMongoosePairingLockout,
+  createMongooseRedeemSeniorWriter,
+} from './infrastructure/MongoosePairingSeniorWriter.ts';
 import { createPairingQrEncoder } from './infrastructure/QrGenerator.ts';
 import { PAIRING_TOKEN_TTL_MINUTES } from './domain/pairingToken.ts';
 
 export { createMongoosePairingTokenRepository };
 export { createMongoosePairingSeniorReader };
 export { createMongooseRedeemSeniorWriter };
+export { createMongoosePairingLockout };
 export { createPairingQrEncoder };
 export { GeneratePairingQr } from './application/GeneratePairingQr.ts';
 export type { PairingQrResult } from './application/GeneratePairingQr.ts';
@@ -41,6 +46,7 @@ export type {
   RedeemSeniorWriterPort,
   SeniorConsentWrite,
 } from './application/RedeemSeniorWriterPort.ts';
+export type { PairingLockoutPort } from './application/PairingLockoutPort.ts';
 export { PAIRING_TOKEN_TTL_MINUTES } from './domain/pairingToken.ts';
 
 /**
@@ -77,12 +83,14 @@ export interface PairingDependencies {
    * dobles distintos porque la emisión y el canje leen distinto.
    */
   redeemProfileReader: RedeemProfileReaderPort;
-  /**
-   * Escritor del vínculo y del bloqueo por perfil (D7/D8), mongoose o doble.
-   * D14.1: la emisión lo comparte — al emitir un QR nuevo reinicia la racha y
-   * el bloqueo de canje del perfil con el mismo `clearRedeemFailures`.
-   */
+  /** Escritor del VÍNCULO del canje (D7), mongoose o doble. */
   redeemSeniorWriter: RedeemSeniorWriterPort;
+  /**
+   * La racha y el bloqueo del canje por perfil (D8). Puerto propio desde el
+   * advisory `R4-2`: la emisión lo comparte (D14.1) sin depender del escritor
+   * del vínculo, y en producción ambas fábricas tocan el mismo documento.
+   */
+  pairingLockout: PairingLockoutPort;
   /** `TERMS_VERSION` de la config (D4): la evidencia del consentimiento. */
   termsVersion: string;
   /** `REDEEM_MAX_ATTEMPTS` (D8, default 5): 5 fallos bloquean el perfil. */
@@ -129,9 +137,9 @@ export function buildPairingRouter(
       seniorReader: deps.pairingSeniorReader,
       pairingTokenRepository: deps.pairingTokenRepository,
       qrEncoder: deps.qrEncoder,
-      // D14.1: la emisión comparte el escritor del canje — el MISMO que usa el
-      // bloqueo por perfil — para reiniciar la racha al emitir un QR nuevo.
-      seniorWriter: deps.redeemSeniorWriter,
+      // D14.1: emitir reinicia la racha del canje de ese perfil. Pide el puerto
+      // del bloqueo, no el escritor del vínculo (advisory `R4-2`).
+      lockout: deps.pairingLockout,
       clock: deps.clock,
       ttlMinutes: deps.pairingTtlMinutes ?? PAIRING_TOKEN_TTL_MINUTES,
     }),
@@ -139,6 +147,7 @@ export function buildPairingRouter(
       tokenRepository: deps.pairingTokenRepository,
       seniorReader: deps.redeemProfileReader,
       seniorWriter: deps.redeemSeniorWriter,
+      lockout: deps.pairingLockout,
       sessionToken: composition.sessionToken,
       ipThrottle:
         deps.redeemIpThrottle ??
@@ -146,7 +155,7 @@ export function buildPairingRouter(
           max: deps.redeemIpMaxAttempts,
           windowMs: deps.redeemIpWindowMinutes * 60_000,
         }),
-      lockout: {
+      lockoutConfig: {
         maxAttempts: deps.redeemMaxAttempts,
         lockMs: deps.redeemLockoutMinutes * 60_000,
       },

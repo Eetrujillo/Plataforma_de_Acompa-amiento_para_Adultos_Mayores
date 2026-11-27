@@ -23,6 +23,7 @@ import type {
   RedeemSeniorWriterPort,
   SeniorConsentWrite,
 } from '../../src/modules/pairing/application/RedeemSeniorWriterPort.ts';
+import type { PairingLockoutPort } from '../../src/modules/pairing/application/PairingLockoutPort.ts';
 import type { LinkStatus } from '../../src/modules/seniors/domain/seniorProfile.ts';
 import type { RegisterFailedLoginConfig } from '../../src/modules/auth/application/Login.ts';
 import type { LockoutState, NextLockoutState } from '../../src/modules/auth/domain/loginLockout.ts';
@@ -214,11 +215,14 @@ export interface RedeemSeniorWriterState {
 }
 
 /**
- * HU-009 — doble del escritor del canje (D7/D8): la transición LINKED con la
- * evidencia en una sola escritura condicional y la racha/bloqueo del canje
- * espejando el pipeline del login (un bloqueo ya vencido reinicia la racha).
+ * HU-009 — doble del escritor del canje y del bloqueo (D7/D8). Un objeto, dos
+ * puertos: el vínculo con la evidencia en una sola escritura condicional y la
+ * racha/bloqueo espejando el pipeline del login (un bloqueo ya vencido reinicia
+ * la racha; uno activo conserva su fecha).
  */
-export class InMemoryRedeemSeniorWriter implements RedeemSeniorWriterPort {
+export class InMemoryRedeemSeniorWriter
+  implements RedeemSeniorWriterPort, PairingLockoutPort
+{
   readonly seniors = new Map<string, RedeemSeniorWriterState>();
   /** Las escrituras recibidas por `markLinkedWithConsent`, en orden. */
   readonly consentWrites: SeniorConsentWrite[] = [];
@@ -273,12 +277,18 @@ export class InMemoryRedeemSeniorWriter implements RedeemSeniorWriterPort {
     const senior = this.seniors.get(seniorId);
     if (senior === undefined) return null;
     // Espeja el pipeline del login (HU-003/D8): un bloqueo ya vencido
-    // reinicia la racha; el umbral fija lockedUntil en la misma escritura.
-    const expired =
-      senior.redeemLockedUntil !== null && senior.redeemLockedUntil.getTime() <= config.now.getTime();
+    // reinicia la racha; el umbral fija lockedUntil en la misma escritura y un
+    // bloqueo ya activo conserva su fecha (advisory `R4-lock-extension-per-attempt`).
+    const stored = senior.redeemLockedUntil;
+    const active = stored !== null && stored.getTime() > config.now.getTime();
+    const expired = stored !== null && !active;
     const attempts = (expired ? 0 : (senior.redeemFailedAttempts ?? 0)) + 1;
     const lockedUntil =
-      attempts >= config.maxAttempts ? new Date(config.now.getTime() + config.lockMs) : null;
+      attempts >= config.maxAttempts
+        ? active
+          ? stored
+          : new Date(config.now.getTime() + config.lockMs)
+        : null;
     this.seniors.set(seniorId, {
       ...senior,
       redeemFailedAttempts: attempts,

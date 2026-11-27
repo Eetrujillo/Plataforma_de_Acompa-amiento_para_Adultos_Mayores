@@ -45,7 +45,7 @@ const STRANGER_ID = '507f1f77bcf86cd7994390bb';
 interface Deps {
   reader: StaticSeniorReader;
   tokens: InMemoryPairingTokenRepository;
-  /** D14.1: la emisión comparte el escritor del canje para reiniciar el bloqueo. */
+  /** D14.1: la emisión pide el bloqueo del canje para reiniciar la racha. */
   writer: InMemoryRedeemSeniorWriter;
   encoder: RecordingQrEncoder | FailingQrEncoder | PairingQrEncoderPort;
   clock: () => Date;
@@ -64,7 +64,7 @@ function makeUseCase(overrides: Partial<Deps> = {}): {
   const useCase = new GeneratePairingQr({
     seniorReader: reader,
     pairingTokenRepository: tokens,
-    seniorWriter: writer,
+    lockout: writer,
     qrEncoder: encoder,
     clock,
     ttlMinutes: overrides.ttlMinutes ?? 1440,

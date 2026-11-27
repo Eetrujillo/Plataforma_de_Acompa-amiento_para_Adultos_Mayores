@@ -537,6 +537,9 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
       // HU-009: canje con los dobles y los límites del contrato, salvo override.
       redeemProfileReader,
       redeemSeniorWriter,
+      // HU-009/D8 + advisory R4-2: el bloqueo del canje es su propio puerto; el
+      // doble implementa los dos, así que es el mismo objeto.
+      pairingLockout: redeemSeniorWriter,
       redeemMaxAttempts: options.redeemMaxAttempts ?? 5,
       redeemLockoutMinutes: options.redeemLockoutMinutes ?? 15,
       redeemIpMaxAttempts: options.redeemIpMaxAttempts ?? 20,

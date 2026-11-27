@@ -43,6 +43,7 @@ import {
 import type { PairingTokenRepositoryPort, PairingTokenRecord } from './PairingTokenRepositoryPort.ts';
 import type { RedeemProfileReaderPort, RedeemSeniorProfile } from './SeniorProfileReaderPort.ts';
 import type { RedeemSeniorWriterPort } from './RedeemSeniorWriterPort.ts';
+import type { PairingLockoutPort } from './PairingLockoutPort.ts';
 
 export interface RedeemPairingTokenCommand {
   /** El token crudo del cuerpo: la forma la valida el caso de uso (S12). */
@@ -75,13 +76,16 @@ export interface RedeemPairingTokenResult {
 export interface RedeemPairingTokenDeps {
   tokenRepository: PairingTokenRepositoryPort;
   seniorReader: RedeemProfileReaderPort;
+  /** D7: el vínculo PENDING → LINKED con la evidencia, y nada más. */
   seniorWriter: RedeemSeniorWriterPort;
+  /** D8: la racha y el bloqueo del canje, puerto propio (advisory `R4-2`). */
+  lockout: PairingLockoutPort;
   /** D10: el único firmante es el módulo auth; nadie arma un JWT a mano. */
   sessionToken: SessionTokenPort;
   /** D9: in-memory, instancia propia del canje, reloj inyectado. */
   ipThrottle: LoginIpLimitPort;
   /** D8: `REDEEM_MAX_ATTEMPTS` (5) / `REDEEM_LOCKOUT_MINUTES` (15). */
-  lockout: LockoutConfig;
+  lockoutConfig: LockoutConfig;
   /** D15.3: ventana del replay en ms (`REDEEM_RECOVERY_MINUTES` × 60 000). */
   recoveryMs: number;
   clock: Clock;
@@ -95,9 +99,10 @@ export class RedeemPairingToken {
   private readonly tokenRepository: PairingTokenRepositoryPort;
   private readonly seniorReader: RedeemProfileReaderPort;
   private readonly seniorWriter: RedeemSeniorWriterPort;
+  private readonly lockout: PairingLockoutPort;
   private readonly sessionToken: SessionTokenPort;
   private readonly ipThrottle: LoginIpLimitPort;
-  private readonly lockout: LockoutConfig;
+  private readonly lockoutConfig: LockoutConfig;
   private readonly recoveryMs: number;
   private readonly clock: Clock;
   private readonly termsVersion: string;
@@ -106,9 +111,10 @@ export class RedeemPairingToken {
     this.tokenRepository = deps.tokenRepository;
     this.seniorReader = deps.seniorReader;
     this.seniorWriter = deps.seniorWriter;
+    this.lockout = deps.lockout;
     this.sessionToken = deps.sessionToken;
     this.ipThrottle = deps.ipThrottle;
-    this.lockout = deps.lockout;
+    this.lockoutConfig = deps.lockoutConfig;
     this.recoveryMs = deps.recoveryMs;
     this.clock = deps.clock;
     this.termsVersion = deps.termsVersion;
@@ -175,7 +181,7 @@ export class RedeemPairingToken {
         profile.linkStatus === 'LINKED' && usedAt !== null &&
         now.getTime() - usedAt.getTime() <= this.recoveryMs
       ) {
-        const lockState = (await this.seniorWriter.redeemLockoutState(profile.id)) ?? LOCKED_OUT_STATE;
+        const lockState = (await this.lockout.redeemLockoutState(profile.id)) ?? LOCKED_OUT_STATE;
         const verdict = evaluateLockout(lockState, now);
         if (verdict.locked) {
           throw new AppError(429, 'ACCOUNT_LOCKED', ACCOUNT_LOCKED_MESSAGE, {
@@ -193,7 +199,7 @@ export class RedeemPairingToken {
 
     // D8/S7: bloqueo por perfil, antes del reclamo — el intento bloqueado no
     // quema el QR ni se cuenta.
-    const lockState = (await this.seniorWriter.redeemLockoutState(profile.id)) ?? LOCKED_OUT_STATE;
+    const lockState = (await this.lockout.redeemLockoutState(profile.id)) ?? LOCKED_OUT_STATE;
     const verdict = evaluateLockout(lockState, now);
     if (verdict.locked) {
       throw new AppError(429, 'ACCOUNT_LOCKED', ACCOUNT_LOCKED_MESSAGE, {
@@ -231,7 +237,7 @@ export class RedeemPairingToken {
     // S7/D15.2: limpiar la racha es best-effort — un canje completado no se
     // convierte en error por el contador (cosmético tras el éxito).
     try {
-      await this.seniorWriter.clearRedeemFailures(profile.id);
+      await this.lockout.clearRedeemFailures(profile.id);
     } catch {
       // la racha se limpia en la próxima oportunidad (otro éxito o emisión)
     }
@@ -272,15 +278,15 @@ export class RedeemPairingToken {
     if (state === 'EXPIRED' || state === 'INVALIDATED') {
       // D8: credencial inservible por vencimiento o invalidación — ésta sí
       // cuenta como fallo del perfil (D14.2).
-      const persisted = await this.seniorWriter.registerRedeemFailure(seniorId, {
-        maxAttempts: this.lockout.maxAttempts,
-        lockMs: this.lockout.lockMs,
+      const persisted = await this.lockout.registerRedeemFailure(seniorId, {
+        maxAttempts: this.lockoutConfig.maxAttempts,
+        lockMs: this.lockoutConfig.lockMs,
         now,
       });
       if (persisted !== null && persisted.lockedUntil !== null) {
         // El intento que dispara el bloqueo ya responde 429, como en el login.
         throw new AppError(429, 'ACCOUNT_LOCKED', ACCOUNT_LOCKED_MESSAGE, {
-          retryAfterSeconds: lockoutRetrySeconds(this.lockout),
+          retryAfterSeconds: lockoutRetrySeconds(this.lockoutConfig),
         });
       }
     }

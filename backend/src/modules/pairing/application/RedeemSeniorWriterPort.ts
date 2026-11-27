@@ -1,18 +1,14 @@
 /**
- * HU-009 / D7-D8 — puerto del escritor del perfil del canje. Dos deberes sobre
- * el MISMO documento `User` del adulto mayor:
+ * HU-009 / D7 — puerto del escritor del VÍNCULO del canje. Un solo deber sobre
+ * el documento `User` del adulto mayor: la transición `PENDING → LINKED` con la
+ * evidencia de la Ley 1581 (D4) en la MISMA escritura condicional — o el perfil
+ * queda vinculado con evidencia, o no queda nada (nunca un vínculo sin
+ * consentimiento).
  *
- * 1. La transición `PENDING → LINKED` con la evidencia de la Ley 1581 (D4) en
- *    la MISMA escritura condicional: o el perfil queda vinculado con
- *    evidencia, o no queda nada (nunca un vínculo sin consentimiento).
- * 2. El bloqueo por perfil (D8), con la forma del bloqueo de login: contador y
- *    fecha de bloqueo sobre el propio documento, contados por el adaptador en
- *    una escritura atómica — no en memoria.
+ * El bloqueo por perfil de D8 NO vive acá: tiene su propio puerto
+ * (`PairingLockoutPort`), porque la emisión del QR lo necesita sin ser parte del
+ * canje (advisory `R4-2`).
  */
-import type { LockoutState, NextLockoutState } from '../../auth/domain/loginLockout.ts';
-import type { RegisterFailedLoginConfig } from '../../auth/application/Login.ts';
-
-/** La evidencia que el servidor arma (D4): el cliente no inventa ninguno. */
 export interface SeniorConsentWrite {
   readonly seniorId: string;
   readonly acceptedTermsAt: Date;
@@ -29,24 +25,4 @@ export interface RedeemSeniorWriterPort {
    * distintas. `true` tiene que implicar la evidencia escrita.
    */
   markLinkedWithConsent(write: SeniorConsentWrite): Promise<boolean>;
-
-  /** D8: la racha y el bloqueo tal como el documento los guarda. */
-  redeemLockoutState(seniorId: string): Promise<LockoutState | null>;
-
-  /**
-   * D8: incrementa la racha exactamente una vez, reiniciándola si el bloqueo
-   * previo ya venció, y fija `lockedUntil` en la MISMA operación al llegar al
-   * umbral. Devuelve el estado persistido; `null` si el perfil ya no existe.
-   */
-  registerRedeemFailure(
-    seniorId: string,
-    config: RegisterFailedLoginConfig,
-  ): Promise<NextLockoutState | null>;
-
-  /**
-   * S7/D14.1: el canje exitoso deja la racha en 0 y `lockedUntil` en `null`;
-   * la emisión de un QR nuevo la usa para el mismo reinicio — el escape
-   * documentado del bloqueo de canje («el familiar emite otro QR»).
-   */
-  clearRedeemFailures(seniorId: string): Promise<void>;
 }
