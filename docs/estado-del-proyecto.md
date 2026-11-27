@@ -490,7 +490,7 @@ Leyenda: ✅ implementado y probado · 🟡 parcial · ❌ no iniciado
 | HU-007 | Perfil del adulto mayor con ficha médica | ✅ | `createSenior` como única fábrica, ficha médica en ruta propia, sin PIN |
 | HU-008 | Generar el QR de vinculación | ✅ | Backend completo: token 32 bytes, PNG data URL, invalidación previa, `503` cerrado |
 | HU-009 | Vincular el dispositivo con consentimiento | ✅ | Canje de un solo uso, consentimiento previo obligatorio, bloqueo tras 5 fallos, recuperación de respuesta perdida |
-| HU-010 | Regenerar el QR | 🟡 | La emisión ya invalida los tokens anteriores del perfil; falta endpoint propio de regeneración y la UI |
+| HU-010 | Regenerar el QR | ✅ | Backend completo en `POST /api/pairing/qr`: emitir invalida los no usados, reemplazado responde byte-idéntico a vencido, `expiresAt` real. Los dos criterios del panel son del cliente, que no existe |
 | HU-011 | Red de cuidadores y asignación | ❌ | Sólo existe la lectura de cuidadores de un perfil (`GET /:id/caregivers`) |
 | HU-012 | Reasignación y desvinculación | ❌ | El modelo soporta `REVOKED`; no hay flujo |
 
@@ -558,8 +558,11 @@ En este orden, por dependencia y no por gusto:
    agente que llegue después.
 2. **Agregar `npm test` y `npm run typecheck` al workflow** de `prod`, o a un workflow de PR que no
    despliegue.
-3. **Cerrar HU-010 en backend**: endpoint de regeneración explícito (la invalidación ya existe, falta
-   la ruta y su contrato en `docs/pairing-api.md`).
+3. **Revisar el estado real de HU-010**: este documento afirmaba que faltaba un «endpoint de
+   regeneración explícito», y es falso — `docs/pairing-api.md:8` documenta `POST /api/pairing/qr`
+   como emisión de HU-008 **y** regeneración de HU-010, y la emisión ya invalida los tokens previos.
+   Lo que faltaba era el pin de paridad reemplazado/vencido (agregado en `pairingRedeem.test.ts`),
+   no una ruta nueva.
 4. **Arrancar el proyecto React Native** con la base compartida (TypeScript, cliente HTTP, modelos de
    dominio) y **dos navegadores raíz separados**, empezando por la app del adulto mayor y su pantalla
    de vinculación (HU-009), que es lo único que hoy puede consumir el backend tal como está.
